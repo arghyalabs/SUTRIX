@@ -77,101 +77,105 @@ class ScientificPipelineController:
     @staticmethod
     async def curate_columns(context: PipelineContext, columns_to_drop: List[str]) -> Dict[str, Any]:
         async with context._lock:
-            df = context.load_slice()
-            if columns_to_drop:
-                cols_existing = [c for c in columns_to_drop if c in df.columns]
-                if cols_existing:
-                    df = df.drop(columns=cols_existing)
-                    parquet_path = parquet_engine.convert_dataframe_to_parquet(df, f"curated_{context.workspace_id}")
-                    context.parquet_path = parquet_path
-                    context.dataframe_cache = df
-                    context.add_trace("curate")
-                    
-            row_count = len(df)
-            col_names = list(df.columns)
-            preview_data = df.head(10).fillna("").to_dict(orient="records")
-            
-            clean_memory()
-            
+            import asyncio
+            loop = asyncio.get_running_loop()
+
+            def _do_curate():
+                df = context.load_slice()
+                if columns_to_drop:
+                    cols_existing = [c for c in columns_to_drop if c in df.columns]
+                    if cols_existing:
+                        df = df.drop(columns=cols_existing)
+                        pp = parquet_engine.convert_dataframe_to_parquet(df, f"curated_{context.workspace_id}")
+                        context.parquet_path = pp
+                        context.dataframe_cache = df
+                        context.add_trace("curate")
+                return (
+                    len(df),
+                    list(df.columns),
+                    df.head(10).fillna("").to_dict(orient="records"),
+                    context.parquet_path,
+                )
+
+            row_count, col_names, preview_data, parquet_path = await loop.run_in_executor(None, _do_curate)
+
             return {
                 "success": True,
                 "row_count": row_count,
                 "columns": col_names,
                 "preview": preview_data,
-                "parquet_path": context.parquet_path
+                "parquet_path": parquet_path
             }
 
     @staticmethod
     async def apply_column_mapping(context: PipelineContext, mappings: Dict[str, str]) -> Dict[str, Any]:
         async with context._lock:
             ScientificPipelineController.validate_stage_transition(context, "mapping")
-            
-            df = context.load_slice()
-            final_mappings = mappings.copy()
-            
-            val_col = next((k for k, v in mappings.items() if v == 'value'), None)
-            if val_col and val_col in df.columns:
-                from backend.utils.qualifier_parser import QualifierParser
-                parser = QualifierParser()
-                
-                q_vals, q_quals, q_units, q_qsar = [], [], [], []
-                for val in df[val_col]:
-                    res = parser.parse(val)
-                    if res:
-                        q_vals.append(res.value)
-                        q_quals.append(res.qualifier.value if res.qualifier else None)
-                        q_units.append(res.unit)
-                        q_qsar.append(res.qsar_ready)
-                    else:
-                        q_vals.append(float('nan'))
-                        q_quals.append(None)
-                        q_units.append("")
-                        q_qsar.append(False)
-                
-                # Assign derived columns to DataFrame
-                df[f"{val_col}_numeric"] = q_vals
-                df[f"{val_col}_qualifier"] = q_quals
-                df[f"{val_col}_unit"] = q_units
-                df[f"{val_col}_qsar_ready"] = q_qsar
-                
-                # Update bindings
-                final_mappings[f"{val_col}_numeric"] = 'value'
-                final_mappings[f"{val_col}_qualifier"] = 'qualifier'
-                
-                # Automatically map units if not already mapped
-                has_unit_mapping = any(v == 'unit' for v in mappings.values())
-                if not has_unit_mapping:
-                    final_mappings[f"{val_col}_unit"] = 'unit'
-                
-                # Map the original value column to none (ignored)
-                final_mappings[val_col] = 'none'
-                
-                # --- SMILES Canonicalization (Streamlit Parity) ---
-                from backend.core.scientific_runtime import ScientificRuntime
-                smiles_col = next((k for k, v in final_mappings.items() if v in ['canonical_smiles', 'smiles']), None)
-                if smiles_col and smiles_col in df.columns:
-                    df[smiles_col] = df[smiles_col].astype(str).apply(ScientificRuntime.canonicalize_smiles)
-                
-                # Save optimized parquet
-                parquet_path = parquet_engine.convert_dataframe_to_parquet(df, f"mapped_{context.workspace_id}")
-                context.parquet_path = parquet_path
-                context.dataframe_cache = df
-            
-            context.mappings = final_mappings
-            context.add_trace("mapping")
-            
-            # --- Ecotoxicology Ontologies Enriched Layer ---
-            from backend.core.ecotox.ecotox_classifier import EcotoxClassifier
-            dataset_type = EcotoxClassifier.classify_dataset_type(list(df.columns), final_mappings)
-            warnings = EcotoxClassifier.validate_toxicological_safety(final_mappings, list(df.columns))
-            
-            return {
-                "success": True, 
-                "mappings": final_mappings,
-                "columns": list(df.columns),
-                "dataset_type": dataset_type,
-                "warnings": warnings
-            }
+            import asyncio
+            loop = asyncio.get_running_loop()
+
+            def _do_mapping():
+                df = context.load_slice()
+                final_mappings = mappings.copy()
+
+                val_col = next((k for k, v in mappings.items() if v == 'value'), None)
+                if val_col and val_col in df.columns:
+                    from backend.utils.qualifier_parser import QualifierParser
+                    parser = QualifierParser()
+
+                    q_vals, q_quals, q_units, q_qsar = [], [], [], []
+                    for val in df[val_col]:
+                        res = parser.parse(val)
+                        if res:
+                            q_vals.append(res.value)
+                            q_quals.append(res.qualifier.value if res.qualifier else None)
+                            q_units.append(res.unit)
+                            q_qsar.append(res.qsar_ready)
+                        else:
+                            q_vals.append(float('nan'))
+                            q_quals.append(None)
+                            q_units.append("")
+                            q_qsar.append(False)
+
+                    df[f"{val_col}_numeric"] = q_vals
+                    df[f"{val_col}_qualifier"] = q_quals
+                    df[f"{val_col}_unit"] = q_units
+                    df[f"{val_col}_qsar_ready"] = q_qsar
+
+                    final_mappings[f"{val_col}_numeric"] = 'value'
+                    final_mappings[f"{val_col}_qualifier"] = 'qualifier'
+
+                    has_unit_mapping = any(v == 'unit' for v in mappings.values())
+                    if not has_unit_mapping:
+                        final_mappings[f"{val_col}_unit"] = 'unit'
+                    final_mappings[val_col] = 'none'
+
+                    # SMILES canonicalization
+                    from backend.core.scientific_runtime import ScientificRuntime
+                    smiles_col = next((k for k, v in final_mappings.items() if v in ['canonical_smiles', 'smiles']), None)
+                    if smiles_col and smiles_col in df.columns:
+                        df[smiles_col] = df[smiles_col].astype(str).apply(ScientificRuntime.canonicalize_smiles)
+
+                    parquet_path = parquet_engine.convert_dataframe_to_parquet(df, f"mapped_{context.workspace_id}")
+                    context.parquet_path = parquet_path
+                    context.dataframe_cache = df
+
+                context.mappings = final_mappings
+                context.add_trace("mapping")
+
+                from backend.core.ecotox.ecotox_classifier import EcotoxClassifier
+                dataset_type = EcotoxClassifier.classify_dataset_type(list(df.columns), final_mappings)
+                warnings = EcotoxClassifier.validate_toxicological_safety(final_mappings, list(df.columns))
+
+                return {
+                    "success": True,
+                    "mappings": final_mappings,
+                    "columns": list(df.columns),
+                    "dataset_type": dataset_type,
+                    "warnings": warnings,
+                }
+
+            return await loop.run_in_executor(None, _do_mapping)
 
     @staticmethod
     async def perform_segmentation(
@@ -300,21 +304,24 @@ class ScientificPipelineController:
     async def run_readiness_analysis(context: PipelineContext) -> Dict[str, Any]:
         async with context._lock:
             ScientificPipelineController.validate_stage_transition(context, "readiness")
-            df = context.load_slice()
-            
-            scorer = DatasetReadinessScorer()
-            drs_res = scorer.evaluate(df, context.mappings)
-            harmonization_res = ScientificIntelligenceEngine.audit_endpoint_harmonization(df, context.mappings)
-            
-            results = {
-                "score": drs_res["score"],
-                "tier": drs_res["tier"],
-                "breakdown": drs_res["breakdown"],
-                "deductions": drs_res["deductions"],
-                "harmonized": harmonization_res["harmonized"],
-                "findings": harmonization_res["findings"]
-            }
-            
+            import asyncio
+            loop = asyncio.get_running_loop()
+
+            def _do_readiness():
+                df = context.load_slice()
+                scorer = DatasetReadinessScorer()
+                drs_res = scorer.evaluate(df, context.mappings)
+                harmonization_res = ScientificIntelligenceEngine.audit_endpoint_harmonization(df, context.mappings)
+                return {
+                    "score": drs_res["score"],
+                    "tier": drs_res["tier"],
+                    "breakdown": drs_res["breakdown"],
+                    "deductions": drs_res["deductions"],
+                    "harmonized": harmonization_res["harmonized"],
+                    "findings": harmonization_res["findings"],
+                }
+
+            results = await loop.run_in_executor(None, _do_readiness)
             context.readiness_results = results
             context.add_trace("readiness")
             context.flush_memory()
