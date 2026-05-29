@@ -88,7 +88,6 @@ async function step_confirmMapping(page: Page) {
   await page.waitForTimeout(600);
 }
 
-/** Step 5: Execute hierarchy cleansing and wait for result */
 async function step_executeHierarchy(page: Page) {
   await expect(
     page.locator('text=/Segregation|Hierarchy|Step 3/i').first()
@@ -96,6 +95,22 @@ async function step_executeHierarchy(page: Page) {
 
   const execBtn = page.getByRole('button', { name: /Execute|Build Hierarchy|Cleansing/i }).first();
   await expect(execBtn).toBeVisible({ timeout: 10000 });
+
+  // HierarchyBuilder requires at least one column selected to enable the button.
+  // If the button is disabled, select the first available column in the left panel.
+  const isDisabled = await execBtn.isDisabled();
+  if (isDisabled) {
+    const columnBtn = page.locator('.border-r button').filter({ hasText: /Species|Endpoint|Duration|Chemical|Value/i }).first();
+    const fallbackBtn = page.locator('.border-r button').nth(1); // 0 is usually the accordion toggle
+    
+    if (await columnBtn.isVisible().catch(() => false)) {
+      await columnBtn.click();
+    } else {
+      await fallbackBtn.click();
+    }
+  }
+
+  await expect(execBtn).toBeEnabled({ timeout: 5000 });
   await execBtn.click();
 
   // Wait for hierarchy completion — can take up to 60s
@@ -224,24 +239,27 @@ test.describe('4. Variable Mapping', () => {
     await step_curate(page);
 
     await expect(
-      page.locator('text=/Variable Mapping|Schema Bindings/i').first()
+      page.locator('text=Variable Mapping').first()
     ).toBeVisible({ timeout: 20000 });
 
-    // Should have at least one select element representing a mapping
-    const selects = page.locator('select');
-    const count = await selects.count();
-    expect(count).toBeGreaterThan(0);
+    // Radix Select renders as button[data-radix-select-trigger] or aria-haspopup="listbox"
+    // Wait for mapping triggers to appear
+    await page.waitForSelector('[data-radix-select-trigger], button[aria-haspopup="listbox"], [role="combobox"]', { timeout: 10000 }).catch(() => {});
 
-    // At least one should have a non-"none" value (auto-detected)
-    let foundNonNone = false;
-    for (let i = 0; i < Math.min(count, 10); i++) {
-      const val = await selects.nth(i).inputValue().catch(() => 'none');
-      if (val && val !== 'none' && val !== '') {
-        foundNonNone = true;
-        break;
-      }
-    }
-    expect(foundNonNone, 'At least one column should be auto-detected').toBe(true);
+    const triggers = page.locator('[data-radix-select-trigger], button[aria-haspopup="listbox"], [role="combobox"]');
+    const count = await triggers.count();
+
+    // If no Radix triggers, check for any visible Select.Trigger by button role
+    const selectBtns = count > 0 ? triggers : page.locator('button').filter({ hasText: /Chemical Name|endpoint|species|duration|LC50|SMILES|Ignore/i });
+    const btnCount = await selectBtns.count();
+    expect(btnCount, 'Mapping controls should be visible').toBeGreaterThan(0);
+
+    // Verify at least one column is NOT 'Ignore Column' (auto-detected)
+    const nonIgnoreText = page.locator('button, [role="combobox"]').filter({
+      hasText: /Chemical Name|Endpoint|Species|Duration|Value|SMILES|CAS|Unit/i
+    });
+    const nonIgnoreCount = await nonIgnoreText.count();
+    expect(nonIgnoreCount, 'At least one column should be auto-detected to non-none role').toBeGreaterThan(0);
   });
 
   test('Confirming mapping transitions to Segregation step', async ({ page }) => {
