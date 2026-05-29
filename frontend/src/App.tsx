@@ -114,6 +114,8 @@ const App: React.FC = () => {
   // ── Upload processing state ──────────────────────────────────
   const [isUploadProcessing, setIsUploadProcessing] = useState(false);
   const [uploadJobId, setUploadJobId] = useState<string | null>(null);
+  // Ref for synchronous access in WS listener (avoids stale-closure race)
+  const uploadJobIdRef = useRef<string | null>(null);
   const [uploadStage, setUploadStage] = useState('');
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -125,10 +127,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const wsState = socket as any;
     const rawMsg = wsState?.lastMessage;
-    if (!rawMsg || !uploadJobId) return;
+    if (!rawMsg) return;
+    // Use ref for synchronous job_id check (avoids race with setState)
+    if (!uploadJobIdRef.current) return;
     try {
       const msg = typeof rawMsg === 'string' ? JSON.parse(rawMsg) : rawMsg;
-      if (msg.job_id !== uploadJobId && msg.workspace_id !== clientId) return;
+      // Accept messages by job_id OR by workspace_id (broadcast)
+      const jobIdMatch = uploadJobIdRef.current && msg.job_id === uploadJobIdRef.current;
+      const wsIdMatch = msg.workspace_id === clientId;
+      if (!jobIdMatch && !wsIdMatch) return;
 
       if (msg.type === 'STAGE_CHANGE') {
         setUploadStage(msg.stage || '');
@@ -223,6 +230,7 @@ const App: React.FC = () => {
       const res = await uploadApi.ingestFile(file, clientId);
       // res now returns { job_id, status: 'PROCESSING', filename, eta_seconds }
       if (res.job_id) {
+        uploadJobIdRef.current = res.job_id;  // sync ref for WS race-safety
         setUploadJobId(res.job_id);
         setUploadEta(res.eta_seconds || 0);
         setUploadStage('PARSING');
@@ -251,11 +259,38 @@ const App: React.FC = () => {
       setUploadLogs([]);
       const res = await workspaceApi.loadDemoDataset(clientId);
       if (res.job_id) {
+        uploadJobIdRef.current = res.job_id;
         setUploadJobId(res.job_id);
         setUploadEta(res.eta_seconds || 0);
-        // Result arrives via WebSocket JOB_COMPLETED
+        // Primary: WebSocket JOB_COMPLETED. Fallback: poll /api/jobs/{id} in case WS missed event.
+        const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+        const jobId = res.job_id;
+        const poll = async () => {
+          for (let i = 0; i < 15; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            if (useWorkspaceStore.getState().rowCount > 0) return; // WS delivered
+            try {
+              const r2 = await fetch(`${apiBase}/api/jobs/${jobId}`);
+              if (!r2.ok) continue;
+              const job = await r2.json();
+              if (job.status === 'COMPLETED' && job.result?.row_count > 0) {
+                const d = job.result;
+                setDataset(d.filename || res.filename, d.parquet_path, d.row_count, d.columns, d.preview ?? []);
+                setIsUploadProcessing(false);
+                setUploadProgress(100);
+                toast.success('Dataset ingested and workspace ready!');
+                return;
+              }
+              if (job.status === 'FAILED') {
+                setIsUploadProcessing(false);
+                toast.error(`Ingestion failed: ${job.error}`);
+                return;
+              }
+            } catch { /* WS will deliver */ }
+          }
+        };
+        poll();
       } else {
-        // Legacy sync fallback
         const legacy = res as any;
         setDataset(res.filename, legacy.parquet_path ?? '', legacy.row_count ?? 0, legacy.columns ?? [], legacy.preview ?? []);
         setIsUploadProcessing(false);

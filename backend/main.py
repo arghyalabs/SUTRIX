@@ -568,6 +568,24 @@ async def api_job_state(job_id: str):
     raise HTTPException(status_code=404, detail="Job not found")
 
 
+@app.get("/api/jobs/{job_id}")
+async def api_job_poll(job_id: str):
+    """Polling endpoint for frontend fallback when WebSocket misses JOB_COMPLETED.
+    Returns status + result so the UI can hydrate without WebSocket delivery."""
+    from backend.core.pipeline_task_manager import pipeline_manager
+    job = pipeline_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {
+        "job_id":   job.job_id,
+        "status":   job.status.value if hasattr(job.status, 'value') else job.status,
+        "progress": job.progress_pct,
+        "result":   job.result or {},
+        "error":    job.error,
+    }
+
+
+
 # ── SYSTEM TELEMETRY ───────────────────────────────────────
 @app.get("/api/system/telemetry")
 async def api_system_telemetry():
