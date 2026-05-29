@@ -284,7 +284,7 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
       </Accordion.Root>
 
       <div className="flex justify-end mt-8">
-        <button onClick={handleSaveMappings} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white font-bold text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all">
+        <button onClick={handleSaveMappings} className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white text-black font-semibold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)]">
           Confirm & Proceed <ChevronRight className="w-4 h-4" />
         </button>
       </div>

@@ -88,7 +88,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({ isOpen, onClose }) =
                   <a 
                     href="https://github.com/ScientificDataOrchestrator/sdo/archive/refs/heads/main.zip"
                     download
-                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-cyan-500 text-void hover:bg-cyan-400 text-xs font-black transition-all shadow-md"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-white text-black font-semibold text-xs transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)]"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Download Source ZIP

@@ -29,7 +29,8 @@ import { BenchmarkPanel } from './components/telemetry/BenchmarkPanel';
 // AGPL-3.0 Compliance Views
 import { LicenseGate } from './components/license/LicenseGate';
 import { LicenseModal } from './components/license/LicenseModal';
-import { SUTRIXLogo } from './components/ui/SUTRIXLogo';
+import { SUTRIXLogo, LogoLoader } from './components/ui/SUTRIXLogo';
+import { LoadingScreen } from './components/ui/LoadingScreen';
 
 // ===========================================================================
 // ERROR BOUNDARY – catches React render crashes and shows a recoverable UI
@@ -84,6 +85,7 @@ const App: React.FC = () => {
   const clientId = useRef(`SDO_CORE_${Math.random().toString(36).substring(2, 9)}`).current;
   
   const [hasLaunched, setHasLaunched] = useState(false);
+  const [isAppLoading, setIsAppLoading] = useState(false);
 
   // AGPL-3.0 Open-Source License compliance state variables
   const [licenseAccepted, setLicenseAccepted] = useState(() => {
@@ -243,11 +245,13 @@ const App: React.FC = () => {
         const jobId = res.job_id;
         const poll = async () => {
           for (let i = 0; i < 15; i++) {
-            await new Promise(r => setTimeout(r, 2000));
             if (useWorkspaceStore.getState().rowCount > 0) return; // WS delivered
             try {
               const r2 = await fetch(`${apiBase}/api/jobs/${jobId}`);
-              if (!r2.ok) continue;
+              if (!r2.ok) {
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+              }
               const job = await r2.json();
               if (job.status === 'COMPLETED' && job.result?.row_count > 0) {
                 const d = job.result;
@@ -282,6 +286,7 @@ const App: React.FC = () => {
                 return;
               }
             } catch { /* WS will deliver */ }
+            await new Promise(r => setTimeout(r, 1000));
           }
         };
         poll();
@@ -316,11 +321,13 @@ const App: React.FC = () => {
         const jobId = res.job_id;
         const poll = async () => {
           for (let i = 0; i < 15; i++) {
-            await new Promise(r => setTimeout(r, 2000));
             if (useWorkspaceStore.getState().rowCount > 0) return; // WS delivered
             try {
               const r2 = await fetch(`${apiBase}/api/jobs/${jobId}`);
-              if (!r2.ok) continue;
+              if (!r2.ok) {
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+              }
               const job = await r2.json();
               if (job.status === 'COMPLETED' && job.result?.row_count > 0) {
                 const d = job.result;
@@ -346,15 +353,16 @@ const App: React.FC = () => {
                 }
                 setIsUploadProcessing(false);
                 setUploadProgress(100);
-                toast.success('Dataset ingested and workspace ready!');
-                return;
-              }
-              if (job.status === 'FAILED') {
-                setIsUploadProcessing(false);
-                toast.error(`Ingestion failed: ${job.error}`);
-                return;
-              }
+                  toast.success('Dataset ingested and workspace ready!');
+                  return;
+                }
+                if (job.status === 'FAILED') {
+                  setIsUploadProcessing(false);
+                  toast.error(`Demo load failed: ${job.error}`);
+                  return;
+                }
             } catch { /* WS will deliver */ }
+            await new Promise(r => setTimeout(r, 1000));
           }
         };
         poll();
@@ -509,7 +517,7 @@ const App: React.FC = () => {
     }
   };
 
-  if (!hasLaunched) {
+  if (!hasLaunched && !isAppLoading) {
     return <LandingPage onLaunch={handleLaunch} />;
   }
 
@@ -604,10 +612,11 @@ const App: React.FC = () => {
 
   return (
     <>
+      <LoadingScreen isLoading={isAppLoading} />
       <Toaster position="top-right" toastOptions={{ 
         className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
         loading: {
-          icon: <SUTRIXLogo className="w-5 h-5" isSpinning3D />,
+          icon: <LogoLoader size="w-5 h-5" compact />,
         }
       }} />
       <DashboardLayout

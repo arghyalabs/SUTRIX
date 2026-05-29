@@ -666,10 +666,10 @@ export const SegregationAnalytics: React.FC<SegregationAnalyticsProps> = ({
 
                 {/* Navigation Button */}
                 <div className="flex justify-end pt-4">
-                  <button 
-                    onClick={() => setActiveTab('enrichment')}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-500 text-void font-bold text-sm shadow-xl hover:bg-cyan-400 transition-colors"
-                  >
+                    <button
+                      onClick={() => setActiveTab('enrichment')}
+                      className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white text-black font-semibold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)]"
+                    >
                     Proceed to Enrichment
                     <ChevronRight className="w-4 h-4" />
                   </button>

@@ -5,7 +5,7 @@ import {
   LogOut, HelpCircle, FileDigit, Scale, Network
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { SUTRIXLogo } from '../ui/SUTRIXLogo';
+import { SUTRIXLogo, LogoLoader } from '../ui/SUTRIXLogo';
 
 // Tabs that need true fullscreen (no scroll wrapper, no padding)
 const FULLSCREEN_TABS = new Set(['hierarchy', 'analysis', 'enrichment']);
@@ -67,17 +67,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           onHoverEnd={() => setCollapsed(true)}
         >
           {/* Header */}
-          <div className="flex items-center h-24 px-4 border-b border-white/[0.06] shrink-0">
-            <SUTRIXLogo className="w-12 h-12 shrink-0" />
+          <div className="flex items-center h-20 px-3 border-b border-white/[0.06] shrink-0 gap-3">
+            <div className="shrink-0">
+              <LogoLoader size="w-10 h-10" compact />
+            </div>
             <AnimatePresence>
               {!collapsed && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  className="ml-3 whitespace-nowrap"
+                  className="whitespace-nowrap min-w-0"
                 >
-                  <span className="font-extrabold tracking-widest text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">SUTRIX</span>
+                  <p className="font-extrabold tracking-[0.2em] text-base text-white leading-none">SUTRIX</p>
+                  <p className="text-[8px] font-semibold tracking-[0.15em] text-white/25 uppercase mt-0.5">SDO Platform</p>
                 </motion.div>
               )}
             </AnimatePresence>

@@ -534,7 +534,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
             </button>
             <button
               onClick={() => useWorkspaceStore.getState().setActiveTab('analysis')}
-              className="flex items-center gap-2 px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-void font-bold text-sm shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all"
+              className="flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-black font-semibold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)]"
             >
               Continue to Analysis
               <ChevronRight className="w-4 h-4" />
@@ -584,9 +584,9 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
                 handleExecute();
               }}
               disabled={!hasConfig}
-              className={`relative flex items-center gap-3 px-10 py-3.5 rounded-xl font-bold text-sm transition-all overflow-hidden
+              className={`relative flex items-center justify-center gap-2 px-10 py-3.5 rounded-lg font-semibold text-sm transition-all
                 ${hasConfig
-                  ? 'bg-gradient-to-r from-cyan-500 to-violet-500 hover:from-cyan-400 hover:to-violet-400 text-white shadow-[0_0_30px_rgba(34,211,238,0.35)] hover:shadow-[0_0_40px_rgba(34,211,238,0.5)]'
+                  ? 'bg-white text-black shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0'
                   : 'bg-white/[0.03] border border-white/[0.06] text-white/20 cursor-not-allowed'
                 }`}
             >
