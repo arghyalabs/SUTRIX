@@ -4,7 +4,7 @@ import {
   ArrowRight, Upload, Map, Zap, CheckCircle, LineChart, Download, 
   Layers, Shield, Cpu, Box, Network, Database, FlaskConical, Activity
 } from 'lucide-react';
-import { SturixLogo } from '../ui/SturixLogo';
+import { SUTRIXLogo } from '../ui/SUTRIXLogo';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -143,8 +143,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
         {/* Navigation */}
         <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
-            <SturixLogo className="w-12 h-12" />
-            <span className="font-extrabold tracking-widest text-xl bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">STURIX</span>
+            <SUTRIXLogo className="w-12 h-12" />
+            <span className="font-extrabold tracking-widest text-xl bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">SUTRIX</span>
           </div>
           <button 
             onClick={onLaunch}

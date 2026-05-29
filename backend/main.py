@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import logging
 import asyncio
 import zipfile
@@ -53,22 +54,60 @@ memory_guard = MemoryGuard()
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("SDO SaaS Engine launching...")
-    # Initialize Sentry from env variables
+    logger.info("SUTRIX Pipeline Engine launching...")
     from backend.logging.logger import initialize_sentry
     initialize_sentry()
-    
+
+    # Inject WS broadcaster into pipeline manager
+    from backend.core.pipeline_task_manager import pipeline_manager
+    pipeline_manager.inject_broadcaster(ws_broadcaster)
+
     start_background_worker_queue()
     asyncio.create_task(registry_cleanup_loop())
     asyncio.create_task(ws_broadcaster.start_heartbeat_monitor())
 
-# ── 1. FILE INGESTION ────────────────────────────────────────
+# ── 1. FILE INGESTION (ASYNC — returns job_id immediately) ────────────────────────────────────────
+async def _run_ingest_background(job_id: str, client_id: str, filename: str, temp_path: str, file_bytes: bytes):
+    """Background coroutine: parse file and stream progress via WebSocket."""
+    from backend.core.pipeline_task_manager import pipeline_manager
+    from backend.core.pipeline_stages import PipelineStage
+    from backend.workers.progress_tracker import ProgressTracker
+
+    job = pipeline_manager.get_job(job_id)
+    if not job:
+        return
+
+    job.status = "RUNNING"
+    job.started_at = time.time() if hasattr(job, 'started_at') else None
+
+    try:
+        # Stage: PARSING
+        await pipeline_manager.broadcast_stage_change(job, PipelineStage.PARSING, f"Reading {filename}...")
+        context = registry.get_context(client_id)
+        result = await ScientificPipelineController.ingest_dataset(context, filename, temp_path, file_bytes)
+
+        # Stage: SCHEMA_DETECTION
+        await pipeline_manager.broadcast_stage_change(job, PipelineStage.SCHEMA_DETECTION, "Identifying scientific variable columns...")
+        await asyncio.sleep(0.1)  # allow WS flush
+
+        # Stage: WORKSPACE_READY
+        await pipeline_manager.broadcast_stage_change(job, PipelineStage.WORKSPACE_READY, "Dataset fully preprocessed.")
+        await pipeline_manager.broadcast_completed(job, result)
+
+    except Exception as e:
+        logger.error(f"Background ingest failed: {e}")
+        await pipeline_manager.broadcast_failed(job, str(e))
+
+
 @app.post("/api/ingest")
 async def api_ingest(file: UploadFile = File(...), client_id: str = Form(...)):
     is_safe, msg = memory_guard.verify_safety_shield()
     if "EMERGENCY" in msg:
         raise HTTPException(status_code=503, detail=msg)
-        
+
+    from backend.core.pipeline_task_manager import pipeline_manager
+    from backend.core.pipeline_stages import PipelineStage
+
     try:
         file_bytes = await file.read()
         validate_uploaded_file(file.filename, len(file_bytes), file.content_type)
@@ -77,32 +116,81 @@ async def api_ingest(file: UploadFile = File(...), client_id: str = Form(...)):
         temp_path = os.path.join(active_uploads, file.filename)
         with open(temp_path, "wb") as f:
             f.write(file_bytes)
-            
-        context = registry.get_context(client_id)
-        result = await ScientificPipelineController.ingest_dataset(context, file.filename, temp_path, file_bytes)
-        return result
+
+        # Create job and return IMMEDIATELY
+        job = pipeline_manager.create_job(client_id, "upload", total_items=1)
+        file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
+        eta = pipeline_manager.estimate_upload_eta(file_size_mb, len(file_bytes) // 100)
+
+        # Fire background task
+        asyncio.create_task(_run_ingest_background(job.job_id, client_id, file.filename, temp_path, file_bytes))
+
+        return {
+            "job_id":      job.job_id,
+            "status":      "PROCESSING",
+            "filename":    file.filename,
+            "file_size_mb": file_size_mb,
+            "eta_seconds": eta,
+        }
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _run_demo_ingest_background(job_id: str, client_id: str, demo_path: str, file_bytes: bytes):
+    """Background coroutine for demo dataset ingestion."""
+    from backend.core.pipeline_task_manager import pipeline_manager
+    from backend.core.pipeline_stages import PipelineStage
+
+    job = pipeline_manager.get_job(job_id)
+    if not job:
+        return
+
+    job.status = "RUNNING"
+    try:
+        await pipeline_manager.broadcast_stage_change(job, PipelineStage.PARSING, "Loading eco-toxicity demo dataset...")
+        context = registry.get_context(client_id)
+        result = await ScientificPipelineController.ingest_dataset(context, "eco_toxicity_dataset.csv", demo_path, file_bytes)
+
+        await pipeline_manager.broadcast_stage_change(job, PipelineStage.SCHEMA_DETECTION, "Detecting toxicological schema...")
+        await asyncio.sleep(0.05)
+        await pipeline_manager.broadcast_stage_change(job, PipelineStage.WORKSPACE_READY, "Demo workspace ready.")
+        await pipeline_manager.broadcast_completed(job, result)
+    except Exception as e:
+        logger.error(f"Demo background ingest failed: {e}")
+        await pipeline_manager.broadcast_failed(job, str(e))
+
 
 @app.post("/api/demo_ingest")
 async def api_demo_ingest(client_id: str = Form(...)):
     is_safe, msg = memory_guard.verify_safety_shield()
     if "EMERGENCY" in msg:
         raise HTTPException(status_code=503, detail=msg)
-        
+
+    from backend.core.pipeline_task_manager import pipeline_manager
+    from backend.core.pipeline_stages import PipelineStage
+
     try:
-        # Resolve path to demo dataset in the project root
         demo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "eco_toxicity_dataset.csv")
         if not os.path.exists(demo_path):
             raise FileNotFoundError("eco_toxicity_dataset.csv not found in project root.")
-            
+
         with open(demo_path, "rb") as f:
             file_bytes = f.read()
-            
-        context = registry.get_context(client_id)
-        result = await ScientificPipelineController.ingest_dataset(context, "eco_toxicity_dataset.csv", demo_path, file_bytes)
-        return result
+
+        file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
+        job = pipeline_manager.create_job(client_id, "upload", total_items=1)
+        eta = pipeline_manager.estimate_upload_eta(file_size_mb, len(file_bytes) // 100)
+
+        asyncio.create_task(_run_demo_ingest_background(job.job_id, client_id, demo_path, file_bytes))
+
+        return {
+            "job_id":       job.job_id,
+            "status":       "PROCESSING",
+            "filename":     "eco_toxicity_dataset.csv",
+            "file_size_mb": file_size_mb,
+            "eta_seconds":  eta,
+        }
     except Exception as e:
         logger.error(f"Demo Ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -428,7 +516,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     try:
         while True:
             data = await websocket.receive_text()
-            # Ignore all payloads to prevent state mutation
             msg = json.loads(data)
             if msg.get("type") == "PONG":
                 pass
@@ -436,3 +523,34 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         ws_broadcaster.disconnect(client_id)
     except Exception as e:
         ws_broadcaster.disconnect(client_id)
+
+
+# ── JOB CANCEL ─────────────────────────────────────────
+@app.post("/api/jobs/{job_id}/cancel")
+async def api_cancel_job(job_id: str):
+    from backend.core.pipeline_task_manager import pipeline_manager
+    cancelled = pipeline_manager.cancel_job(job_id)
+    if cancelled:
+        job = pipeline_manager.get_job(job_id)
+        if job:
+            await pipeline_manager.broadcast_partial_save(job)
+        return {"status": "CANCELLED", "job_id": job_id}
+    raise HTTPException(status_code=404, detail="Job not found or not running")
+
+
+@app.get("/api/jobs/{job_id}/state")
+async def api_job_state(job_id: str):
+    from backend.core.pipeline_task_manager import pipeline_manager
+    job = pipeline_manager.get_job(job_id)
+    if job:
+        return job.to_dict()
+    raise HTTPException(status_code=404, detail="Job not found")
+
+
+# ── SYSTEM TELEMETRY ───────────────────────────────────────
+@app.get("/api/system/telemetry")
+async def api_system_telemetry():
+    from backend.core.pipeline_task_manager import pipeline_manager
+    metrics = pipeline_manager.get_system_metrics()
+    metrics["ws_connections"] = ws_broadcaster.connection_count()
+    return metrics

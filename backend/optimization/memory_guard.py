@@ -16,7 +16,7 @@ class MemoryGuard:
     Adaptive Memory Protection System for SDO.
     Tracks RAM footprints of host and children subprocesses to prevent out-of-memory crashes.
     """
-    def __init__(self, ram_limit_pct: float = 75.0, emergency_limit_pct: float = 85.0):
+    def __init__(self, ram_limit_pct: float = 90.0, emergency_limit_pct: float = 95.0):
         self.ram_limit_pct = ram_limit_pct
         self.emergency_limit_pct = emergency_limit_pct
         self._last_system_pct = 0.0
@@ -78,12 +78,12 @@ class MemoryGuard:
         """
         status = self.get_memory_status()
         
-        if status["is_locked"]:
-            return False, "EMERGENCY_LOCK: RAM exceeded 85% safety bounds. Queue execution paused."
-        if status["is_critical"]:
+        if status["is_locked"] and status["available_ram_gb"] < 1.0:
+            return False, "EMERGENCY_LOCK: RAM exceeded safety bounds and available memory < 1GB. Queue execution paused."
+        if status["is_critical"] and status["available_ram_gb"] < 2.0:
             # Run aggressive garbage sweeps
             self.emergency_garbage_sweep()
-            return True, "WARNING: Memory load is high (exceeded 75%). Calculations throttled."
+            return True, "WARNING: Memory load is high. Calculations throttled."
             
         return True, "OK: Memory load is within safe operational thresholds."
 

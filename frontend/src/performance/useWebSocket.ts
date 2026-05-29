@@ -12,6 +12,7 @@ interface UseWebSocketReturn {
   logs: string[];
   jobStatus: JobStatus | 'IDLE';
   error: string | null;
+  lastMessage: object | null;  // raw last parsed WS message for consumers
   connectToJob: (jobId: string) => void;
   resetSocketState: () => void;
 }
@@ -25,6 +26,7 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
   const [logs, setLogs] = useState<string[]>([]);
   const [jobStatus, setJobStatus] = useState<JobStatus | 'IDLE'>('IDLE');
   const [error, setError] = useState<string | null>(null);
+  const [lastMessage, setLastMessage] = useState<object | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
@@ -69,25 +71,28 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          setLastMessage(msg);  // expose raw message to consumers
           
           if (msg.type === 'PING') {
             ws.send(JSON.stringify({ type: 'PONG' }));
             return;
           }
           
-          if (msg.job_id !== activeJobIdRef.current) return;
+          // Only filter by job_id for enrichment/segmentation messages
+          // Upload/stage messages use workspace_id filter handled by consumer
+          const isJobSpecific = msg.job_id && activeJobIdRef.current;
+          if (isJobSpecific && msg.job_id !== activeJobIdRef.current) return;
 
-          if (msg.type === 'PROGRESS' && msg.data) {
+          if ((msg.type === 'PROGRESS' || msg.type === 'PROGRESS_UPDATE') && msg.data) {
             const data: JobTelemetry = msg.data;
             setProgress(data.progress_pct);
             setEta(data.eta_seconds);
-            setSpeed(data.compounds_per_sec);
+            setSpeed(data.compounds_per_sec || data.items_per_sec || 0);
             
-            // Allow active_node to override phase display
             if (msg.data.active_node) {
               setPhase(msg.data.active_node);
             } else {
-              setPhase(data.phase);
+              setPhase(data.phase || data.stage_label || 'Processing...');
             }
             
             if (data.logs && data.logs.length > 0) {
@@ -177,15 +182,35 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
     setError(null);
   }, [disconnect]);
 
+  // Auto-connect WebSocket on mount so we receive upload events immediately
   useEffect(() => {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? '127.0.0.1:8000'
+      : window.location.host;
+    const wsUrl = `${wsProto}//${host}/ws/jobs/${clientId}`;
+    try {
+      const ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
+      ws.onopen = () => { setIsConnected(true); setError(null); };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          setLastMessage(msg);
+          if (msg.type === 'PING') { ws.send(JSON.stringify({ type: 'PONG' })); }
+        } catch { /* ignore */ }
+      };
+      ws.onerror = () => setIsConnected(false);
+      ws.onclose = () => { setIsConnected(false); };
+    } catch { /* no ws support */ }
     return () => {
-      disconnect();
+      if (socketRef.current) socketRef.current.close();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
     };
-  }, [disconnect]);
+  }, [clientId]);
 
   return {
-    isConnected, progress, eta, speed, phase, logs, jobStatus, error,
+    isConnected, progress, eta, speed, phase, logs, jobStatus, error, lastMessage,
     connectToJob, resetSocketState
   };
 }

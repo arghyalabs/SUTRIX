@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Download, FileText, Archive, ArrowRight, RotateCcw, GitBranch, FolderOpen, CheckCircle, AlertCircle } from 'lucide-react';
 import { hierarchyApi } from '../../services/hierarchyApi';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
-import { SturixLogo } from '../ui/SturixLogo';
+import { SUTRIXLogo } from '../ui/SUTRIXLogo';
 
 interface ReportsExportProps {
   clientId: string;
@@ -159,7 +159,7 @@ export const ReportsExport: React.FC<ReportsExportProps> = ({
           </div>
         ) : isLoadingHierarchy ? (
           <div className="px-6 py-8 text-center">
-            <SturixLogo className="w-8 h-8 mx-auto mb-3" isSpinning3D />
+            <SUTRIXLogo className="w-8 h-8 mx-auto mb-3" isSpinning3D />
             <p className="text-white/30 text-sm">Loading hierarchy tree...</p>
           </div>
         ) : (

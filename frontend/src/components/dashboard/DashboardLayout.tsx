@@ -5,7 +5,7 @@ import {
   LogOut, HelpCircle, FileDigit, Scale, Network
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { SturixLogo } from '../ui/SturixLogo';
+import { SUTRIXLogo } from '../ui/SUTRIXLogo';
 
 // Tabs that need true fullscreen (no scroll wrapper, no padding)
 const FULLSCREEN_TABS = new Set(['hierarchy', 'analysis', 'enrichment']);
@@ -68,7 +68,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         >
           {/* Header */}
           <div className="flex items-center h-24 px-4 border-b border-white/[0.06] shrink-0">
-            <SturixLogo className="w-12 h-12 shrink-0" />
+            <SUTRIXLogo className="w-12 h-12 shrink-0" />
             <AnimatePresence>
               {!collapsed && (
                 <motion.div 
@@ -77,7 +77,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   exit={{ opacity: 0, x: -10 }}
                   className="ml-3 whitespace-nowrap"
                 >
-                  <span className="font-extrabold tracking-widest text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">STURIX</span>
+                  <span className="font-extrabold tracking-widest text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">SUTRIX</span>
                 </motion.div>
               )}
             </AnimatePresence>
