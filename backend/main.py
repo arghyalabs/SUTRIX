@@ -171,9 +171,16 @@ async def api_demo_ingest(client_id: str = Form(...)):
     from backend.core.pipeline_stages import PipelineStage
 
     try:
-        demo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "eco_toxicity_dataset.csv")
-        if not os.path.exists(demo_path):
-            raise FileNotFoundError("eco_toxicity_dataset.csv not found in project root.")
+        # Search for demo file: check data/ first, then project root, then backend root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidates = [
+            os.path.join(project_root, "data", "eco_toxicity_dataset.csv"),
+            os.path.join(project_root, "eco_toxicity_dataset.csv"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "eco_toxicity_dataset.csv"),
+        ]
+        demo_path = next((p for p in candidates if os.path.exists(p)), None)
+        if not demo_path:
+            raise FileNotFoundError(f"eco_toxicity_dataset.csv not found. Searched: {candidates}")
 
         with open(demo_path, "rb") as f:
             file_bytes = f.read()

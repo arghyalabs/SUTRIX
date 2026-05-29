@@ -5,7 +5,8 @@ import {
   Trash2, Database, ChevronRight, File as FileIcon,
   AlertCircle, RotateCcw
 } from 'lucide-react';
-import { ProcessingTimeline, StageItem } from '../telemetry/ProcessingTimeline';
+import { ProcessingTimeline } from '../telemetry/ProcessingTimeline';
+import type { StageItem } from '../telemetry/ProcessingTimeline';
 import { LiveTelemetryPanel } from '../telemetry/LiveTelemetryPanel';
 
 const UPLOAD_STAGE_ORDER = [

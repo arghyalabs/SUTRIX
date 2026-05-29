@@ -104,7 +104,9 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
                 tel["phase"] = "🔍 Phase 1: Identity Resolution"
                 # Map progress to 0-35%
                 mapped_progress = int((completed_resolutions / len(resolve_list)) * 35)
-                job_registry.update_job(job_id, progress=mapped_progress, eta=tel["eta_seconds"], speed=tel["compounds_per_sec"])
+                _speed = tel.get("compounds_per_sec") or tel.get("items_per_sec", 0.0)
+                _eta   = tel.get("eta_seconds", 0.0)
+                job_registry.update_job(job_id, progress=mapped_progress, eta=_eta, speed=_speed)
                 tel["progress_pct"] = mapped_progress
                 await ws_broadcaster.broadcast({"job_id": job_id, "type": "PROGRESS", "data": tel})
 
@@ -197,7 +199,9 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
                 tel = tracker.calculate_telemetry(total_processed)
                 # Map progress to 50-90%
                 m_prog = 50 + int((completed_count / len(smiles_to_calculate)) * 40)
-                job_registry.update_job(job_id, progress=m_prog, eta=tel["eta_seconds"], speed=tel["compounds_per_sec"])
+                _speed = tel.get("compounds_per_sec") or tel.get("items_per_sec", 0.0)
+                _eta   = tel.get("eta_seconds", 0.0)
+                job_registry.update_job(job_id, progress=m_prog, eta=_eta, speed=_speed)
                 tel["progress_pct"] = m_prog
                 tel["phase"] = "⚗️ Phase 3: Subprocess calculations"
                 asyncio.run_coroutine_threadsafe(
@@ -424,8 +428,12 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
             
             # Throttle database writes to avoid locking SQLite
             if processed_state["rows"] % max(1, (total_work // 20)) == 0:
-                job_registry.update_job(job_id, progress=int(mapped_prog), eta=tel["eta_seconds"], speed=tel["compounds_per_sec"])
+                speed = tel.get("compounds_per_sec") or tel.get("items_per_sec", 0.0)
+                eta   = tel.get("eta_seconds", 0.0)
+                job_registry.update_job(job_id, progress=int(mapped_prog), eta=eta, speed=speed)
             
+            speed = tel.get("compounds_per_sec") or tel.get("items_per_sec", 0.0)
+            eta   = tel.get("eta_seconds", 0.0)
             asyncio.run_coroutine_threadsafe(
                 ws_broadcaster.broadcast({
                     "job_id": job_id, "type": "PROGRESS",
@@ -435,8 +443,9 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
                         "active_node": event.get("active_node", "Root"),
                         "rows_remaining": event.get("rows_remaining", len(df)),
                         "memory_usage": f"{psutil.virtual_memory().percent:.1f}%",
-                        "eta_seconds": tel["eta_seconds"],
-                        "compounds_per_sec": tel["compounds_per_sec"],
+                        "eta_seconds": eta,
+                        "compounds_per_sec": speed,
+                        "items_per_sec": speed,
                     },
                 }),
                 loop

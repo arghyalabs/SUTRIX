@@ -1,5 +1,4 @@
 import { apiClient } from './apiClient';
-import type { IngestResponse } from './uploadApi';
 
 export interface TelemetryResponse {
   ram_usage_pct: number;
@@ -10,18 +9,26 @@ export interface TelemetryResponse {
   active_workspaces: number;
 }
 
+// New async job response shape returned by /api/demo_ingest and /api/ingest
+export interface AsyncJobResponse {
+  job_id: string;
+  status: 'PROCESSING';
+  filename: string;
+  file_size_mb?: number;
+  eta_seconds?: number;
+}
+
 export const workspaceApi = {
   /**
    * Pre-seeds active user workspace with standard toxicology benchmark data.
+   * Returns job_id immediately — progress streams via WebSocket.
    */
-  loadDemoDataset: async (clientId: string): Promise<IngestResponse> => {
+  loadDemoDataset: async (clientId: string): Promise<AsyncJobResponse> => {
     const formData = new FormData();
     formData.append('client_id', clientId);
 
-    const response = await apiClient.post<IngestResponse>('/api/demo_ingest', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await apiClient.post<AsyncJobResponse>('/api/demo_ingest', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
@@ -36,3 +43,4 @@ export const workspaceApi = {
     return response.data;
   },
 };
+

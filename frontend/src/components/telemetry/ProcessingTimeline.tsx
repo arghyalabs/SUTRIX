@@ -2,13 +2,13 @@ import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Circle, Loader2, Clock, Zap, Database, GitBranch, Search, Package } from 'lucide-react';
 
-export interface StageItem {
+export type StageItem = {
   stage: string;
   stage_label: string;
   description: string;
   status: 'pending' | 'active' | 'completed';
   duration_s?: number;
-}
+};
 
 interface ProcessingTimelineProps {
   stages: StageItem[];
