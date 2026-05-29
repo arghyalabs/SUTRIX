@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-export const SturixLogo: React.FC<{ className?: string; isSpinning3D?: boolean }> = ({ className = "w-8 h-8", isSpinning3D = false }) => {
+export const SUTRIXLogo: React.FC<{ className?: string; isSpinning3D?: boolean }> = ({ className = "w-8 h-8", isSpinning3D = false }) => {
   return (
     <motion.div 
       className={`relative flex items-center justify-center ${className}`}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 
 // API Services Resilience Layer
@@ -29,7 +29,7 @@ import { BenchmarkPanel } from './components/telemetry/BenchmarkPanel';
 // AGPL-3.0 Compliance Views
 import { LicenseGate } from './components/license/LicenseGate';
 import { LicenseModal } from './components/license/LicenseModal';
-import { SturixLogo } from './components/ui/SturixLogo';
+import { SUTRIXLogo } from './components/ui/SUTRIXLogo';
 
 // ===========================================================================
 // ERROR BOUNDARY – catches React render crashes and shows a recoverable UI
@@ -111,6 +111,77 @@ const App: React.FC = () => {
 
   const socket = useWebSocket(clientId);
 
+  // ── Upload processing state ──────────────────────────────────
+  const [isUploadProcessing, setIsUploadProcessing] = useState(false);
+  const [uploadJobId, setUploadJobId] = useState<string | null>(null);
+  const [uploadStage, setUploadStage] = useState('');
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadEta, setUploadEta] = useState(0);
+  const [uploadItemsPerSec, setUploadItemsPerSec] = useState(0);
+  const [uploadLogs, setUploadLogs] = useState<string[]>([]);
+
+  // Listen to WebSocket for upload job completion
+  useEffect(() => {
+    const wsState = socket as any;
+    const rawMsg = wsState?.lastMessage;
+    if (!rawMsg || !uploadJobId) return;
+    try {
+      const msg = typeof rawMsg === 'string' ? JSON.parse(rawMsg) : rawMsg;
+      if (msg.job_id !== uploadJobId && msg.workspace_id !== clientId) return;
+
+      if (msg.type === 'STAGE_CHANGE') {
+        setUploadStage(msg.stage || '');
+        setUploadMessage(msg.description || '');
+      }
+      if (msg.type === 'PROGRESS_UPDATE') {
+        setUploadProgress(msg.progress || 0);
+        setUploadEta(msg.eta_seconds || 0);
+        setUploadItemsPerSec(msg.items_per_sec || 0);
+        setUploadStage(msg.stage || uploadStage);
+        setUploadMessage(msg.message || '');
+        if (msg.logs?.length) setUploadLogs(msg.logs);
+      }
+      if (msg.type === 'JOB_COMPLETED') {
+        const d = msg.result || {};
+        if (d.filename || d.row_count) {
+          setDataset(d.filename, d.parquet_path, d.row_count, d.columns, d.preview);
+          // Auto-infer schema
+          if (d.columns?.length) {
+            mappingApi.inferSchema(d.columns).then(schemaRes => {
+              const aiMappings: any = {};
+              const inferenceDetails: any = {};
+              schemaRes.mappings.forEach((m: any) => {
+                aiMappings[m.column] = m.mapped_to;
+                inferenceDetails[m.column] = { confidence: m.confidence, reasons: m.reasons };
+              });
+              setMappings(aiMappings);
+              const store = useWorkspaceStore.getState();
+              if (store.setMappingIntelligence) store.setMappingIntelligence(inferenceDetails);
+            }).catch(() => {
+              const fallback: any = {};
+              d.columns.forEach((c: string) => { fallback[c] = 'none'; });
+              setMappings(fallback);
+            });
+          }
+        }
+        setIsUploadProcessing(false);
+        setUploadProgress(100);
+        toast.success('Dataset ingested and workspace ready!');
+      }
+      if (msg.type === 'JOB_FAILED') {
+        setIsUploadProcessing(false);
+        toast.error(`Ingestion failed: ${msg.error}`);
+      }
+      if (msg.type === 'PARTIAL_SAVE') {
+        setIsUploadProcessing(false);
+        toast('Processing cancelled. Progress saved.', { icon: '⚠️' });
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [(socket as any)?.lastMessage, uploadJobId]);
+
   const handleLaunch = () => {
     setHasLaunched(true);
     useWorkspaceStore.getState().setWorkspaceId(clientId);
@@ -140,78 +211,60 @@ const App: React.FC = () => {
     resetWorkspace();
   };
 
-  const handleIngestFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIngestFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     const file = e.target.files[0];
-    
     try {
-      const toastId = toast.loading('Uploading & processing dataset...');
-      const d = await uploadApi.ingestFile(file, clientId);
-      toast.success('Ingestion complete. Converted to snappy Parquet.', { id: toastId });
-      
-      setDataset(d.filename, d.parquet_path, d.row_count, d.columns, d.preview);
-      
-      // Fetch AI Semantic Schema Inference
-      let aiMappings: any = {};
-      let inferenceDetails: any = {};
-      try {
-        const schemaRes = await mappingApi.inferSchema(d.columns);
-        schemaRes.mappings.forEach((m: any) => {
-          aiMappings[m.column] = m.mapped_to;
-          inferenceDetails[m.column] = {
-            confidence: m.confidence,
-            reasons: m.reasons
-          };
-        });
-      } catch (err) {
-        console.warn("AI Schema inference failed, falling back to manual mapping.", err);
-        d.columns.forEach((c: string) => { aiMappings[c] = 'none'; });
-      }
-
-      setMappings(aiMappings);
-      const store = useWorkspaceStore.getState();
-      if (store.setMappingIntelligence) {
-        store.setMappingIntelligence(inferenceDetails);
+      setIsUploadProcessing(true);
+      setUploadProgress(0);
+      setUploadStage('UPLOADING');
+      setUploadMessage(`Uploading ${file.name}...`);
+      setUploadLogs([]);
+      const res = await uploadApi.ingestFile(file, clientId);
+      // res now returns { job_id, status: 'PROCESSING', filename, eta_seconds }
+      if (res.job_id) {
+        setUploadJobId(res.job_id);
+        setUploadEta(res.eta_seconds || 0);
+        setUploadStage('PARSING');
+        setUploadMessage('Parsing dataset...');
+        // Result arrives via WebSocket JOB_COMPLETED
+      } else {
+        // Fallback: legacy sync response
+        setDataset(res.filename, res.parquet_path, res.row_count, res.columns, res.preview);
+        setIsUploadProcessing(false);
+        toast.success('Dataset ingested.');
       }
     } catch (error: any) {
+      setIsUploadProcessing(false);
       toast.error(error.response?.data?.detail || 'Upload failed');
     }
-  };
+  }, [clientId]);
 
-  const handleLoadDemo = async () => {
+
+  const handleLoadDemo = useCallback(async () => {
     try {
-      const toastId = toast.loading('Loading demo dataset...');
-      const d = await workspaceApi.loadDemoDataset(clientId);
-      toast.success('Demo dataset loaded.', { id: toastId });
-      
-      setDataset(d.filename, d.parquet_path, d.row_count, d.columns, d.preview);
-      
-      // Fetch AI Semantic Schema Inference
-      let aiMappings: any = {};
-      let inferenceDetails: any = {};
-      try {
-        const schemaRes = await mappingApi.inferSchema(d.columns);
-        schemaRes.mappings.forEach((m: any) => {
-          aiMappings[m.column] = m.mapped_to;
-          inferenceDetails[m.column] = {
-            confidence: m.confidence,
-            reasons: m.reasons
-          };
-        });
-      } catch (err) {
-        console.warn("AI Schema inference failed, falling back to manual mapping.", err);
-        d.columns.forEach((c: string) => { aiMappings[c] = 'none'; });
-      }
-
-      setMappings(aiMappings);
-      const store = useWorkspaceStore.getState();
-      if (store.setMappingIntelligence) {
-        store.setMappingIntelligence(inferenceDetails);
+      setIsUploadProcessing(true);
+      setUploadProgress(0);
+      setUploadStage('PARSING');
+      setUploadMessage('Loading eco-toxicity demo dataset...');
+      setUploadLogs([]);
+      const res = await workspaceApi.loadDemoDataset(clientId);
+      if (res.job_id) {
+        setUploadJobId(res.job_id);
+        setUploadEta(res.eta_seconds || 0);
+        // Result arrives via WebSocket JOB_COMPLETED
+      } else {
+        // Legacy sync fallback
+        setDataset(res.filename, res.parquet_path, res.row_count, res.columns, res.preview);
+        setIsUploadProcessing(false);
+        toast.success('Demo dataset loaded.');
       }
     } catch (error: any) {
+      setIsUploadProcessing(false);
       toast.error(error.response?.data?.detail || 'Failed to load demo dataset');
     }
-  };
+  }, [clientId]);
+
 
   const handleCurateColumns = async (colsToDrop: string[]) => {
     try {
@@ -282,16 +335,24 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCancelJob = async () => {
+  const handleCancelJob = useCallback(async (jobId?: string) => {
     try {
-      const storeState = useWorkspaceStore.getState();
-      if (!storeState.activeJobId) return;
+      const targetId = jobId || useWorkspaceStore.getState().activeJobId;
+      if (!targetId) return;
+      // Cancel upload job
+      if (targetId === uploadJobId) {
+        await fetch(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/api/jobs/${targetId}/cancel`, { method: 'POST' });
+        setIsUploadProcessing(false);
+        toast('Upload cancelled. Partial progress saved.', { icon: '⚠️' });
+        return;
+      }
       await enrichmentApi.cancelJob(clientId);
       toast.error('Job cancellation requested.');
-    } catch (error: any) {
+    } catch {
       toast.error('Failed to cancel job');
     }
-  };
+  }, [clientId, uploadJobId]);
+
 
   const handleFetchEnrichmentResults = async () => {
     try {
@@ -353,8 +414,18 @@ const App: React.FC = () => {
         return (
           <UploadWorkspace
             filename={filename} rowCount={rowCount} columns={columns} preview={preview}
-            handleIngestFile={handleIngestFile} handleLoadDemo={handleLoadDemo}
+            isProcessing={isUploadProcessing}
+            processingStage={uploadStage}
+            processingMessage={uploadMessage}
+            processingProgress={uploadProgress}
+            processingEta={uploadEta}
+            processingItemsPerSec={uploadItemsPerSec}
+            processingStageLogs={uploadLogs}
+            activeJobId={uploadJobId}
+            handleIngestFile={handleIngestFile}
+            handleLoadDemo={handleLoadDemo}
             handleCurateColumns={handleCurateColumns}
+            onCancelJob={handleCancelJob}
           />
         );
       case 'mapping':
@@ -424,7 +495,7 @@ const App: React.FC = () => {
       <Toaster position="top-right" toastOptions={{ 
         className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
         loading: {
-          icon: <SturixLogo className="w-5 h-5" isSpinning3D />,
+          icon: <SUTRIXLogo className="w-5 h-5" isSpinning3D />,
         }
       }} />
       <DashboardLayout
