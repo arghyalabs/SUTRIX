@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { ArrowRight, ExternalLink } from 'lucide-react';
-import { SUTRIXLogo } from '../ui/SUTRIXLogo';
+import { LogoLoader } from '../ui/SUTRIXLogo';
 
 interface FinalCTAProps {
   onLaunch: () => void;
@@ -35,20 +35,15 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onLaunch }) => {
           transition={{ duration: 0.7 }}
           className="space-y-8"
         >
-          {/* Spinning logo */}
+          {/* 3D logo */}
           <div className="flex justify-center">
-            <motion.div
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-            >
-              <SUTRIXLogo className="w-14 h-14 opacity-50" />
-            </motion.div>
+            <LogoLoader size="w-20 h-20" compact />
           </div>
 
           <h2 className="text-5xl font-extrabold text-white leading-tight">
             Build AI-Ready
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-violet-400 to-cyan-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-300 via-gray-100 to-gray-400">
               Scientific Datasets
             </span>
           </h2>
@@ -59,23 +54,20 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onLaunch }) => {
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <motion.button
-              whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(34,211,238,0.28)' }}
-              whileTap={{ scale: 0.97 }}
+            <button
               onClick={onLaunch}
-              className="group flex items-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 text-white font-bold text-sm shadow-[0_0_30px_rgba(34,211,238,0.18)] transition-all"
+              className="group flex items-center gap-2.5 px-8 py-4 rounded-lg bg-white text-black font-semibold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)]"
             >
               Launch Workspace
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </motion.button>
-            <motion.a
-              whileHover={{ scale: 1.02 }}
+            </button>
+            <a
               href="#workflow"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/60 font-semibold text-sm hover:bg-white/[0.07] hover:text-white transition-all"
+              className="group flex items-center gap-2 px-8 py-4 rounded-lg bg-white/[0.03] border border-white/10 text-white/70 font-semibold text-sm hover:bg-white/[0.06] hover:text-white transition-all hover:-translate-y-0.5"
             >
               Explore Workflow
               <ExternalLink className="w-3.5 h-3.5" />
-            </motion.a>
+            </a>
           </div>
 
           {/* Subtle trust indicators */}

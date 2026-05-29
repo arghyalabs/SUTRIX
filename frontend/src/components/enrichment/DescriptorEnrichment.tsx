@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import * as Progress from '@radix-ui/react-progress';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { enrichmentApi } from '../../services/enrichmentApi';
+import { LogoLoader } from '../ui/SUTRIXLogo';
 
 interface DescriptorEnrichmentProps {
   enrichmentMode: 'fast' | 'standard' | 'full';
@@ -281,9 +282,8 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
             </div>
 
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-10 opacity-50">
-                <Zap className="w-6 h-6 text-cyan-400 animate-pulse mb-3" />
-                <p className="text-white/50 text-[10px] uppercase tracking-wider font-bold">Loading Library...</p>
+              <div className="flex flex-col items-center justify-center py-14">
+                <LogoLoader size="w-16 h-16" label="Loading Descriptor Library..." />
               </div>
             ) : (
               <div className="space-y-6 pb-4">

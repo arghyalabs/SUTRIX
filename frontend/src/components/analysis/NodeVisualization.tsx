@@ -7,6 +7,7 @@ import {
 import { Download, Image, FileText, Maximize2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { FullscreenPieModal } from './FullscreenPieModal';
+import { LogoLoader } from '../ui/SUTRIXLogo';
 
 interface NodeDetail {
   id: string;
@@ -259,13 +260,8 @@ export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
-        <SkeletonBlock className="h-8 w-48" />
-        <div className="grid grid-cols-2 gap-6">
-          <SkeletonBlock className="h-80" />
-          <SkeletonBlock className="h-80" />
-        </div>
-        <SkeletonBlock className="h-48" />
+      <div className="flex flex-col items-center justify-center h-full min-h-[320px]">
+        <LogoLoader size="w-20 h-20" label="Loading Analysis..." />
       </div>
     );
   }
