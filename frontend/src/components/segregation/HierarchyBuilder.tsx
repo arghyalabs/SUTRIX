@@ -133,6 +133,29 @@ function buildFlowGraph(
   return { nodes, edges };
 }
 
+export function isChemicalIdentifierColumn(colName: string, role?: string): boolean {
+  const colLower = colName.toLowerCase().trim();
+  if (role && ["chemical_name", "canonical_smiles", "smiles", "cas_number", "chemical_id", "structure"].includes(role)) {
+    return true;
+  }
+  const patterns = [
+    "chemical_name",
+    "compound_name",
+    "substance_name",
+    "chemical",
+    "compound",
+    "cas_number",
+    "cas-linked",
+    "smiles-linked",
+    "inchi-linked",
+    "casrn",
+    "inchi",
+    "inchikey",
+    "structure"
+  ];
+  return patterns.some(pat => colLower.includes(pat));
+}
+
 export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, socket }) => {
   const { columns, mappings, setActiveJobId, setActiveJobType } = useWorkspaceStore();
   const [isBuilding, setIsBuilding] = useState(false);
@@ -164,8 +187,8 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
 
   // Get candidate columns from mappings
   const candidateColumns = useMemo(() => {
-    if (columns.length > 0) return columns;
-    return Object.keys(mappings);
+    const list = columns.length > 0 ? columns : Object.keys(mappings);
+    return list.filter(col => !isChemicalIdentifierColumn(col, mappings[col]));
   }, [columns, mappings]);
 
   // When socket completes, show completion state
