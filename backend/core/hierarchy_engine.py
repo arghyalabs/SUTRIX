@@ -102,6 +102,19 @@ class HierarchyEngine:
 
         self._total_nodes_built = 0
 
+    def _is_chemical_identifier_column(self, col_name: str, role: Optional[str]) -> bool:
+        col_lower = col_name.lower().strip()
+        if role in {"chemical_name", "canonical_smiles", "smiles", "cas_number", "chemical_id", "structure"}:
+            return True
+        patterns = [
+            "chemical_name", "compound_name", "substance_name", "chemical", "compound",
+            "cas_number", "cas-linked", "smiles-linked", "inchi-linked", "casrn",
+            "inchi", "inchikey", "structure"
+        ]
+        if any(pat in col_lower for pat in patterns):
+            return True
+        return False
+
     # ── Public API ──────────────────────────────────────────────────────────
 
     def build(
@@ -112,22 +125,15 @@ class HierarchyEngine:
     ) -> dict:
         if df is None or df.empty:
             raise ValueError("HierarchyEngine.build() received an empty DataFrame.")
-
-        # Truncate hierarchy columns exactly before any unique compound/chemical identifiers
-        # (since each chemical is unique with 1 record, splitting on it renders redundant 1-row charts)
-        clean_cols = []
-        for col in hierarchy_cols:
-            role = self.mappings.get(col)
-            if role in {"chemical_name", "canonical_smiles", "smiles", "cas_number", "chemical_id"}:
-                logger.info(f"Truncating hierarchy columns exactly before compound identifier column '{col}' (role: '{role}')")
-                break
-            clean_cols.append(col)
+            
+        # Sanitize hierarchy columns to strip out chemical identifiers
+        hierarchy_cols = [
+            c for c in hierarchy_cols
+            if not self._is_chemical_identifier_column(c, self.mappings.get(c))
+        ]
         
-        if clean_cols:
-            hierarchy_cols = clean_cols
-
         if not hierarchy_cols:
-            raise ValueError("hierarchy_cols must have at least one column.")
+            raise ValueError("All configured hierarchy columns are unique chemical identifiers. Please select at least one grouping variable (e.g., Species, Endpoint, Duration) to build a meaningful scientific hierarchy.")
 
         missing = [c for c in hierarchy_cols if c not in df.columns]
         if missing:
