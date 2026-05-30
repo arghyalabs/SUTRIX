@@ -113,6 +113,9 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
   const [fullscreenScrollTop, setFullscreenScrollTop] = useState(0);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
   const fullscreenContainerHeight = 550;
+  
+  // PubChem 2D Structure state
+  const [usePubChem, setUsePubChem] = useState(true);
 
   // Debounce search query
   useEffect(() => {
@@ -165,6 +168,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
     
     const fetchDetail = async () => {
       setDetailLoading(true);
+      setUsePubChem(true);
       setStructureGenerated(false);
       setStructureSvg('');
       setDistributionData(null);
@@ -645,7 +649,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                   
                   <div className="flex justify-between items-start gap-4">
                     <div>
-                      <h2 className="text-xl font-extrabold text-white tracking-tight">
+                      <h2 className="text-2xl font-extrabold text-white tracking-tight leading-normal py-1">
                         {detail.name || 'Unnamed Chemical Subgroup'}
                       </h2>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -728,21 +732,34 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                       )}
                     </div>
                     
-                    <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-black/25 border border-white/[0.03] rounded-lg mt-2.5">
-                      {structureLoading ? (
+                    <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-[#0a0f1d] border border-white/[0.03] rounded-lg mt-2.5">
+                      {usePubChem ? (
+                        <div className="w-full h-full flex items-center justify-center bg-white p-2.5 shadow-inner">
+                          <img
+                            src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG`}
+                            alt={`${detail.name || 'Compound'} 2D Structure`}
+                            className="max-w-full max-h-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                            onError={() => {
+                              console.warn(`[FLOW-TRACE] PubChem REST PUG image load failed for SMILES. Falling back to local RDKit generator.`);
+                              setUsePubChem(false);
+                              handleGenerateStructure();
+                            }}
+                          />
+                        </div>
+                      ) : structureLoading ? (
                         <div className="flex flex-col items-center gap-2 text-white/30 text-[10px] font-mono">
                           <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
                           RENDERING 2D SVG...
                         </div>
                       ) : structureGenerated && structureSvg ? (
                         <div
-                          className="w-full h-full flex items-center justify-center p-2 svg-structure-wrapper filter invert saturate-150 brightness-125"
+                          className="w-full h-full flex items-center justify-center p-2.5 bg-white svg-structure-wrapper"
                           dangerouslySetInnerHTML={{ __html: structureSvg }}
                         />
                       ) : (
                         <div className="flex flex-col items-center gap-3">
                           <p className="text-[10px] text-white/30 font-mono text-center px-4 leading-normal">
-                            Rendering structure on-demand preserves workstation memory
+                            Fetching from database failed. Preserves local RDKit rendering fallback.
                           </p>
                           <button
                             onClick={handleGenerateStructure}
@@ -1157,21 +1174,34 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-black/20 border border-white/[0.03] rounded-lg mt-3">
-                    {structureLoading ? (
+                  <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-[#0a0f1d] border border-white/[0.03] rounded-lg mt-3">
+                    {usePubChem ? (
+                      <div className="w-full h-full flex items-center justify-center bg-white p-3.5 shadow-inner">
+                        <img
+                          src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG`}
+                          alt={`${detail.name || 'Compound'} 2D Structure`}
+                          className="max-w-full max-h-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                          onError={() => {
+                            console.warn(`[FLOW-TRACE] PubChem REST PUG image load failed in fullscreen. Falling back to local RDKit.`);
+                            setUsePubChem(false);
+                            handleGenerateStructure();
+                          }}
+                        />
+                      </div>
+                    ) : structureLoading ? (
                       <div className="flex flex-col items-center gap-2 text-white/30 text-xs font-mono">
                         <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
                         RENDERING 2D SVG...
                       </div>
                     ) : structureGenerated && structureSvg ? (
                       <div
-                        className="w-full h-full flex items-center justify-center p-3 svg-structure-wrapper filter invert saturate-150 brightness-125"
+                        className="w-full h-full flex items-center justify-center p-3.5 bg-white svg-structure-wrapper"
                         dangerouslySetInnerHTML={{ __html: structureSvg }}
                       />
                     ) : (
                       <div className="flex flex-col items-center gap-3">
                         <p className="text-xs text-white/30 font-mono text-center px-4 leading-normal">
-                          Molecular structure representation
+                          Fetching from database failed. Preserves local RDKit rendering fallback.
                         </p>
                         <button
                           onClick={handleGenerateStructure}
