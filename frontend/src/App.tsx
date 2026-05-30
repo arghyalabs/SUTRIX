@@ -82,6 +82,53 @@ class ErrorBoundary extends React.Component<
   }
 }
 
+const getErrorMessage = (error: any, fallback: string): string => {
+  if (!error) return fallback;
+  
+  const responseData = error.response?.data;
+  if (responseData) {
+    const detail = responseData.detail;
+    if (detail) {
+      if (typeof detail === 'string') {
+        return detail;
+      }
+      if (Array.isArray(detail)) {
+        try {
+          return detail
+            .map((err: any) => {
+              const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : '';
+              const prefix = field ? `[${field}] ` : '';
+              return `${prefix}${err.msg || 'Validation error'}`;
+            })
+            .join('; ');
+        } catch {
+          return JSON.stringify(detail);
+        }
+      }
+      if (typeof detail === 'object') {
+        try {
+          return JSON.stringify(detail);
+        } catch {
+          return fallback;
+        }
+      }
+    }
+    if (typeof responseData === 'string') {
+      return responseData;
+    }
+  }
+
+  if (error.message && typeof error.message === 'string') {
+    return error.message;
+  }
+  
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return fallback;
+};
+
 const App: React.FC = () => {
   const storeWorkspaceId = useWorkspaceStore(s => s.workspaceId);
   const generatedClientId = useRef(`SDO_CORE_${Math.random().toString(36).substring(2, 9)}`).current;
@@ -302,7 +349,7 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       setIsUploadProcessing(false);
-      toast.error(error.response?.data?.detail || 'Upload failed');
+      toast.error(getErrorMessage(error, 'Upload failed'));
     }
   }, [clientId]);
 
@@ -377,7 +424,7 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       setIsUploadProcessing(false);
-      toast.error(error.response?.data?.detail || 'Failed to load demo dataset');
+      toast.error(getErrorMessage(error, 'Failed to load demo dataset'));
     }
   }, [clientId]);
 
@@ -390,7 +437,7 @@ const App: React.FC = () => {
       setDataset(filename || 'dataset.parquet', d.parquet_path, d.row_count, d.columns, d.preview);
       setActiveTab('mapping');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Curation failed');
+      toast.error(getErrorMessage(error, 'Curation failed'));
     }
   };
 
@@ -428,7 +475,7 @@ const App: React.FC = () => {
       
       setActiveTab('hierarchy');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Mapping failed');
+      toast.error(getErrorMessage(error, 'Mapping failed'));
     }
   };
 
@@ -447,7 +494,7 @@ const App: React.FC = () => {
       socket.connectToJob(response.job_id);
       toast.success('Parallel calculation job dispatched.');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to start job');
+      toast.error(getErrorMessage(error, 'Failed to start job'));
     }
   };
 
@@ -491,7 +538,7 @@ const App: React.FC = () => {
 
       setActiveTab('readiness');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to fetch results');
+      toast.error(getErrorMessage(error, 'Failed to fetch results'));
     }
   };
 
@@ -502,7 +549,7 @@ const App: React.FC = () => {
       setReadiness(auditRes as any);
       toast.success('Audit recalculated', { id: t });
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Failed to recalculate', { id: t });
+      toast.error(getErrorMessage(e, 'Failed to recalculate'), { id: t });
     }
   };
 
@@ -571,7 +618,7 @@ const App: React.FC = () => {
                 setModelingAnalysis(result);
                 toast.success('AI Analysis complete!');
               } catch (e: any) {
-                toast.error(e.response?.data?.detail || 'Analysis failed');
+                toast.error(getErrorMessage(e, 'Analysis failed'));
               } finally {
                 setModelingLoading(false);
               }

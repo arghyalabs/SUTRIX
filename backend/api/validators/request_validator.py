@@ -80,7 +80,10 @@ class MappingPayload(BaseClientPayload):
         sanitized = {}
         for col, sci_var in v.items():
             col = col.strip()
-            sci_var = sci_var.strip().lower()
+            if not sci_var or not sci_var.strip():
+                sci_var = "none"
+            else:
+                sci_var = sci_var.strip().lower()
             if sci_var not in ALLOWED_SCI_VARS:
                 raise ValueError(f"Mapping value '{sci_var}' is invalid. Allowed variables are: {list(ALLOWED_SCI_VARS)}")
             

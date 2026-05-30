@@ -187,8 +187,10 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
 
   // Get candidate columns from mappings
   const candidateColumns = useMemo(() => {
-    const list = columns.length > 0 ? columns : Object.keys(mappings);
-    return list.filter(col => !isChemicalIdentifierColumn(col, mappings[col]));
+    const safeColumns = columns || [];
+    const safeMappings = mappings || {};
+    const list = safeColumns.length > 0 ? safeColumns : Object.keys(safeMappings);
+    return list.filter(col => !isChemicalIdentifierColumn(col, safeMappings[col]));
   }, [columns, mappings]);
 
   // When socket completes, show completion state
