@@ -140,7 +140,7 @@ def _resolve_compound_fields(row: pd.Series, mappings: Dict[str, str]) -> Dict[s
     value = None
     user_col = sci_to_user.get("value")
     if user_col and user_col in row.index and pd.notnull(row[user_col]):
-        value = row[user_col]
+        value = _to_json_safe(row[user_col])
         
     # 7. Resolve Unit
     unit = None
