@@ -3,6 +3,7 @@ import re
 from typing import List, Dict
 from pydantic import BaseModel, field_validator, model_validator
 from fastapi import HTTPException
+from backend.core.scientific_ontology import SCIENTIFIC_VARIABLES
 
 class BaseClientPayload(BaseModel):
     client_id: str
@@ -34,21 +35,12 @@ class MappingPayload(BaseClientPayload):
     @classmethod
     def validate_mappings_dict(cls, v: Dict[str, str]) -> Dict[str, str]:
         """Ensures that the mapping values map to allowed scientific columns."""
-        ALLOWED_SCI_VARS = {
-            "none", "chemical_name", "chemical_id", "cas_number", "canonical_smiles", "inchi",
-            "molecular_weight", "logp", "pka", "tpsa", "h_bond_donors", "h_bond_acceptors",
-            "endpoint", "value", "unit", "qualifier", "pxc50", "assay_type", "target_gene", "cell_line",
-            "organism", "strain", "life_stage", "trophic_level",
-            "temperature", "ph", "study_year", "glp_compliant", "source_database", "test_type",
-            "exposure_time", "exposure_route", "route", "test_medium",
-            "biodegradation", "half_life", "bcf", "koc",
-            "patient_id", "age", "sex", "clinical_phase", "adverse_event",
-            "clearance", "bioavailability", "cmax", "tmax", "vd",
-            "smiles", "species", "duration", "ic50", "ec50", "ki", "potency", "toxicity", 
-            "absorption", "distribution", "metabolism", "excretion", "toxicology", 
-            "hbd", "hba", "rotatable_bonds", "target", "assay", "classification_target", "regression_target",
-            "descriptor", "metabolite", "ghs_classification", "pubchem_cid", "chembl_id", "drugbank_id", 
-            "dsstox_id", "echa_id", "molecular_formula", "inchikey"
+        ALLOWED_SCI_VARS = set(SCIENTIFIC_VARIABLES.keys()) | {
+            "none", "smiles", "inchi", "chemical_id", "organism", "exposure_time", "exposure_route", "route",
+            "pxc50", "regression_target", "pic50", "potency", "ic50", "ec50", "ki",
+            "classification_target", "assay", "assay_type", "target", "toxicity", "toxicology",
+            "absorption", "distribution", "metabolism", "excretion",
+            "species", "duration", "value", "endpoint", "chemical_name"
         }
         
         # Translation map to normalize all scientific variables to canonical backend keys
