@@ -18,7 +18,7 @@ if (SafePlot) {
   }
 }
 
-export const OptimizedPlotly: React.FC<PlotProps> = ({ data, layout, useGL = true }) => {
+export const OptimizedPlotly: React.FC<PlotProps> = ({ data, layout, useGL = false }) => {
   // Guard: if data or layout missing, show placeholder
   if (!data || !layout) {
     return (
@@ -28,19 +28,24 @@ export const OptimizedPlotly: React.FC<PlotProps> = ({ data, layout, useGL = tru
     );
   }
 
+  // Deep clone the layout object to prevent Plotly from mutatively cross-wiring nested objects (xaxis, yaxis) between multiple charts on the same page
+  const parsedLayout = JSON.parse(JSON.stringify(layout));
+
   const finalLayout = {
-    ...layout,
+    ...parsedLayout,
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
-    font: { ...(layout?.font || {}), family: 'Inter, system-ui, sans-serif', color: '#94A3B8' },
-    margin: { t: 40, r: 20, l: 40, b: 40 },
+    font: { ...(parsedLayout?.font || {}), family: 'Inter, system-ui, sans-serif', color: '#94A3B8' },
+    margin: parsedLayout.margin || { t: 40, r: 20, l: 40, b: 40 },
   };
 
-  // Enforce WebGL rendering for performance on large datasets
+  // Enforce WebGL rendering ONLY if explicitly requested, otherwise fallback to SVG for maximum environmental compatibility
   const optimizedData = (Array.isArray(data) ? data : []).map(trace => {
-    if (trace.type === 'scatter') return { ...trace, type: 'scattergl' };
-    if (trace.type === 'heatmap') return { ...trace, type: 'heatmapgl' };
-    if (trace.type === 'contour') return { ...trace, type: 'contourgl' };
+    if (useGL) {
+      if (trace.type === 'scatter') return { ...trace, type: 'scattergl' };
+      if (trace.type === 'heatmap') return { ...trace, type: 'heatmapgl' };
+      if (trace.type === 'contour') return { ...trace, type: 'contourgl' };
+    }
     return trace;
   });
 
