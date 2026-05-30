@@ -644,12 +644,12 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
               >
                 
                 {/* ── SECTION 1: Compound Identity Card ── */}
-                <div className="rounded-xl border border-white/[0.05] bg-black/40 p-6 pt-7 mt-4 relative overflow-hidden">
+                <div className="rounded-xl border border-white/[0.05] bg-black/40 p-6 pt-12 pb-6 mt-4 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-cyan-500/5 to-violet-500/5 rounded-bl-full pointer-events-none" />
                   
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-2xl font-extrabold text-white tracking-tight leading-normal pt-2 pb-1 break-words">
+                      <h2 className="text-2xl font-extrabold text-white tracking-tight leading-relaxed mt-2 pt-2 pb-1 break-words">
                         {detail.name || 'Unnamed Chemical Subgroup'}
                       </h2>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -734,11 +734,11 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                     
                     <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-white border border-white/[0.08] rounded-lg mt-2.5 shadow-inner">
                       {usePubChem ? (
-                        <div className="w-full h-full flex items-center justify-center bg-white p-2.5">
+                        <div className="w-full h-full flex items-center justify-center bg-white p-2.5 overflow-hidden">
                           <img
                             src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG?image_size=400x400`}
                             alt={`${detail.name || 'Compound'} 2D Structure`}
-                            className="max-w-full max-h-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                            className="w-full h-full object-contain scale-[1.75] transition-transform duration-300 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                             onError={() => {
                               console.warn(`[FLOW-TRACE] PubChem REST PUG image load failed for SMILES. Falling back to local RDKit generator.`);
                               setUsePubChem(false);
@@ -753,7 +753,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                         </div>
                       ) : structureGenerated && structureSvg ? (
                         <div
-                          className="w-full h-full flex items-center justify-center p-2.5 bg-white svg-structure-wrapper"
+                          className="w-full h-full flex items-center justify-center p-2.5 bg-white svg-structure-wrapper scale-[1.3] transition-transform duration-300"
                           dangerouslySetInnerHTML={{ __html: structureSvg }}
                         />
                       ) : (
@@ -1132,7 +1132,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-cyan-400 font-mono">
                   High-Density Chemical Intelligence Workspace
                 </span>
-                <h1 className="text-2xl font-extrabold text-white mt-1 leading-normal break-words">
+                <h1 className="text-2xl font-extrabold text-white mt-2 leading-relaxed break-words">
                   {detail.name || 'Unnamed Chemical Subgroup'}
                 </h1>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -1178,11 +1178,11 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                   </div>
                   <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-white border border-white/[0.08] rounded-lg mt-3 shadow-inner">
                     {usePubChem ? (
-                      <div className="w-full h-full flex items-center justify-center bg-white p-3.5">
+                      <div className="w-full h-full flex items-center justify-center bg-white p-3.5 overflow-hidden">
                         <img
                           src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG?image_size=600x600`}
                           alt={`${detail.name || 'Compound'} 2D Structure`}
-                          className="max-w-full max-h-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                          className="w-full h-full object-contain scale-[1.75] transition-transform duration-300 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
                           onError={() => {
                             console.warn(`[FLOW-TRACE] PubChem REST PUG image load failed in fullscreen. Falling back to local RDKit.`);
                             setUsePubChem(false);
@@ -1197,7 +1197,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                       </div>
                     ) : structureGenerated && structureSvg ? (
                       <div
-                        className="w-full h-full flex items-center justify-center p-3.5 bg-white svg-structure-wrapper"
+                        className="w-full h-full flex items-center justify-center p-3.5 bg-white svg-structure-wrapper scale-[1.3] transition-transform duration-300"
                         dangerouslySetInnerHTML={{ __html: structureSvg }}
                       />
                     ) : (
