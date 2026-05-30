@@ -214,10 +214,10 @@ async def render_structure_svg(smiles: str = Query(..., description="SMILES stri
         if mol is None:
             raise ValueError(f"RDKit could not parse SMILES: {smiles!r}")
 
-        drawer = rdMolDraw2D.MolDraw2DSVG(300, 200)
+        drawer = rdMolDraw2D.MolDraw2DSVG(600, 400)
         drawer.drawOptions().addStereoAnnotation = True
-        drawer.drawOptions().bondLineWidth = 3.0
-        drawer.drawOptions().minFontSize = 14
+        drawer.drawOptions().bondLineWidth = 4.5
+        drawer.drawOptions().minFontSize = 18
         drawer.DrawMolecule(mol)
         drawer.FinishDrawing()
         svg_content = drawer.GetDrawingText()
