@@ -17,12 +17,36 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
   const chartRef = useRef<HTMLDivElement>(null);
+  const legendListRef = useRef<HTMLUListElement>(null);
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set());
 
-  // Compute Research Metrics
+  // Reset exclusions when data changes or modal opens/closes
+  React.useEffect(() => {
+    setExcludedCategories(new Set());
+  }, [data, isOpen]);
+
+  const toggleCategory = (name: string) => {
+    setExcludedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        if (next.size >= data.length - 1) return prev; // Keep at least one subgroup active
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const filteredData = useMemo(() => {
+    return data.filter(item => !excludedCategories.has(item.name));
+  }, [data, excludedCategories]);
+
+  // Compute Research Metrics dynamically from filtered active categories
   const metrics = useMemo(() => {
-    if (!data || data.length === 0) return null;
+    if (!filteredData || filteredData.length === 0) return null;
     
-    const total = data.reduce((sum, item) => sum + item.value, 0);
+    const total = filteredData.reduce((sum, item) => sum + item.value, 0);
     let shannonEntropy = 0;
     let maxProp = 0;
     let minProp = Infinity;
@@ -31,7 +55,7 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
     let rareCategory = '';
     let rareCount = 0;
 
-    const enrichedData = data.map(item => {
+    const enrichedData = filteredData.map(item => {
       const p = item.value / total;
       if (p > 0) shannonEntropy -= p * Math.log(p);
       if (p > maxProp) {
@@ -48,10 +72,9 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
     });
 
     // Shannon Diversity Index: H = -sum(p * ln(p))
-    // Evenness: E = H / ln(S) where S is number of categories
-    const maxEntropy = Math.log(data.length) || 1;
+    const maxEntropy = Math.log(filteredData.length) || 1;
     const evenness = shannonEntropy / maxEntropy;
-    const richness = data.length;
+    const richness = filteredData.length;
 
     return {
       total,
@@ -66,19 +89,28 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
       richness,
       enrichedData: enrichedData.sort((a, b) => b.value - a.value)
     };
-  }, [data]);
+  }, [filteredData]);
 
   const handleDownloadPng = async () => {
     if (!chartRef.current) return;
+    
+    // Add downloading class to completely strip scrollbars and set overflow hidden via CSS
+    chartRef.current.classList.add('downloading-png');
+    
     try {
       const filter = (node: Element) => !(node instanceof HTMLElement && node.dataset.downloadIgnore === 'true');
-      const dataUrl = await toPng(chartRef.current, { pixelRatio: 2, filter });
+      // Two-pass for font/style warm-up to ensure clean rendering
+      await toPng(chartRef.current, { pixelRatio: 2, filter, cacheBust: true });
+      const dataUrl = await toPng(chartRef.current, { pixelRatio: 2, filter, cacheBust: true });
       const a = document.createElement('a');
       a.download = `sdo_pie_${title.replace(/\s+/g, '_')}.png`;
       a.href = dataUrl;
       a.click();
     } catch (err) {
       console.error('PNG Export failed:', err);
+    } finally {
+      // Remove downloading class to restore normal UI scrollbars and interaction
+      chartRef.current.classList.remove('downloading-png');
     }
   };
 
@@ -135,84 +167,172 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
             <div className="flex-1 min-h-0 relative w-full h-full">
               {viewMode === 'chart' ? (
                 <div className="grid grid-cols-12 gap-6 w-full h-full p-4">
-                  {/* Left Panel: Mathematically Centered Pie Visual (8/12 cols) */}
-                  <div className="col-span-8 relative w-full h-full flex items-center justify-center">
-                    <div className="absolute flex flex-col items-center justify-center pointer-events-none" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                      <span className="text-[10px] uppercase tracking-wider text-white/40 font-bold">TOTAL</span>
-                      <span className="text-2xl font-extrabold text-white leading-none my-0.5">
-                        {metrics.total.toLocaleString()}
-                      </span>
-                      <span className="text-[9px] uppercase tracking-wider text-cyan-400 font-bold">
-                        Records
-                      </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={metrics.enrichedData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius="40%"
-                          outerRadius="72%"
-                          paddingAngle={2}
-                          dataKey="value"
-                          labelLine={true}
-                          label={({ name, value, percentage }: any) => `${name} (${value.toLocaleString()} | ${percentage.toFixed(1)}%)`}
-                        >
-                          {metrics.enrichedData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={colors[index % colors.length]} stroke="rgba(255,255,255,0.05)" />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          content={({ active, payload }: any) => {
-                            if (active && payload && payload.length) {
-                              const d = payload[0].payload;
-                              const displayLabel = title.replace("Composition Analysis: ", "").replace("Pie Chart Analysis", "").trim();
-                              const finalLabel = displayLabel ? displayLabel : 'Category';
-                              return (
-                                <div className="bg-[#0d1a30] border border-white/[0.08] rounded-xl px-4 py-3 shadow-2xl space-y-1 font-mono">
-                                  <p className="text-white text-xs font-semibold">
-                                    <span className="text-white/50">{finalLabel}: </span>
-                                    <span className="text-cyan-400 font-bold">{d.name}</span>
-                                  </p>
-                                  <p className="text-white text-xs">
-                                    <span className="text-white/50">Count: </span>
-                                    <span className="font-bold text-white">{d.value.toLocaleString()}</span>
-                                  </p>
-                                  <p className="text-white text-xs">
-                                    <span className="text-white/50">Percentage: </span>
-                                    <span className="font-bold text-cyan-400">{d.percentage.toFixed(1)}%</span>
-                                  </p>
-                                </div>
-                              );
+                  {/* Left Panel: Pie chart (9/12 cols) — uses flex centering with square inner box so cx/cy=50% is always symmetric */}
+                  <div className="col-span-9 w-full h-full flex items-center justify-center">
+                    {/* Square aspect box ensures equal horizontal and vertical radius from cx/cy center */}
+                    <div className="relative" style={{ width: 'min(100%, 100vh - 220px)', aspectRatio: '1 / 1' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                          <Pie
+                            data={metrics.enrichedData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius="28%"
+                            outerRadius="46%"
+                            paddingAngle={2}
+                            dataKey="value"
+                            labelLine={metrics.richness <= 12}
+                            label={metrics.richness <= 12
+                              ? ({ name, percentage }: any) => {
+                                  if (percentage < 2) return '';
+                                  const shortName = name.length > 14 ? name.slice(0, 13) + '…' : name;
+                                  return `${shortName} ${percentage.toFixed(1)}%`;
+                                }
+                              : false
                             }
-                            return null;
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                          >
+                            {metrics.enrichedData.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} stroke="rgba(255,255,255,0.05)" />
+                            ))}
+                          </Pie>
+                          
+                          {/* Center text rendered directly inside SVG to guarantee perfect, pixel-accurate alignment with the Pie center */}
+                          <text
+                            x="50%"
+                            y="50%"
+                            dy="-18"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fill="rgba(255, 255, 255, 0.4)"
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.1em',
+                              fontFamily: "'Inter', system-ui, sans-serif"
+                            }}
+                          >
+                            TOTAL
+                          </text>
+                          <text
+                            x="50%"
+                            y="50%"
+                            dy="5"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fill="#ffffff"
+                            style={{
+                              fontSize: '24px',
+                              fontWeight: 800,
+                              fontFamily: "'Inter', system-ui, sans-serif"
+                            }}
+                          >
+                            {metrics.total.toLocaleString()}
+                          </text>
+                          <text
+                            x="50%"
+                            y="50%"
+                            dy="24"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fill="#22D3EE"
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.1em',
+                              fontFamily: "'Inter', system-ui, sans-serif"
+                            }}
+                          >
+                            Records
+                          </text>
+
+                          <Tooltip 
+                            content={({ active, payload }: any) => {
+                              if (active && payload && payload.length) {
+                                const d = payload[0].payload;
+                                const displayLabel = title.replace("Composition Analysis: ", "").replace("Pie Chart Analysis", "").trim();
+                                const finalLabel = displayLabel ? displayLabel : 'Category';
+                                return (
+                                  <div className="bg-[#0d1a30] border border-white/[0.08] rounded-xl px-4 py-3 shadow-2xl space-y-1 font-mono">
+                                    <p className="text-white text-xs font-semibold">
+                                      <span className="text-white/50">{finalLabel}: </span>
+                                      <span className="text-cyan-400 font-bold">{d.name}</span>
+                                    </p>
+                                    <p className="text-white text-xs">
+                                      <span className="text-white/50">Count: </span>
+                                      <span className="font-bold text-white">{d.value.toLocaleString()}</span>
+                                    </p>
+                                    <p className="text-white text-xs">
+                                      <span className="text-white/50">Percentage: </span>
+                                      <span className="font-bold text-cyan-400">{d.percentage.toFixed(1)}%</span>
+                                    </p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
 
-                  {/* Right Panel: Clean Sidebar Legend (4/12 cols) */}
-                  <div className="col-span-4 flex items-center justify-center pr-2">
-                    <ul className="w-full max-h-[85%] overflow-y-auto pr-1 custom-scrollbar bg-[#0b1220]/90 p-5 border border-white/[0.06] rounded-xl shadow-2xl">
-                      <li className="text-[10px] uppercase tracking-wider font-extrabold text-white/40 mb-3 border-b border-white/[0.05] pb-2 flex justify-between font-mono">
-                        <span>Subgroup</span>
+                  {/* Right Panel: Clean Sidebar Legend (3/12 cols) with interactive select/deselect toggles */}
+                  <div className="col-span-3 flex items-center justify-center pr-2">
+                    <ul ref={legendListRef} className="w-full max-h-full overflow-y-auto pr-1 custom-scrollbar bg-[#0b1220]/90 p-5 border border-white/[0.06] rounded-xl shadow-2xl">
+                      <li className="text-[10px] uppercase tracking-wider font-extrabold text-white/40 mb-3 border-b border-white/[0.05] pb-2 flex justify-between items-center font-mono">
+                        <div className="flex items-center gap-2">
+                          <span>Subgroup</span>
+                          <button
+                            onClick={() => {
+                              if (excludedCategories.size > 0) {
+                                setExcludedCategories(new Set());
+                              } else {
+                                // Exclude all except the first one (highest count category)
+                                const sorted = [...data].sort((a, b) => b.value - a.value);
+                                const firstCat = sorted[0]?.name;
+                                if (firstCat) {
+                                  setExcludedCategories(new Set(data.map(d => d.name).filter(n => n !== firstCat)));
+                                }
+                              }
+                            }}
+                            className="text-[9px] text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded transition-all normal-case cursor-pointer select-none"
+                            title="Toggle all categories"
+                            data-download-ignore="true"
+                          >
+                            {excludedCategories.size > 0 ? "select all" : "clear all"}
+                          </button>
+                        </div>
                         <span>Distribution</span>
                       </li>
-                      {metrics.enrichedData.map((entry: any, index: number) => {
+                      {[...data].sort((a, b) => b.value - a.value).map((entry: any, index: number) => {
+                        const isExcluded = excludedCategories.has(entry.name);
                         const count = entry.value;
-                        const pct = entry.percentage;
+                        const activeTotal = metrics?.total ?? 0;
+                        const pct = activeTotal > 0 ? (count / activeTotal) * 100 : 0;
                         const color = colors[index % colors.length];
                         return (
-                          <li key={`item-${index}`} className="flex items-center justify-between w-full text-xs font-mono py-1">
-                            <span className="flex items-center gap-2 text-white/80">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                              <span className="truncate max-w-[120px]" title={entry.name}>{entry.name}</span>
+                          <li
+                            key={`item-${index}`}
+                            onClick={() => toggleCategory(entry.name)}
+                            className="flex items-center justify-between w-full text-xs font-mono py-1.5 px-2 rounded-lg cursor-pointer hover:bg-white/[0.03] select-none transition-colors"
+                          >
+                            <span className="flex items-center gap-2 text-white/85 min-w-0 flex-1">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0 border transition-all duration-200"
+                                style={{
+                                  backgroundColor: isExcluded ? 'transparent' : color,
+                                  borderColor: isExcluded ? 'rgba(255,255,255,0.2)' : 'transparent'
+                                }}
+                              />
+                              <span className={`truncate transition-all ${isExcluded ? 'text-white/20 line-through' : 'text-white/80'}`} title={entry.name}>
+                                {entry.name}
+                              </span>
                             </span>
                             <span className="flex-1 mx-2 border-b border-dotted border-white/20 align-bottom h-3" />
-                            <span className="text-white/60 shrink-0 font-bold">
-                              {count.toLocaleString()} ({pct.toFixed(1)}%)
+                            <span className={`shrink-0 font-bold transition-all ${isExcluded ? 'text-white/10 font-normal' : 'text-white/60'}`}>
+                              {isExcluded ? `${count.toLocaleString()} (hidden)` : `${count.toLocaleString()} (${pct.toFixed(1)}%)`}
                             </span>
                           </li>
                         );
