@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
+import { AnimatePresence } from 'framer-motion';
 
 // API Services Resilience Layer
 import { uploadApi } from './services/uploadApi';
@@ -26,6 +27,15 @@ import { modelingApi } from './services/modelingApi';
 import { ReportsExport } from './components/reports/ReportsExport';
 import { BenchmarkPanel } from './components/telemetry/BenchmarkPanel';
 import { CompoundExplorer } from './components/reports/CompoundExplorer';
+import { CompoundPreview } from './components/reports/CompoundPreview';
+
+// SUTRIX Dual Environment Workspaces and Modals
+import { WorkspaceChoiceModal } from './components/ui/WorkspaceChoiceModal';
+import { StructureRecoveryWizard } from './components/scientific/StructureRecoveryWizard';
+import { ScientificIntelligenceWorkspace } from './components/scientific/ScientificIntelligenceWorkspace';
+import { ScientificDataExplorer } from './components/scientific/ScientificDataExplorer';
+import { AlertTriangle } from 'lucide-react';
+import type { DatasetMode } from './types';
 
 // AGPL-3.0 Compliance Views
 import { LicenseGate } from './components/license/LicenseGate';
@@ -148,6 +158,10 @@ const App: React.FC = () => {
     setLicenseAccepted(true);
   };
 
+  const [showWorkspaceChoiceModal, setShowWorkspaceChoiceModal] = useState(false);
+  const [showSwitchWorkspaceModal, setShowSwitchWorkspaceModal] = useState(false);
+  const [showRecoveryWizard, setShowRecoveryWizard] = useState(false);
+
   const {
     activeTab, setActiveTab,
     filename, parquetPath, rowCount, columns, preview, setDataset,
@@ -158,7 +172,12 @@ const App: React.FC = () => {
     activeJobId, setActiveJobId, setActiveJobType,
     modelingAnalysis, setModelingAnalysis, modelingLoading, setModelingLoading,
     modelingActivePanel, setModelingActivePanel,
-    resetWorkspace
+    resetWorkspace, setWorkspaceId,
+    datasetMode, setDatasetMode,
+    datasetClassification, setDatasetClassification,
+    datasetPassport, setDatasetPassport,
+    detectedDomain, setDetectedDomain,
+    primaryEntityType, setPrimaryEntityType
   } = useWorkspaceStore();
 
   const socket = useWebSocket(clientId);
@@ -455,6 +474,14 @@ const App: React.FC = () => {
         }
       }
       
+      if (mapRes.dataset_mode) {
+        setDatasetMode(mapRes.dataset_mode as DatasetMode);
+        setDatasetClassification(mapRes.dataset_classification);
+        setDatasetPassport(mapRes.dataset_passport);
+        setDetectedDomain(mapRes.dataset_passport?.detected_domain || 'General Scientific');
+        setPrimaryEntityType(mapRes.dataset_passport?.primary_entity_type || 'Compound');
+      }
+      
       if (mapRes.dataset_type) {
         toast.success(`Dataset classified: ${mapRes.dataset_type}`, {
           icon: '🧠',
@@ -471,12 +498,30 @@ const App: React.FC = () => {
         });
       }
       
-      toast.success('Mapping complete. Proceed to Hierarchy Builder.', { id: toastId });
+      toast.success('Mapping complete.', { id: toastId });
       
-      setActiveTab('hierarchy');
+      if (mapRes.dataset_mode === 'HYBRID') {
+        setShowWorkspaceChoiceModal(true);  // user picks mode
+      } else {
+        setActiveTab('hierarchy');          // direct transition
+      }
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Mapping failed'));
     }
+  };
+
+  // Workspace locked → "Switch Workspace" warning modal -> new session
+  const handleSwitchWorkspace = () => {
+    setShowSwitchWorkspaceModal(true);
+  };
+
+  const handleConfirmSwitchWorkspace = () => {
+    // Generate new unique ID, reset workspace state, and close warning popup
+    const newId = `SDO_CORE_${Math.random().toString(36).substring(2, 9)}`;
+    resetWorkspace();
+    setWorkspaceId(newId);
+    setShowSwitchWorkspaceModal(false);
+    toast.success('Switched to new workspace session. Stale memory swept.');
   };
 
   const handleRunEnrichment = async () => {
@@ -629,11 +674,15 @@ const App: React.FC = () => {
         );
       case 'verification':
         return (
-          <CompoundExplorer
+          <CompoundPreview
             clientId={clientId}
             activeJobId={activeJobId || null}
           />
         );
+      case 'sci-intelligence':
+        return <ScientificIntelligenceWorkspace clientId={clientId} />;
+      case 'sci-explorer':
+        return <ScientificDataExplorer clientId={clientId} />;
       case 'benchmark':
         return <BenchmarkPanel />;
       case 'reports':
@@ -668,13 +717,72 @@ const App: React.FC = () => {
         onExit={handleExit}
         onGoHome={() => setHasLaunched(false)}
         onOpenLicense={() => setIsLicenseModalOpen(true)}
+        onSwitchWorkspace={handleSwitchWorkspace}
         telemetryData={mockTelemetry}
       >
         <ErrorBoundary key={activeTab} onReset={() => setActiveTab('enrichment')}>
           {renderContent()}
         </ErrorBoundary>
       </DashboardLayout>
+      
       <LicenseModal isOpen={isLicenseModalOpen} onClose={() => setIsLicenseModalOpen(false)} />
+
+      {/* Workspace Choice Modal for HYBRID Datasets */}
+      <WorkspaceChoiceModal
+        isOpen={showWorkspaceChoiceModal}
+        onClose={() => setShowWorkspaceChoiceModal(false)}
+        onSelectMode={(mode) => {
+          setDatasetMode(mode);
+          setShowWorkspaceChoiceModal(false);
+          setActiveTab('hierarchy');
+        }}
+        onStartRecovery={() => {
+          setShowWorkspaceChoiceModal(false);
+          setShowRecoveryWizard(true);
+        }}
+      />
+
+      {/* Structure Recovery Wizard Modal */}
+      <StructureRecoveryWizard
+        isOpen={showRecoveryWizard}
+        onClose={() => setShowRecoveryWizard(false)}
+      />
+
+      {/* Switch Workspace Warning Overlay */}
+      <AnimatePresence>
+        {showSwitchWorkspaceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md p-6 border rounded-3xl bg-slate-900 border-slate-800 shadow-2xl flex flex-col items-center text-center space-y-4"
+            >
+              <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400">
+                <AlertTriangle className="w-8 h-8 animate-pulse" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Switch Active Workspace?</h3>
+              <p className="text-xs text-slate-400">
+                Your current workspace and all generated mappings, tree hierarchies, and analytical profiles will be securely preserved. A new session ID will be allocated for your new dataset.
+              </p>
+              <div className="flex gap-3 w-full pt-2">
+                <button 
+                  onClick={() => setShowSwitchWorkspaceModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white font-bold text-xs transition-colors"
+                >
+                  Keep Current
+                </button>
+                <button 
+                  onClick={handleConfirmSwitchWorkspace}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-cyan-400 text-slate-950 font-bold hover:bg-cyan-300 text-xs transition-colors"
+                >
+                  Confirm Switch
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

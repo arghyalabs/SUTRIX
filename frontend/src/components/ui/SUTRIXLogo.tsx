@@ -99,6 +99,7 @@ export const LogoLoader: React.FC<{
             stroke="url(#line-grad)" 
             strokeWidth="2.5" 
             strokeLinejoin="round"
+            d="M 25 45 L 75 25 L 60 75 L 25 45 Z"
             animate={{
               d: [
                 "M 25 45 L 75 25 L 60 75 L 25 45 Z",
@@ -111,11 +112,13 @@ export const LogoLoader: React.FC<{
           />
           <motion.line
             stroke="url(#line-grad)" strokeWidth="2.5"
+            x1="25" y1="45" x2="60" y2="75"
             animate={{ x1: [25, 23, 27, 25], y1: [45, 46, 44, 45], x2: [60, 62, 58, 60], y2: [75, 76, 74, 75] }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.line
             stroke="url(#line-grad)" strokeWidth="2.5"
+            x1="50" y1="50" x2="75" y2="25"
             animate={{ x1: [50, 49, 51, 50], y1: [50, 51, 49, 50], x2: [75, 73, 77, 75], y2: [25, 24, 26, 25] }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />
@@ -123,21 +126,25 @@ export const LogoLoader: React.FC<{
           {/* Drifting atoms */}
           <motion.circle 
             r="7.5" fill="url(#logo-grad)" 
+            cx="25" cy="45"
             animate={{ cx: [25, 23, 27, 25], cy: [45, 46, 44, 45] }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.circle 
             r="9.5" fill="url(#logo-grad)" 
+            cx="75" cy="25"
             animate={{ cx: [75, 73, 77, 75], cy: [25, 24, 26, 25] }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.circle 
             r="8.5" fill="url(#logo-grad)" 
+            cx="60" cy="75"
             animate={{ cx: [60, 62, 58, 60], cy: [75, 76, 74, 75] }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.circle 
             r="11" fill="url(#logo-grad)" 
+            cx="50" cy="50"
             animate={{ cx: [50, 49, 51, 50], cy: [50, 51, 49, 50] }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />

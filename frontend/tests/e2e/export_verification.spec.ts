@@ -105,7 +105,7 @@ test.describe('Export Page Deliverables E2E Verification', () => {
     // 1. Download Final Enriched Dataset (QSAR Ready)
     console.log('1. Fetching Final Enriched Dataset...');
     const parquetPromise = page.waitForEvent('download');
-    await page.getByRole('link', { name: 'Download Enriched Dataset' }).click();
+    await page.getByRole('link', { name: 'Download Parquet' }).click();
     const parquetDownload = await parquetPromise;
     const parquetPath = path.join(downloadsDir, 'enriched_dataset.parquet');
     await parquetDownload.saveAs(parquetPath);
@@ -139,7 +139,9 @@ test.describe('Export Page Deliverables E2E Verification', () => {
     console.log(`Saved compliance package to ${compliancePath}, size: ${fs.statSync(compliancePath).size} bytes`);
 
     console.log('--- Step 12: Testing Compound Preview Search ---');
-    const searchInput = page.locator("input[placeholder*='Atenolol']");
+    await page.locator('#sidebar-tab-verification').click();
+    await page.waitForTimeout(1000);
+    const searchInput = page.locator("input[placeholder*='Compound Name']");
     await expect(searchInput).toBeVisible();
     await searchInput.fill('CCO');
     await page.getByRole('button', { name: 'Search' }).click();

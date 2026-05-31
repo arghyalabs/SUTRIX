@@ -185,3 +185,38 @@ export interface ModelingAnalysis {
   meta: { elapsed_seconds: number; n_samples: number; n_features: number; analysis_timestamp: number };
 }
 
+export type DatasetMode = 'MOLECULAR' | 'SCIENTIFIC' | 'HYBRID';
+
+export interface DatasetClassification {
+  dataset_mode: DatasetMode;
+  smiles_detected: boolean;
+  smiles_col: string | null;
+  structure_rows: number;
+  missing_structure_rows: number;
+  total_rows: number;
+  structure_coverage_pct: number;
+  detection_method: string;
+  detected_domain: string;
+  domain_confidence: number;
+  domain_signals: string[];
+  primary_entity_type: string;
+  primary_entity_col: string | null;
+}
+
+export interface DatasetPassport {
+  dataset_mode: DatasetMode;
+  detected_domain: string;
+  domain_confidence: number;
+  primary_entity_type: string;
+  row_count: number;
+  column_count: number;
+  missing_pct: number;
+  duplicate_pct: number;
+  smiles_detected: boolean;
+  structure_coverage_pct: number;
+  recommended_workflow: string;
+  top_mapped_roles: string[];
+  key_warnings: string[];
+  timestamp: number;
+}
+

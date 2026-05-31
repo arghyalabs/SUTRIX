@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronRight, Activity, Network, Zap, GitBranch, Database, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ChevronRight, Activity, Network, Zap, GitBranch, Database, ShieldCheck, Trash2, RefreshCw } from 'lucide-react';
 import { LogoLoader } from '../ui/SUTRIXLogo';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { toast } from 'react-hot-toast';
 
 interface HeroSectionProps {
   onLaunch: () => void;
@@ -18,6 +19,7 @@ const SCIENTIFIC_CAPABILITIES = [
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onLaunch }) => {
   const hasActiveSession = useWorkspaceStore(state => !!state.filename);
+  const resetWorkspace = useWorkspaceStore(state => state.resetWorkspace);
 
   return (
     <section className="relative min-h-[92vh] flex flex-col w-full bg-[#03060d] overflow-hidden font-sans">
@@ -121,25 +123,51 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onLaunch }) => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className="pt-6 flex flex-wrap items-center gap-5"
+            className="pt-6 flex flex-wrap items-center gap-4"
           >
-            {/* Standardized Primary Button */}
+            {/* Standardized Primary Button: Always "Enter Workspace" */}
             <button
               onClick={onLaunch}
               className="group relative flex items-center gap-3 px-8 py-3.5 rounded-lg bg-white text-black font-semibold text-sm transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)]"
             >
-              {hasActiveSession ? 'Continue Workflow' : 'Enter Workspace'}
+              Enter Workspace
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
-            
-            {/* Standardized Secondary Button */}
-            <a
-              href="#workflow"
-              className="group flex items-center gap-2 px-7 py-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-semibold text-white/70 transition-all hover:-translate-y-0.5 hover:bg-white/[0.06] hover:text-white"
-            >
-              View Workflow
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-white/50 group-hover:text-white/80" />
-            </a>
+
+            {hasActiveSession ? (
+              <>
+                {/* Secondary Button: Resume Saved Session */}
+                <button
+                  onClick={onLaunch}
+                  className="group flex items-center gap-2 px-6 py-3.5 rounded-lg bg-white/[0.03] border border-cyan-500/30 text-sm font-semibold text-cyan-400 transition-all hover:-translate-y-0.5 hover:bg-cyan-500/10 hover:text-cyan-300 hover:border-cyan-500/50"
+                >
+                  <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-700 text-cyan-400" />
+                  Resume Session
+                </button>
+
+                {/* Reset Session Trash Utility */}
+                <button
+                  onClick={() => {
+                    resetWorkspace();
+                    toast.success('Workspace session successfully reset. Stale progress swept.');
+                  }}
+                  className="group flex items-center justify-center px-5 py-3.5 rounded-lg bg-red-950/20 border border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10 hover:border-red-500/40 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                  title="Reset Workspace Session"
+                >
+                  <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-semibold ml-2">Reset Session</span>
+                </button>
+              </>
+            ) : (
+              /* Standardized Secondary Button */
+              <a
+                href="#workflow"
+                className="group flex items-center gap-2 px-7 py-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm font-semibold text-white/70 transition-all hover:-translate-y-0.5 hover:bg-white/[0.06] hover:text-white"
+              >
+                View Workflow
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-white/50 group-hover:text-white/80" />
+              </a>
+            )}
           </motion.div>
         </div>
 
@@ -172,11 +200,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onLaunch }) => {
               <motion.path d="M 50 50 L 10 40" stroke="url(#lineGradWhite2)" strokeWidth="0.5" strokeDasharray="2,2" fill="none" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.5, delay: 1.0 }} />
               
               {/* Animated data particles flowing along paths */}
-              <motion.circle r="1" fill="#22d3ee" animate={{ cx: [50, 50], cy: [50, 15], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 0 }} />
-              <motion.circle r="1" fill="#22d3ee" animate={{ cx: [50, 90], cy: [50, 40], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 1 }} />
-              <motion.circle r="1" fill="#22d3ee" animate={{ cx: [50, 75], cy: [50, 85], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 0.5 }} />
-              <motion.circle r="1" fill="#8b5cf6" animate={{ cx: [50, 25], cy: [50, 85], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 1.5 }} />
-              <motion.circle r="1" fill="#8b5cf6" animate={{ cx: [50, 10], cy: [50, 40], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 2 }} />
+              <motion.circle cx="50" cy="50" r="1" fill="#22d3ee" animate={{ cx: [50, 50], cy: [50, 15], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 0 }} />
+              <motion.circle cx="50" cy="50" r="1" fill="#22d3ee" animate={{ cx: [50, 90], cy: [50, 40], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 1 }} />
+              <motion.circle cx="50" cy="50" r="1" fill="#22d3ee" animate={{ cx: [50, 75], cy: [50, 85], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 0.5 }} />
+              <motion.circle cx="50" cy="50" r="1" fill="#8b5cf6" animate={{ cx: [50, 25], cy: [50, 85], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 1.5 }} />
+              <motion.circle cx="50" cy="50" r="1" fill="#8b5cf6" animate={{ cx: [50, 10], cy: [50, 40], opacity: [0, 1, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear', delay: 2 }} />
             </svg>
 
             {/* 2. Central Intelligence Core */}

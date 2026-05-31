@@ -233,7 +233,8 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-3">Variable Mapping</h1>
+        <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Variable Mapping</h1>
+        <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block mb-3">Schema Bindings</p>
         <p className="text-secondary text-sm max-w-md mx-auto">
           Bind your dataset columns to toxicological primitives. SDO's mapping intelligence handles complex ecotox ontologies automatically.
         </p>

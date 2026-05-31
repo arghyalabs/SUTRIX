@@ -8,7 +8,7 @@ test.describe('Scientific Data Orchestrator - End-to-End Production Pipeline Tes
     await page.waitForLoadState('networkidle');
 
     // Verify the landing page features first
-    await expect(page.locator('text=AI-Native Scientific')).toBeVisible();
+    await expect(page.locator('text=AI-Native Intelligence Engine')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Enter Workspace' })).toBeVisible();
 
     // Phase 2: Enter Workspace sandbox (triggers LicenseGate)
@@ -41,7 +41,7 @@ test.describe('Scientific Data Orchestrator - End-to-End Production Pipeline Tes
     await page.waitForTimeout(500);
 
     // Phase 4: Variable Mapping
-    await expect(page.locator('text=Variable Mapping')).toBeVisible();
+    await expect(page.locator('text=Variable Mapping').first()).toBeVisible();
     await expect(page.locator('text=Schema Bindings')).toBeVisible();
     
     // Click final mapping confirm to dispatch bindings to backend
@@ -89,11 +89,11 @@ test.describe('Scientific Data Orchestrator - End-to-End Production Pipeline Tes
     // Click on the sidebar Export tab item
     await page.locator('#sidebar-tab-reports').click();
     await page.waitForTimeout(500);
-    await expect(page.locator('text=Export & Compliance Reports')).toBeVisible();
+    await expect(page.locator('text=Export & Reports').first()).toBeVisible();
     
     // Verify the compliance deliverables are ready for downstream downloads
-    await expect(page.locator('text=Download Compliance ZIP')).toBeVisible();
-    await expect(page.locator('text=Download PDF Report')).toBeVisible();
+    await expect(page.locator('text=Download ZIP').first()).toBeVisible();
+    await expect(page.locator('text=Download PDF Report').first()).toBeVisible();
   });
   
 });
