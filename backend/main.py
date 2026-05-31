@@ -34,6 +34,7 @@ from backend.api.routes.hierarchy_routes import router as hierarchy_router
 from backend.api.routes.descriptor_routes import router as descriptor_router
 from backend.api.routes.modeling_routes import router as modeling_router
 from backend.api.routes.explorer_routes import router as explorer_router
+from backend.api.routes.structure_recovery_routes import router as recovery_router
 from backend.core.config import settings
 
 app = FastAPI(title="Scientific Data Orchestrator", version="4.0")
@@ -51,6 +52,7 @@ app.include_router(hierarchy_router)
 app.include_router(descriptor_router)
 app.include_router(modeling_router)
 app.include_router(explorer_router)
+app.include_router(recovery_router)
 
 memory_guard = MemoryGuard()
 
@@ -329,6 +331,93 @@ async def api_readiness(payload: BaseClientPayload):
         return await ScientificPipelineController.run_readiness_analysis(context)
     except Exception as e:
         logger.error(f"Readiness check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── 5b. WORKSPACE & DATA DICTIONARY ─────────────────────
+@app.get("/api/workspace/{client_id}/mode")
+async def api_workspace_mode(client_id: str):
+    try:
+        context = registry.get_context(client_id)
+        return {
+            "dataset_mode": getattr(context, "dataset_mode", "MOLECULAR"),
+            "dataset_classification": getattr(context, "dataset_classification", None),
+            "dataset_passport": getattr(context, "dataset_passport", None),
+            "detected_domain": getattr(context, "detected_domain", "General Scientific"),
+            "primary_entity_type": getattr(context, "primary_entity_type", "Compound")
+        }
+    except Exception as e:
+        logger.error(f"Failed to query workspace mode: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/workspace/{client_id}/data-dictionary")
+async def api_data_dictionary(client_id: str):
+    try:
+        context = registry.get_context(client_id)
+        df = context.load_slice()
+        
+        from backend.core.data_dictionary_generator import DataDictionaryGenerator
+        entries = DataDictionaryGenerator.generate(df, context.mappings)
+        from dataclasses import asdict
+        return [asdict(e) for e in entries]
+    except Exception as e:
+        logger.error(f"Data dictionary generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/workspace/{client_id}/data-dictionary/export")
+async def api_data_dictionary_export(client_id: str, format: str = "xlsx"):
+    try:
+        context = registry.get_context(client_id)
+        df = context.load_slice()
+        
+        from backend.core.data_dictionary_generator import DataDictionaryGenerator
+        entries = DataDictionaryGenerator.generate(df, context.mappings)
+        
+        fmt = format.lower().strip()
+        if fmt == "json":
+            from dataclasses import asdict
+            import json
+            from fastapi import Response
+            json_bytes = json.dumps([asdict(e) for e in entries], indent=2, ensure_ascii=False).encode("utf-8")
+            return Response(
+                content=json_bytes,
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename=data_dictionary_{client_id[:8]}.json"}
+            )
+            
+        elif fmt == "xlsx":
+            excel_bytes = DataDictionaryGenerator.to_excel(entries)
+            from fastapi import Response
+            return Response(
+                content=excel_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f"attachment; filename=data_dictionary_{client_id[:8]}.xlsx"}
+            )
+            
+        elif fmt == "pdf":
+            from backend.core.dataset_passport import DatasetPassport
+            p_dict = getattr(context, "dataset_passport", None)
+            if p_dict:
+                passport = DatasetPassport(**p_dict)
+            else:
+                from backend.core.dataset_classifier import DatasetClassifier
+                classification = DatasetClassifier.classify(df, context.mappings)
+                from backend.core.dataset_passport import DatasetPassportGenerator
+                passport = DatasetPassportGenerator.generate(df, context.mappings, classification)
+            
+            pdf_bytes = DataDictionaryGenerator.to_pdf(entries, passport)
+            from fastapi import Response
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename=data_dictionary_{client_id[:8]}.pdf"}
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported export format '{fmt}'")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Data dictionary export failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ── 6. TELEMETRY ─────────────────────────────────────

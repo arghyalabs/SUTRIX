@@ -47,6 +47,14 @@ class PipelineContext:
     active_job_id: Optional[str] = None
     active_segregation_result: Optional[Any] = None
 
+    # ── Dataset Intelligence (populated after column mapping) ─────────────────
+    # Mode is "MOLECULAR" for all legacy sessions (backwards compatible)
+    dataset_mode: str = "MOLECULAR"          # "MOLECULAR" | "SCIENTIFIC" | "HYBRID"
+    dataset_classification: Optional[Dict[str, Any]] = None  # full DatasetClassification dict
+    dataset_passport: Optional[Dict[str, Any]] = None        # full DatasetPassport dict
+    detected_domain: str = "General Scientific"
+    primary_entity_type: str = "Compound"
+
     # ── Scientific Hierarchy / Lineage (populated after segregation) ──────────
     # Serialisable lineage dict: {nodes, edges, root_id, total_nodes, max_depth}
     active_hierarchy: List[str] = field(default_factory=list)

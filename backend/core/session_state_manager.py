@@ -44,7 +44,13 @@ class SessionStateManager:
                 "active_lineage": context.active_lineage,
                 "node_details": context.hierarchy_engine.node_details if (context.hierarchy_engine and hasattr(context.hierarchy_engine, "node_details")) else None,
                 "last_accessed": context.last_accessed,
-                "saved_at": time.time()
+                "saved_at": time.time(),
+                # Dataset Intelligence fields (new)
+                "dataset_mode": getattr(context, "dataset_mode", "MOLECULAR"),
+                "dataset_classification": getattr(context, "dataset_classification", None),
+                "dataset_passport": getattr(context, "dataset_passport", None),
+                "detected_domain": getattr(context, "detected_domain", "General Scientific"),
+                "primary_entity_type": getattr(context, "primary_entity_type", "Compound"),
             }
             
             temp_path = self.get_state_file_path(context.workspace_id) + ".tmp"
@@ -93,6 +99,13 @@ class SessionStateManager:
             context.active_job_id = state_data.get("active_job_id")
             context.last_accessed = state_data.get("last_accessed", time.time())
             
+            # Restore Dataset Intelligence fields (with MOLECULAR default for legacy sessions)
+            context.dataset_mode = state_data.get("dataset_mode", "MOLECULAR")
+            context.dataset_classification = state_data.get("dataset_classification", None)
+            context.dataset_passport = state_data.get("dataset_passport", None)
+            context.detected_domain = state_data.get("detected_domain", "General Scientific")
+            context.primary_entity_type = state_data.get("primary_entity_type", "Compound")
+
             # Restore active lineage & hierarchy engine details
             context.active_lineage = state_data.get("active_lineage")
             context.active_segregation_result = context.active_lineage

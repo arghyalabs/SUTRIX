@@ -473,6 +473,134 @@ SCIENTIFIC_VARIABLES: Dict[str, Dict[str, Any]] = {
         "priority": 80,
         "category": "metadata",
         "label": "pH"
+    },
+
+    # ── UNIVERSAL ENTITY ROLES ───────────────────────────────────────────────
+    "entity_id": {
+        "aliases": ["entity_id", "entity id", "id", "identifier", "record_id", "record id"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Entity ID"
+    },
+    "entity_name": {
+        "aliases": ["entity_name", "entity name", "name", "label", "record_name"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Entity Name"
+    },
+    "subject_id": {
+        "aliases": ["subject_id", "subject id", "subject", "subjid"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Subject ID"
+    },
+    "participant_id": {
+        "aliases": ["participant_id", "participant id", "participant", "part_id"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Participant ID"
+    },
+    "site_id": {
+        "aliases": ["site_id", "site id", "site", "station", "station_id", "station id"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Site ID"
+    },
+    "location": {
+        "aliases": ["location", "site location", "place", "address"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Location"
+    },
+    "region": {
+        "aliases": ["region", "area", "zone", "province", "state", "country"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Region"
+    },
+    "department": {
+        "aliases": ["department", "dept", "division", "sector"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Department"
+    },
+    "sample_id": {
+        "aliases": ["sample_id", "sample id", "sample", "specimen_id", "specimen id", "sample_number", "sample no"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Sample ID"
+    },
+    "material_id": {
+        "aliases": ["material_id", "material id", "material", "mat_id"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Material ID"
+    },
+    "device_id": {
+        "aliases": ["device_id", "device id", "device", "instrument_id", "instrument id"],
+        "regex": [],
+        "priority": 75,
+        "category": "metadata",
+        "label": "Device ID"
+    },
+    "category": {
+        "aliases": ["category", "class", "type", "grouping"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Category"
+    },
+    "group": {
+        "aliases": ["group", "cohort", "cluster", "batch_group"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Group"
+    },
+    "treatment": {
+        "aliases": ["treatment", "intervention", "therapy", "exposure"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Treatment"
+    },
+    "outcome": {
+        "aliases": ["outcome", "result", "response", "effect", "endpoint_outcome"],
+        "regex": [],
+        "priority": 85,
+        "category": "metadata",
+        "label": "Outcome / Result"
+    },
+    "timestamp": {
+        "aliases": ["timestamp", "time_stamp", "time", "date_time", "datetime"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Timestamp"
+    },
+    "date": {
+        "aliases": ["date", "day", "month", "year"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Date"
+    },
+    "batch": {
+        "aliases": ["batch", "lot", "run", "batch_id", "batch id", "lot_number", "lot no"],
+        "regex": [],
+        "priority": 70,
+        "category": "metadata",
+        "label": "Batch / Lot"
     }
 }
 

@@ -15,6 +15,9 @@ from backend.storage.parquet_engine import ParquetEngine
 from backend.storage.memory_optimizer import downcast_dataframe, clean_memory
 from backend.workers.task_manager import TaskManager
 from backend.processing.readiness_engine import DatasetReadinessScorer, ScientificIntelligenceEngine
+from backend.core.dataset_classifier import DatasetClassifier
+from backend.core.dataset_passport import DatasetPassportGenerator
+from dataclasses import asdict
 
 logger = logging.getLogger("sdo.core.pipeline")
 parquet_engine = ParquetEngine()
@@ -221,17 +224,29 @@ class ScientificPipelineController:
 
             df, new_path, final_mappings, col_names, dataset_type, warnings = await loop.run_in_executor(None, _do_mapping)
 
+            # Perform Dual Environment Dataset Classification and Passport Generation
+            classification = DatasetClassifier.classify(df, final_mappings)
+            passport = DatasetPassportGenerator.generate(df, final_mappings, classification)
+
             # Apply ALL context mutations on the async side
             context.parquet_path = new_path
             context.dataframe_cache = df
             context.mappings = final_mappings
-            context.add_trace("mapping")  # THIS is what was missing
+            context.dataset_mode = classification.dataset_mode
+            context.dataset_classification = asdict(classification)
+            context.dataset_passport = DatasetPassportGenerator.to_dict(passport)
+            context.detected_domain = passport.detected_domain
+            context.primary_entity_type = passport.primary_entity_type
+            context.add_trace("mapping")
 
             return {
                 "success": True,
                 "mappings": final_mappings,
                 "columns": col_names,
                 "dataset_type": dataset_type,
+                "dataset_mode": classification.dataset_mode,
+                "dataset_classification": asdict(classification),
+                "dataset_passport": DatasetPassportGenerator.to_dict(passport),
                 "warnings": warnings,
             }
 
@@ -251,7 +266,10 @@ class ScientificPipelineController:
             # Derive hierarchy from mapped columns if none provided
             if not selected_hierarchy:
                 available_variables = [col for col in context.mappings if col in df.columns]
-                desired_sci_order = ['study_type', 'toxicity_category', 'species', 'endpoint', 'qualifier', 'duration']
+                if getattr(context, "dataset_mode", "MOLECULAR") == "SCIENTIFIC":
+                    desired_sci_order = ['category', 'group', 'site', 'region', 'department', 'treatment', 'outcome']
+                else:
+                    desired_sci_order = ['study_type', 'toxicity_category', 'species', 'endpoint', 'qualifier', 'duration']
                 sci_to_user = {v: k for k, v in context.mappings.items() if k in available_variables}
                 default_hierarchy = []
                 for sci_var in desired_sci_order:
@@ -369,17 +387,29 @@ class ScientificPipelineController:
 
             def _do_readiness():
                 df = context.load_slice()
-                scorer = DatasetReadinessScorer()
-                drs_res = scorer.evaluate(df, context.mappings)
-                harmonization_res = ScientificIntelligenceEngine.audit_endpoint_harmonization(df, context.mappings)
-                return {
-                    "score": drs_res["score"],
-                    "tier": drs_res["tier"],
-                    "breakdown": drs_res["breakdown"],
-                    "deductions": drs_res["deductions"],
-                    "harmonized": harmonization_res["harmonized"],
-                    "findings": harmonization_res["findings"],
-                }
+                if getattr(context, "dataset_mode", "MOLECULAR") == "SCIENTIFIC":
+                    from backend.processing.scientific_readiness_engine import ScientificReadinessEngine
+                    drs_res = ScientificReadinessEngine.evaluate(df, context.mappings)
+                    return {
+                        "score": drs_res["score"],
+                        "tier": drs_res["tier"],
+                        "breakdown": drs_res["breakdown"],
+                        "deductions": drs_res["deductions"],
+                        "harmonized": True,
+                        "findings": [],
+                    }
+                else:
+                    scorer = DatasetReadinessScorer()
+                    drs_res = scorer.evaluate(df, context.mappings)
+                    harmonization_res = ScientificIntelligenceEngine.audit_endpoint_harmonization(df, context.mappings)
+                    return {
+                        "score": drs_res["score"],
+                        "tier": drs_res["tier"],
+                        "breakdown": drs_res["breakdown"],
+                        "deductions": drs_res["deductions"],
+                        "harmonized": harmonization_res["harmonized"],
+                        "findings": harmonization_res["findings"],
+                    }
 
             results = await loop.run_in_executor(None, _do_readiness)
             results = _sanitize_for_json(results)  # convert all numpy scalars before JSON serialisation

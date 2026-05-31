@@ -127,6 +127,7 @@ class HierarchyNode:
     row_count: int
     unique_compounds: int    # unique SMILES/CAS count in this node's slice
     is_leaf: bool
+    unique_entities: int = 0
     children: List[str] = field(default_factory=list)  # child node ids
 
 
@@ -156,9 +157,14 @@ class HierarchyEngine:
             if role not in self._sci_to_col:
                 self._sci_to_col[role] = col
 
-        # Resolve compound ID column once
+        # Resolve compound ID / entity column once
         self._compound_col: Optional[str] = None
-        for role in ("canonical_smiles", "smiles", "cas_number", "chemical_id"):
+        priority_roles = [
+            "canonical_smiles", "smiles", "cas_number", "chemical_id", "chemical_name",
+            "entity_id", "entity_name", "patient_id", "subject_id", "participant_id",
+            "site_id", "location", "region", "sample_id", "material_id", "device_id"
+        ]
+        for role in priority_roles:
             col = self._sci_to_col.get(role)
             if col:
                 self._compound_col = col
@@ -234,6 +240,7 @@ class HierarchyEngine:
             path="Root",
             row_count=len(df),
             unique_compounds=root_unique,
+            unique_entities=root_unique,
             is_leaf=(len(hierarchy_cols) == 0),
             children=[],
         )
@@ -432,6 +439,7 @@ class HierarchyEngine:
                 path=child_path,
                 row_count=len(child_df),
                 unique_compounds=child_unique,
+                unique_entities=child_unique,
                 is_leaf=is_leaf,
                 children=[],
             )
@@ -498,6 +506,7 @@ class HierarchyEngine:
             "numeric_cols": numeric_cols,
             "categorical_cols": categorical_cols,
             "unique_compounds": unique_compounds,
+            "unique_entities": unique_compounds,
             "missing_pct": missing_pct,
         }
 
@@ -598,6 +607,7 @@ class HierarchyEngine:
             "applied_filter": node.applied_filter,
             "row_count": node.row_count,
             "unique_compounds": node.unique_compounds,
+            "unique_entities": getattr(node, "unique_entities", node.unique_compounds),
             "is_leaf": node.is_leaf,
             "children": node.children,
         }

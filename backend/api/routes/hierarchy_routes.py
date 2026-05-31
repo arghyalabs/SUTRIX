@@ -495,3 +495,23 @@ async def _stream_parquet_as_format(
             "Content-Disposition": f'attachment; filename="node_{node_id}.{fmt}"'
         },
     )
+
+
+@router.get("/{client_id}/recommend")
+async def get_hierarchy_recommendations(client_id: str, n: int = Query(default=5, description="Max recommendations to return")):
+    """
+    Returns AI-guided hierarchy recommendations for building the tree.
+    """
+    context = _get_context(client_id)
+    df = context.load_slice()
+    
+    from backend.core.hierarchy_recommendation_engine import HierarchyRecommendationEngine
+    recs = HierarchyRecommendationEngine.recommend(
+        df=df,
+        mappings=context.mappings,
+        dataset_mode=getattr(context, "dataset_mode", "MOLECULAR"),
+        n=n
+    )
+    
+    from dataclasses import asdict
+    return [asdict(r) for r in recs]
