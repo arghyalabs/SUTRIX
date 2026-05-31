@@ -108,6 +108,19 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Hide scrollbars during high-res PNG export */
+.downloading-png .custom-scrollbar::-webkit-scrollbar,
+.downloading-png *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.downloading-png .custom-scrollbar,
+.downloading-png * {
+  scrollbar-width: none !important;
+  overflow: hidden !important;
+}
+
 /* Text color utilities that map to CSS theme variables */
 .text-primary { color: var(--color-text-primary); }
 .text-secondary { color: var(--color-text-secondary); }
@@ -125,4 +138,29 @@ body {
 }
 .animate-marquee {
   animation: marquee 30s linear infinite;
+}
+
+/* ── Accessibility Contrast Enhancements for Shorter/Secondary Fonts ── */
+
+/* Elevate contrast on standard dark themes to make small texts highly legible */
+.text-white\/10 {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+.text-white\/20 {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+.text-white\/30 {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+.text-white\/40 {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+.text-white\/50 {
+  color: rgba(255, 255, 255, 0.90) !important;
+}
+.text-slate-500 {
+  color: #cbd5e1 !important; /* Elevated to slate-300 contrast */
+}
+.text-slate-400 {
+  color: #e2e8f0 !important; /* Elevated to slate-200 contrast */
 }

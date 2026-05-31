@@ -661,15 +661,6 @@ export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail
                       <div className="flex flex-col h-[340px]">
                         {/* 1. Pie Chart Visual */}
                         <div className="relative w-full h-[200px] flex-shrink-0">
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)' }}>
-                            <span className="text-[9px] uppercase tracking-wider text-white/40 font-bold">TOTAL</span>
-                            <span className="text-lg font-extrabold text-white leading-none my-0.5">
-                              {pieTotal.toLocaleString()}
-                            </span>
-                            <span className="text-[8px] uppercase tracking-wider text-cyan-400 font-bold">
-                              Records
-                            </span>
-                          </div>
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
@@ -690,6 +681,16 @@ export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail
                               <Tooltip content={<CustomPieTooltip categoryLabel={charts.composition_pie?.title || 'Category'} />} />
                             </PieChart>
                           </ResponsiveContainer>
+                          {/* Center overlay: stacked above the SVG, perfectly centered on pie cx/cy */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span className="text-[9px] uppercase tracking-wider text-white/40 font-bold">TOTAL</span>
+                            <span className="text-lg font-extrabold text-white leading-none my-0.5">
+                              {pieTotal.toLocaleString()}
+                            </span>
+                            <span className="text-[8px] uppercase tracking-wider text-cyan-400 font-bold">
+                              Records
+                            </span>
+                          </div>
                         </div>
 
                         {/* 2. Legend List */}
