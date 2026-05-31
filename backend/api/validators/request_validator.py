@@ -36,11 +36,21 @@ class MappingPayload(BaseClientPayload):
     def validate_mappings_dict(cls, v: Dict[str, str]) -> Dict[str, str]:
         """Ensures that the mapping values map to allowed scientific columns."""
         ALLOWED_SCI_VARS = set(SCIENTIFIC_VARIABLES.keys()) | {
-            "none", "smiles", "inchi", "chemical_id", "organism", "exposure_time", "exposure_route", "route",
+            # Molecular (existing)
+            "chemical_name", "chemical_id", "cas_number", "canonical_smiles",
+            "endpoint", "value", "unit", "qualifier", "species", "duration",
+            "route", "study_type", "toxicity_category",
+            # Universal entity roles (new)
+            "entity_id", "entity_name",
+            "patient_id", "subject_id", "participant_id",
+            "site_id", "location", "region", "department",
+            "sample_id", "material_id", "device_id",
+            "category", "group", "treatment", "outcome",
+            "timestamp", "date", "batch",
+            "none", "smiles", "inchi", "organism", "exposure_time", "exposure_route",
             "pxc50", "regression_target", "pic50", "potency", "ic50", "ec50", "ki",
             "classification_target", "assay", "assay_type", "target", "toxicity", "toxicology",
-            "absorption", "distribution", "metabolism", "excretion",
-            "species", "duration", "value", "endpoint", "chemical_name"
+            "absorption", "distribution", "metabolism", "excretion"
         }
         
         # Translation map to normalize all scientific variables to canonical backend keys

@@ -74,6 +74,26 @@ class TaskManager:
         return job_id
 
     @staticmethod
+    def submit_structure_recovery(
+        workspace_id: str,
+        column_to_resolve: str
+    ) -> str:
+        """Submits a PubChem/CompTox/ChEBI structures recovery background task."""
+        job_id = job_registry.create_job()
+        if not job_id:
+            return ""
+
+        payload = {
+            "type": "structure_recovery",
+            "workspace_id": workspace_id,
+            "column_to_resolve": column_to_resolve
+        }
+
+        task_queue.put_nowait((job_id, payload))
+        logger.info(f"Successfully queued structure recovery task '{job_id}' for workspace '{workspace_id}'")
+        return job_id
+
+    @staticmethod
     def query_status(job_id: str) -> Dict[str, Any]:
         """Queries the status, ETA, and progress of an active or completed background job."""
         job = job_registry.get_job(job_id)

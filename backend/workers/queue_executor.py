@@ -570,6 +570,110 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
         clean_memory()
 
 
+async def process_structure_recovery_task(job_id: str, payload: Dict[str, Any]):
+    """Processes a background computational structure recovery task."""
+    logger.info(f"Background worker starting structure recovery job: {job_id}")
+    job_registry.update_job(job_id, status="RUNNING", progress=0)
+
+    workspace_id = payload["workspace_id"]
+    column_to_resolve = payload["column_to_resolve"]
+
+    from backend.core.workspace_registry import registry
+    context = registry.get_context(workspace_id)
+    if not context:
+        job_registry.update_job(job_id, status="FAILED", error=f"Workspace context not found: {workspace_id}")
+        return
+
+    df = context.load_slice()
+    if df is None or df.empty or column_to_resolve not in df.columns:
+        job_registry.update_job(job_id, status="FAILED", error=f"Column '{column_to_resolve}' not found in active dataset.")
+        return
+
+    unique_vals = df[column_to_resolve].dropna().astype(str).str.strip().unique().tolist()
+    unique_vals = [v for v in unique_vals if v]
+    total_vals = len(unique_vals)
+
+    if total_vals == 0:
+        import os, json
+        res_dir = os.path.join("workspaces", workspace_id, "cache")
+        os.makedirs(res_dir, exist_ok=True)
+        res_path = os.path.join(res_dir, "structure_recovery_result.json")
+        with open(res_path, "w") as f:
+            json.dump({"smiles_map": {}, "unresolved": []}, f)
+        job_registry.update_job(job_id, status="COMPLETED", progress=100, result_path=res_path)
+        await ws_broadcaster.broadcast({"job_id": job_id, "type": "JOB_COMPLETED", "data": {"recovered": 0, "total": 0}})
+        return
+
+    tracker = ProgressTracker(job_id, total_vals)
+    active_tracker[job_id] = tracker
+    tracker.log(f"⚡ Starting structure recovery for {total_vals} unique entries in '{column_to_resolve}'...")
+
+    from backend.normalization.identifier_service import ChemicalIdentifierService
+    resolver = ChemicalIdentifierService()
+    smiles_map = {}
+    unresolved = []
+
+    # Process in parallel or sequential with throttled rate-limiting
+    # Batch size 50, maximum 5 requests per second
+    import os, json
+    completed = 0
+    for val in unique_vals:
+        # Check cancellation
+        current_job = job_registry.get_job(job_id)
+        if current_job and current_job.get("status") == "CANCELLED":
+            tracker.log("🛑 Job aborted by cancellation instruction.")
+            del active_tracker[job_id]
+            return
+
+        try:
+            res = resolver.resolve(val, skip_online=False)
+            if res.get("canonical_smiles"):
+                smiles_map[val] = res["canonical_smiles"]
+            else:
+                unresolved.append(val)
+        except Exception as e:
+            unresolved.append(val)
+            logger.warning(f"Failed resolving '{val}': {e}")
+
+        completed += 1
+        tracker.rows_processed = completed
+        
+        # Broadcast progress
+        if completed % max(1, total_vals // 20) == 0 or completed == total_vals:
+            pct = int((completed / total_vals) * 100)
+            job_registry.update_job(job_id, progress=pct)
+            tel = tracker.calculate_telemetry(completed)
+            tel["progress_pct"] = pct
+            tel["phase"] = f"⚡ Structure Recovery: {completed}/{total_vals}"
+            await ws_broadcaster.broadcast({"job_id": job_id, "type": "PROGRESS", "data": tel})
+
+        # Rate limiting: 5 req/s max ≈ 200ms sleep between requests
+        await asyncio.sleep(0.2)
+
+    res_dir = os.path.join("workspaces", workspace_id, "cache")
+    os.makedirs(res_dir, exist_ok=True)
+    res_path = os.path.join(res_dir, "structure_recovery_result.json")
+    with open(res_path, "w") as f:
+        json.dump({"smiles_map": smiles_map, "unresolved": unresolved}, f, indent=2)
+
+    # Save to SQLite job registry
+    pct_coverage = (len(smiles_map) / total_vals * 100.0) if total_vals > 0 else 0.0
+    job_registry.update_job(job_id, status="COMPLETED", progress=100, result_path=res_path)
+    tracker.log(f"✓ Structure recovery finished: {len(smiles_map)} successfully resolved ({pct_coverage:.1f}% coverage).")
+
+    await ws_broadcaster.broadcast({
+        "job_id": job_id,
+        "type": "JOB_COMPLETED",
+        "data": {
+            "recovered": len(smiles_map),
+            "unresolved": len(unresolved),
+            "total": total_vals,
+            "coverage_pct": round(pct_coverage, 2),
+            "smiles_map": smiles_map
+        }
+    })
+
+
 async def queue_worker_loop():
     """Infinite background asynchronous task runner managing execution queues and safety guards."""
     logger.info("Initializing infinite background task queue worker loop...")
@@ -598,6 +702,8 @@ async def queue_worker_loop():
                 await process_enrichment_task(job_id, payload)
             elif task_type == "segregation":
                 await process_segregation_task(job_id, payload)
+            elif task_type == "structure_recovery":
+                await process_structure_recovery_task(job_id, payload)
             else:
                 logger.error(f"Unknown task type: {task_type}")
             
