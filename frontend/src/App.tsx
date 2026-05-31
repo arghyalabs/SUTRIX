@@ -19,6 +19,7 @@ import { DashboardLayout } from './components/dashboard/DashboardLayout';
 import { UploadWorkspace } from './components/upload/UploadWorkspace';
 import { DatasetMapping } from './components/mapping/DatasetMapping';
 import { HierarchyBuilder } from './components/segregation/HierarchyBuilder';
+import { AdvancedTreeWorkspace } from './components/segregation/AdvancedTreeWorkspace';
 import { DataAnalysisWorkspace } from './components/analysis/DataAnalysisWorkspace';
 import { DescriptorEnrichment } from './components/enrichment/DescriptorEnrichment';
 import { ReadinessDashboard } from './components/readiness/ReadinessDashboard';
@@ -638,6 +639,8 @@ const App: React.FC = () => {
         );
       case 'hierarchy':
         return <HierarchyBuilder clientId={clientId} socket={socket} />;
+      case 'advanced-tree':
+        return <AdvancedTreeWorkspace clientId={clientId} socket={socket} />;
       case 'analysis':
         return <DataAnalysisWorkspace />;
       case 'enrichment':
