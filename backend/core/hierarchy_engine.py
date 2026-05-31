@@ -393,9 +393,17 @@ class HierarchyEngine:
             )
         except Exception as e:
             logger.warning(f"[{self.workspace_id}] Cannot enumerate column '{current_col}': {e}")
+            if parent_id in self.nodes:
+                self.nodes[parent_id].is_leaf = True
+                if parent_id in self.node_details:
+                    self.node_details[parent_id]["metadata"]["is_leaf"] = True
             return
 
         if not unique_vals:
+            if parent_id in self.nodes:
+                self.nodes[parent_id].is_leaf = True
+                if parent_id in self.node_details:
+                    self.node_details[parent_id]["metadata"]["is_leaf"] = True
             return
 
         # ── KEY OPTIMISATION: pre-convert column to str ONCE per level ──────

@@ -404,7 +404,11 @@ export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail
     ? `column: ${charts.composition_bar.title}`
     : undefined;
 
-  const isTerminal = nodeDetail.metadata?.is_leaf;
+  const isTerminal = 
+    nodeDetail.metadata?.is_leaf || 
+    !nodeDetail.metadata?.children || 
+    nodeDetail.metadata.children.length === 0 || 
+    pieData.length === 0;
   const qsar = getQSARMetrics(nodeDetail.id, stats.missing_pct || 0);
 
   return (
