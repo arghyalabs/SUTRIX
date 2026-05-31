@@ -17,6 +17,9 @@ export interface SaveMappingResponse {
   columns: string[];
   dataset_type?: string;
   warnings?: string[];
+  dataset_mode?: 'MOLECULAR' | 'SCIENTIFIC' | 'HYBRID';
+  dataset_classification?: any;
+  dataset_passport?: any;
 }
 
 export const mappingApi = {
