@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // API Services Resilience Layer
 import { uploadApi } from './services/uploadApi';
@@ -19,7 +19,6 @@ import { DashboardLayout } from './components/dashboard/DashboardLayout';
 import { UploadWorkspace } from './components/upload/UploadWorkspace';
 import { DatasetMapping } from './components/mapping/DatasetMapping';
 import { HierarchyBuilder } from './components/segregation/HierarchyBuilder';
-import { AdvancedTreeWorkspace } from './components/segregation/AdvancedTreeWorkspace';
 import { DataAnalysisWorkspace } from './components/analysis/DataAnalysisWorkspace';
 import { DescriptorEnrichment } from './components/enrichment/DescriptorEnrichment';
 import { ReadinessDashboard } from './components/readiness/ReadinessDashboard';
@@ -639,8 +638,6 @@ const App: React.FC = () => {
         );
       case 'hierarchy':
         return <HierarchyBuilder clientId={clientId} socket={socket} />;
-      case 'advanced-tree':
-        return <AdvancedTreeWorkspace clientId={clientId} socket={socket} />;
       case 'analysis':
         return <DataAnalysisWorkspace />;
       case 'enrichment':

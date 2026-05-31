@@ -157,7 +157,7 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
                           paddingAngle={2}
                           dataKey="value"
                           labelLine={true}
-                          label={({ name, value, percentage }) => `${name} (${value.toLocaleString()} | ${percentage.toFixed(1)}%)`}
+                          label={({ name, value, percentage }: any) => `${name} (${value.toLocaleString()} | ${percentage.toFixed(1)}%)`}
                         >
                           {metrics.enrichedData.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={colors[index % colors.length]} stroke="rgba(255,255,255,0.05)" />

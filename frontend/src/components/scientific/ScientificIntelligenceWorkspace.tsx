@@ -274,7 +274,7 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
     );
   }
 
-  const readinessObj = modelingAnalysis.readiness || {};
+  const readinessObj = (modelingAnalysis.readiness || {}) as any;
   const score = readinessObj.score ?? readinessObj.ai_score ?? 0;
   const tier = readinessObj.tier ?? 'Unknown';
   const breakdown = readinessObj.breakdown ?? {};
@@ -492,7 +492,7 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
               {/* Left Breakdown Column */}
               <div className="p-6 border rounded-2xl bg-slate-900/60 border-slate-800/80 space-y-4">
                 <h4 className="text-sm font-bold text-white mb-2">Readiness Dimensions</h4>
-                {Object.entries(breakdown).map(([dim, val]) => (
+                {(Object.entries(breakdown) as Array<[string, any]>).map(([dim, val]) => (
                   <div key={dim} className="space-y-1.5">
                     <div className="flex justify-between text-xs font-semibold text-slate-400 capitalize">
                       <span>{dim.replace('_', ' ')}</span>
@@ -516,7 +516,7 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
                   <div className="p-6 border rounded-2xl bg-slate-900/60 border-slate-800/80">
                     <h4 className="text-sm font-bold text-white mb-3">Score Deductions & Flagged Items</h4>
                     <div className="space-y-2">
-                      {deductions.map((d, idx) => (
+                      {deductions.map((d: any, idx: number) => (
                         <div key={idx} className="flex gap-2.5 items-start text-xs text-rose-400">
                           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                           <span>{d}</span>
@@ -530,7 +530,7 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
                 <div className="p-6 border rounded-2xl bg-slate-900/60 border-slate-800/80">
                   <h4 className="text-sm font-bold text-white mb-3">Actionable Data-Cleaning Tips</h4>
                   <div className="space-y-3">
-                    {recommendations.slice(0, 4).map((r, idx) => (
+                    {recommendations.slice(0, 4).map((r: any, idx: number) => (
                       <div key={idx} className="flex gap-2.5 items-start text-xs text-slate-400">
                         <span className="w-5 h-5 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-[10px] shrink-0">{idx + 1}</span>
                         <span>{r}</span>

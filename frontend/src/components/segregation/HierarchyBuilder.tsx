@@ -12,6 +12,7 @@ import { SUTRIXLogo } from '../ui/SUTRIXLogo';
 import { DatasetPassportCard } from '../ui/DatasetPassportCard';
 import { StructureRecoveryBanner } from '../scientific/StructureRecoveryBanner';
 import { StructureRecoveryWizard } from '../scientific/StructureRecoveryWizard';
+import { AdvancedTreeWorkspace } from './AdvancedTreeWorkspace';
 import { toast } from 'react-hot-toast';
 
 interface HierarchyBuilderProps {
@@ -39,6 +40,8 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [enableDedup, setEnableDedup] = useState(true);
   const [enableVariancePruning, setEnableVariancePruning] = useState(true);
+  const [isAdvancedDesignerOpen, setIsAdvancedDesignerOpen] = useState(false);
+  const [activeBuilderMode, setActiveBuilderMode] = useState<'sequential' | 'advanced'>('sequential');
 
   // Redesign state variables
   const [isEduPanelOpen, setIsEduPanelOpen] = useState(true);
@@ -389,6 +392,50 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
           />
         )}
 
+        {/* Toggle Workspace Mode */}
+        <div className="flex items-center justify-between p-4 border rounded-2xl bg-[#0c1224]/80 border-white/[0.06] backdrop-blur-xl relative shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.01] to-violet-500/[0.01] pointer-events-none" />
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+              <Network className="w-5 h-5 text-cyan-400 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm leading-none">Hierarchical Segregation Mode</h3>
+              <p className="text-[10px] text-white/40 mt-1">Select standard sequential column splitting or design custom non-linear topological filters.</p>
+            </div>
+          </div>
+
+          <div className="flex bg-[#050813] p-1 rounded-xl border border-white/[0.06] shrink-0">
+            <button
+              onClick={() => {
+                setActiveBuilderMode('sequential');
+                setFilterNodes([]); // Reset custom filters if switching to sequential
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                activeBuilderMode === 'sequential' 
+                  ? 'bg-cyan-500 text-black shadow-md' 
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Sequential Column Splitter
+            </button>
+            <button
+              onClick={() => {
+                setActiveBuilderMode('advanced');
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                activeBuilderMode === 'advanced' 
+                  ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10' 
+                  : 'text-white/50 hover:text-white'
+              }`}
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+              Advanced Custom Tree Designer
+            </button>
+          </div>
+        </div>
+
         {/* SECTION 1: Collapsible Hierarchy Education Panel */}
         <div className="rounded-2xl border border-white/[0.06] bg-[#0c1224]/80 backdrop-blur-xl overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.01] to-violet-500/[0.01] pointer-events-none" />
@@ -471,8 +518,10 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
           </AnimatePresence>
         </div>
 
-        {/* SECTION 2: Primary Columns Workspace */}
-        <div className="bg-[#080d19]/40 border border-white/[0.05] rounded-2xl p-6 relative">
+        {activeBuilderMode === 'sequential' ? (
+          <>
+            {/* SECTION 2: Primary Columns Workspace */}
+            <div className="bg-[#080d19]/40 border border-white/[0.05] rounded-2xl p-6 relative">
           <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.005] to-violet-500/[0.005] pointer-events-none" />
           
           <div className="mb-6">
@@ -949,7 +998,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
             </p>
           </div>
           <button
-            onClick={() => setActiveTab('advanced-tree')}
+            onClick={() => setActiveBuilderMode('advanced')}
             className="px-6 py-3 rounded-xl bg-violet-600/15 text-violet-300 border border-violet-500/20 hover:bg-violet-600/35 hover:text-white transition-all text-xs font-bold tracking-wider shrink-0"
           >
             Open Advanced Tree Designer
@@ -1018,6 +1067,24 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
             )}
           </div>
         </div>
+          </>
+        ) : (
+          <div className="bg-[#080d19]/40 border border-[#c084fc]/20 rounded-2xl p-6 relative">
+            <div className="absolute inset-0 bg-gradient-to-b from-violet-500/[0.005] to-cyan-500/[0.005] pointer-events-none" />
+            <div className="mb-4">
+              <h3 className="text-white text-base font-extrabold tracking-tight">Advanced Custom Directed Tree Designer</h3>
+              <p className="text-xs text-white/40 mt-1">
+                Design a custom directed acyclic graph (DAG) topology to isolate and partition specific target datasets.
+              </p>
+            </div>
+            <AdvancedTreeWorkspace 
+              clientId={clientId} 
+              socket={socket} 
+              onClose={() => setActiveBuilderMode('sequential')} 
+              isInline={true}
+            />
+          </div>
+        )}
 
       </div>
 
@@ -1078,6 +1145,8 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
           )}
         </div>
       </div>
+
+      {/* Immersive Fullscreen Custom Tree Designer Modal disabled - rendered inline instead */}
 
       {/* Structure Recovery Wizard Modal */}
       <StructureRecoveryWizard

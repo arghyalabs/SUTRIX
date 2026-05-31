@@ -23,6 +23,8 @@ import { FilterEditorPanel } from '../hierarchy/FilterEditorPanel';
 interface AdvancedTreeWorkspaceProps {
   clientId: string;
   socket: any;
+  onClose: () => void;
+  isInline?: boolean;
 }
 
 interface FilterNodeData {
@@ -123,13 +125,20 @@ function buildFlowGraph(
   return { nodes, edges };
 }
 
-export const AdvancedTreeWorkspace: React.FC<AdvancedTreeWorkspaceProps> = ({ clientId, socket }) => {
-  const { columns, mappings, filterNodes: storeNodes, setFilterNodes: setStoreNodes, setActiveTab } = useWorkspaceStore();
+export const AdvancedTreeWorkspace: React.FC<AdvancedTreeWorkspaceProps> = ({ clientId, socket, onClose, isInline = false }) => {
+  const { columns, mappings, filterNodes: storeNodes, setFilterNodes: setStoreNodes } = useWorkspaceStore();
   const [localNodes, setLocalNodes] = useState<FilterNodeData[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>('root');
   const [editorParentId, setEditorParentId] = useState<string | null>(null);
   const [editorParentLabel, setEditorParentLabel] = useState<string>('');
   const [infoTab, setInfoTab] = useState<'how' | 'why'>('how');
+
+  // Auto-sync localNodes to storeNodes when inline
+  useEffect(() => {
+    if (isInline) {
+      setStoreNodes(localNodes);
+    }
+  }, [localNodes, isInline, setStoreNodes]);
 
   // Load from store on mount
   useEffect(() => {
@@ -173,11 +182,11 @@ export const AdvancedTreeWorkspace: React.FC<AdvancedTreeWorkspaceProps> = ({ cl
 
   const handleApply = () => {
     setStoreNodes(localNodes);
-    setActiveTab('hierarchy');
+    onClose();
   };
 
   const handleDiscard = () => {
-    setActiveTab('hierarchy');
+    onClose();
   };
 
   const handleReset = () => {
@@ -192,57 +201,80 @@ export const AdvancedTreeWorkspace: React.FC<AdvancedTreeWorkspaceProps> = ({ cl
   }, [columns, mappings]);
 
   return (
-    <div className="flex flex-col h-full bg-[#050813] select-none text-white relative">
+    <div className={`flex flex-col select-none text-white relative ${isInline ? 'h-[650px] rounded-2xl border border-white/[0.06] bg-[#050813]' : 'h-full bg-[#050813]'}`}>
       {/* Decoupled Workspace Top Banner */}
-      <div className="flex justify-between items-center px-8 py-5 border-b border-white/[0.06] bg-[#0c1224]/85 backdrop-blur-xl shrink-0 z-10">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleDiscard}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-white/65 text-xs hover:text-white hover:bg-white/[0.06] transition-all"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Discard
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-400 font-mono">
-                Advanced Analytical Sandbox
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[9px] bg-red-500/10 border border-red-500/20 text-red-400 font-bold uppercase tracking-wider">
-                Expert Mode
-              </span>
+      {!isInline ? (
+        <div className="flex justify-between items-center px-8 py-5 border-b border-white/[0.06] bg-[#0c1224]/85 backdrop-blur-xl shrink-0 z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleDiscard}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-white/65 text-xs hover:text-white hover:bg-white/[0.06] transition-all"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Discard
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-violet-400 font-mono">
+                  Advanced Analytical Sandbox
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] bg-red-500/10 border border-red-500/20 text-red-400 font-bold uppercase tracking-wider">
+                  Expert Mode
+                </span>
+              </div>
+              <h2 className="text-lg font-extrabold text-white flex items-center gap-2 mt-0.5">
+                <Network className="w-4 h-4 text-violet-400" />
+                Advanced Tree Designer (Custom DAG Override)
+              </h2>
             </div>
-            <h2 className="text-lg font-extrabold text-white flex items-center gap-2 mt-0.5">
-              <Network className="w-4 h-4 text-violet-400" />
-              Advanced Tree Designer (Custom DAG Override)
-            </h2>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {localNodes.length > 0 && (
+              <button
+                onClick={handleReset}
+                className="px-4 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.08] text-white/50 hover:text-white transition-colors text-xs font-bold"
+              >
+                Reset Graph
+              </button>
+            )}
+            <button
+              onClick={handleApply}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-bold hover:from-cyan-400 hover:to-violet-400 transition-all text-xs tracking-wider shadow-[0_0_20px_rgba(139,92,246,0.3)] flex items-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5" /> Apply Custom Tree & Close
+            </button>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          {localNodes.length > 0 && (
-            <button
-              onClick={handleReset}
-              className="px-4 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.08] text-white/50 hover:text-white transition-colors text-xs font-bold"
-            >
-              Reset Graph
-            </button>
-          )}
-          <button
-            onClick={handleApply}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white font-bold hover:from-cyan-400 hover:to-violet-400 transition-all text-xs tracking-wider shadow-[0_0_20px_rgba(139,92,246,0.3)] flex items-center gap-1.5"
-          >
-            <Check className="w-3.5 h-3.5" /> Apply Custom Tree & Close
-          </button>
+      ) : (
+        <div className="flex justify-between items-center px-6 py-3 border-b border-white/[0.06] bg-[#0c1224]/50 shrink-0 z-10">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[10px] font-extrabold uppercase font-mono">
+              Advanced DAG Sandbox
+            </span>
+            <span className="text-xs text-white/50">Custom Directed Acyclic Graph Filters</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {localNodes.length > 0 && (
+              <button
+                onClick={handleReset}
+                className="px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] text-white/50 hover:text-white text-[11px] font-bold transition-all"
+              >
+                Reset Graph
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Access Control Alert / Instruction strip */}
-      <div className="bg-amber-500/[0.07] border-b border-amber-500/20 px-8 py-3 flex items-start gap-2.5 text-xs text-amber-300 z-10 shrink-0">
-        <Info className="w-4 h-4 mt-0.5 shrink-0" />
-        <div>
-          <span className="font-bold">Caution:</span> This designer allows manual directed-acyclic-graph (DAG) branching to configure bespoke logical filters. This overrides standard sequential columns. Recommended for expert users only. Most users should utilize SUTRIX's <strong>Select Hierarchy Columns (Sequential)</strong> interface.
+      {!isInline && (
+        <div className="bg-amber-500/[0.07] border-b border-amber-500/20 px-8 py-3 flex items-start gap-2.5 text-xs text-amber-300 z-10 shrink-0">
+          <Info className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-bold">Caution:</span> This designer allows manual directed-acyclic-graph (DAG) branching to configure bespoke logical filters. This overrides standard sequential columns. Recommended for expert users only. Most users should utilize SUTRIX's <strong>Select Hierarchy Columns (Sequential)</strong> interface.
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main workspace container */}
       <div className="flex-1 relative flex overflow-hidden">
@@ -394,25 +426,27 @@ export const AdvancedTreeWorkspace: React.FC<AdvancedTreeWorkspaceProps> = ({ cl
       </div>
 
       {/* Sticky Bottom Bar */}
-      <div className="px-8 py-5 border-t border-white/[0.06] bg-[#0c1224]/85 backdrop-blur-xl flex justify-between items-center shrink-0 z-10">
-        <div className="text-xs text-white/40 font-mono">
-          {localNodes.length} custom branches configured. Manual changes override default column selection.
+      {!isInline && (
+        <div className="px-8 py-5 border-t border-white/[0.06] bg-[#0c1224]/85 backdrop-blur-xl flex justify-between items-center shrink-0 z-10">
+          <div className="text-xs text-white/40 font-mono">
+            {localNodes.length} custom branches configured. Manual changes override default column selection.
+          </div>
+          <div className="flex gap-4">
+            <button
+              onClick={handleDiscard}
+              className="px-6 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] text-white/80 transition-colors text-xs font-bold"
+            >
+              Cancel changes
+            </button>
+            <button
+              onClick={handleApply}
+              className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 transition-colors shadow-lg"
+            >
+              Apply Custom Tree
+            </button>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <button
-            onClick={handleDiscard}
-            className="px-6 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] text-white/80 transition-colors text-xs font-bold"
-          >
-            Cancel changes
-          </button>
-          <button
-            onClick={handleApply}
-            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 transition-colors shadow-lg"
-          >
-            Apply Custom Tree
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Filter Editor Panel (slide-in from right) */}
       <AnimatePresence>

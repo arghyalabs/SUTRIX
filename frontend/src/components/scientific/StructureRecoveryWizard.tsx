@@ -17,9 +17,11 @@ export const StructureRecoveryWizard: React.FC<StructureRecoveryWizardProps> = (
   onClose,
 }) => {
   const { 
-    columns, clientId, setDatasetMode, setDatasetClassification, 
+    columns, workspaceId, setDatasetMode, setDatasetClassification, 
     setDatasetPassport, setDetectedDomain, setPrimaryEntityType, setActiveTab 
   } = useWorkspaceStore();
+
+  const clientId = workspaceId;
 
   const [step, setStep] = useState(1);
   const [columnToResolve, setColumnToResolve] = useState('');
