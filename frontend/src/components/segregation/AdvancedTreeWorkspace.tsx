@@ -143,7 +143,8 @@ export const AdvancedTreeWorkspace: React.FC<AdvancedTreeWorkspaceProps> = ({ cl
   // Load from store on mount
   useEffect(() => {
     setLocalNodes(storeNodes || []);
-  }, [storeNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<Node>([]);
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState<Edge>([]);
