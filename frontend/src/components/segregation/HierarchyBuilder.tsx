@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Network, Play, Layers, ChevronDown, ChevronUp, Activity, GitBranch, 
   RotateCcw, Download, ChevronRight, Brain, Sliders, Info, HelpCircle, 
-  X, Check, Trash2, ArrowUp, ArrowDown, BookOpen, AlertTriangle
+  X, Check, Trash2, ArrowUp, ArrowDown, BookOpen, AlertTriangle,
+  Maximize2, Minimize2
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { hierarchyApi } from '../../services/hierarchyApi';
@@ -42,6 +43,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
   const [enableVariancePruning, setEnableVariancePruning] = useState(true);
   const [isAdvancedDesignerOpen, setIsAdvancedDesignerOpen] = useState(false);
   const [activeBuilderMode, setActiveBuilderMode] = useState<'sequential' | 'advanced'>('sequential');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Redesign state variables
   const [isEduPanelOpen, setIsEduPanelOpen] = useState(true);
@@ -344,6 +346,255 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
     return tree;
   }, [selectedColumns]);
 
+  const renderSequentialGrid = (isFull: boolean = false) => {
+    return (
+      <div className="grid grid-cols-12 gap-6 items-start">
+        
+        {/* Left Panel: Available Columns (4 cols) */}
+        <div className={`col-span-4 flex flex-col bg-[#0c1224]/50 border border-white/[0.05] border-r rounded-xl p-4 ${isFull ? 'h-[580px]' : 'max-h-[460px]'}`}>
+          <div className="mb-3.5 space-y-2 shrink-0">
+            <input
+              type="text"
+              placeholder="Search variables..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-white/[0.03] border border-white/[0.08] rounded-lg focus:outline-none focus:border-cyan-500/50 placeholder-white/20 transition-all"
+            />
+            
+            {/* Category filter tabs */}
+            <div className="flex bg-[#050813] border border-white/[0.06] p-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider">
+              {(['all', 'categorical', 'numeric', 'recommended'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveFilterTab(tab)}
+                  className={`flex-1 py-1 rounded-md text-center transition-colors ${
+                    activeFilterTab === tab ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-extrabold' : 'text-white/40 hover:text-white/70'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Scrollable list */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+            {filteredAvailableColumns.length === 0 ? (
+              <div className="text-center py-12 text-white/20 text-xs">
+                No matching available variables found.
+              </div>
+            ) : (
+              filteredAvailableColumns.map(col => {
+                const stat = colStats[col];
+                return (
+                  <button
+                    key={col}
+                    onClick={() => addColumn(col)}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] hover:border-cyan-500/20 text-left transition-all group border-r"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors block truncate">{col}</span>
+                      {stat && (
+                        <span className="text-[9.5px] text-white/30 block mt-0.5 font-medium">
+                          {stat.unique} unique values · {stat.missing}% missing
+                        </span>
+                      )}
+                    </div>
+                    <span className={`shrink-0 ml-3 text-[8.5px] font-extrabold tracking-widest px-2 py-0.5 rounded-full border
+                      ${stat?.type === 'Categorical' 
+                        ? 'bg-violet-500/10 border-violet-500/20 text-violet-400' 
+                        : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      }`}
+                    >
+                      {stat?.type === 'Categorical' ? 'CAT' : 'NUM'}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Center Panel: Selected Columns (4 cols) */}
+        <div className={`col-span-4 flex flex-col bg-[#0c1224]/50 border border-white/[0.05] rounded-xl p-4 ${isFull ? 'h-[580px]' : 'max-h-[460px]'}`}>
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.06] mb-3.5 shrink-0">
+            <span className="text-[10px] font-extrabold text-white/80 uppercase tracking-widest">
+              Selected Hierarchy
+            </span>
+            <span className="text-[9.5px] text-white/30 font-mono">
+              {selectedColumns.length} dimensions
+            </span>
+          </div>
+
+          {/* Selected Scrollable List */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+            {selectedColumns.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-white/20 gap-2.5">
+                <Layers className="w-8 h-8 text-white/5 animate-pulse" />
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold text-white/40">Workspace Empty</p>
+                  <p className="text-[9.5px] text-white/25 max-w-xs leading-normal">
+                    Click on candidate variables in the Left Panel to chain sequential partitioning parameters.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              selectedColumns.map((col, idx) => {
+                const stat = colStats[col];
+                return (
+                  <div
+                    key={col}
+                    className="flex items-center gap-2 p-3 rounded-xl border border-cyan-500/30 bg-[#0d1627] hover:border-cyan-500/50 transition-colors shadow-lg relative overflow-hidden group"
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-full bg-cyan-400" />
+                    
+                    <div className="w-5 h-5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </div>
+
+                    <div className="min-w-0 flex-1 pl-1">
+                      <span className="text-xs font-bold text-white block truncate">{col}</span>
+                      {stat && (
+                        <span className="text-[9px] text-slate-500 block truncate font-medium">
+                          Type: {stat.type} · Max splits: {stat.unique}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Control buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => moveUp(idx)}
+                        disabled={idx === 0}
+                        title="Move Up"
+                        className="p-1 rounded bg-white/[0.02] border border-white/[0.04] text-white/40 hover:text-white disabled:opacity-20 transition-colors"
+                      >
+                        <ArrowUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => moveDown(idx)}
+                        disabled={idx === selectedColumns.length - 1}
+                        title="Move Down"
+                        className="p-1 rounded bg-white/[0.02] border border-white/[0.04] text-white/40 hover:text-white disabled:opacity-20 transition-colors"
+                      >
+                        <ArrowDown className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => removeColumn(col)}
+                        title="Remove variable"
+                        className="p-1 rounded bg-red-500/5 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-white transition-colors ml-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel: Hierarchy Intelligence Panel (4 cols) */}
+        <div className={`col-span-4 flex flex-col bg-[#0c1224]/50 border border-white/[0.05] rounded-xl p-5 shadow-inner ${isFull ? 'h-[580px]' : 'max-h-[460px]'}`}>
+          <div className="pb-3.5 border-b border-white/[0.06] mb-4 shrink-0">
+            <span className="text-[10px] font-extrabold text-violet-400 uppercase tracking-widest block mb-0.5">
+              Scientific Telemetry
+            </span>
+            <h4 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-violet-400" />
+              Hierarchy Intelligence Panel
+            </h4>
+          </div>
+
+          {/* Stats values */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3.5 text-xs text-white/60 pr-1 shrink-0">
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl">
+                <span className="block text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-1">Depth</span>
+                <span className="text-base font-extrabold text-white">{expectedMetrics.depth}</span>
+              </div>
+              <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl">
+                <span className="block text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-1">Leaf Nodes</span>
+                <span className="text-base font-extrabold text-white">{selectedColumns.length > 0 ? expectedMetrics.leafNodes : 0}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t border-white/[0.04] pt-3 text-[11px] leading-relaxed">
+              <div className="flex justify-between items-center">
+                <span>Expected Folder Count:</span>
+                <span className="text-white font-bold">{selectedColumns.length > 0 ? expectedMetrics.expectedFolders : 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Average Rows Per Node:</span>
+                <span className="text-white font-bold">{expectedMetrics.avgRows.toLocaleString()} rows</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Hierarchy Quality Score:</span>
+                <span className={`font-extrabold ${expectedMetrics.qualityScore > 80 ? 'text-emerald-400' : expectedMetrics.qualityScore > 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {expectedMetrics.qualityScore}/100
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-white/[0.04] pt-3 text-[10px] text-white/40 font-mono">
+              <div className="flex justify-between">
+                <span>Sparsity Risk:</span>
+                <span className={`font-bold ${sparsityWarning ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {sparsityWarning ? 'High' : 'Negligible'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Entropy Reduction:</span>
+                <span className="text-cyan-400 font-bold">{selectedColumns.length > 0 ? 'High' : 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Processing Cost:</span>
+                <span className="text-white/60 font-bold">{selectedColumns.length > 4 ? 'Moderate' : 'Optimal'}</span>
+              </div>
+            </div>
+
+            {/* Deduplication & Checkboxes */}
+            <div className="space-y-2.5 border-t border-white/[0.04] pt-3 shrink-0 text-white/60 text-[11px] leading-relaxed font-sans">
+              <span className="block text-[10px] text-[#a78bfa] uppercase tracking-wider font-extrabold mb-1">Cleansing Parameters</span>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer text-white/70 hover:text-white group">
+                  <input
+                    type="checkbox"
+                    checked={enableDedup}
+                    onChange={() => setEnableDedup(!enableDedup)}
+                    className="w-3.5 h-3.5 rounded bg-white/[0.03] border-white/[0.08] text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-cyan-500 shrink-0"
+                  />
+                  <span className="group-hover:text-cyan-300 transition-colors">Smart Deduplication</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-white/70 hover:text-white group">
+                  <input
+                    type="checkbox"
+                    checked={enableVariancePruning}
+                    onChange={() => setEnableVariancePruning(!enableVariancePruning)}
+                    className="w-3.5 h-3.5 rounded bg-white/[0.03] border-white/[0.08] text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-cyan-500 shrink-0"
+                  />
+                  <span className="group-hover:text-cyan-300 transition-colors">Variance Pruning</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Warning Guard Box */}
+            {sparsityWarning && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[10.5px] leading-relaxed flex items-start gap-2 mt-2 shrink-0">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <strong className="block mb-0.5 uppercase tracking-wider font-extrabold text-[9.5px]">Sparsity Guard Alert</strong>
+                  ⚠ Column <strong>"{sparsityWarning.column}"</strong> creates excessive fragmentation. Mapped values exceed safe thresholds.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    );
+  };
+
   const hasConfig = selectedColumns.length > 0 || filterNodes.length > 0;
 
   return (
@@ -522,265 +773,25 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
           <>
             {/* SECTION 2: Primary Columns Workspace */}
             <div className="bg-[#080d19]/40 border border-white/[0.05] rounded-2xl p-6 relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.005] to-violet-500/[0.005] pointer-events-none" />
-          
-          <div className="mb-6">
-            <h3 className="text-white text-base font-extrabold tracking-tight">Select Hierarchy Columns (Sequential)</h3>
-            <p className="text-xs text-white/40 mt-1">
-              Assemble variables in the order you want SUTRIX to segregate your biological dataset. Available items list metadata from the mapped workspace.
-            </p>
-          </div>
-
-          {/* Grid Layout: 3 Columns (4 available, 4 selected, 4 stats) */}
-          <div className="grid grid-cols-12 gap-6 items-start">
-            
-            {/* Left Panel: Available Columns (4 cols) */}
-            <div className="col-span-4 flex flex-col max-h-[460px] bg-[#0c1224]/50 border border-white/[0.05] border-r rounded-xl p-4">
-              <div className="mb-3.5 space-y-2 shrink-0">
-                <input
-                  type="text"
-                  placeholder="Search variables..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white/[0.03] border border-white/[0.08] rounded-lg focus:outline-none focus:border-cyan-500/50 placeholder-white/20 transition-all"
-                />
-                
-                {/* Category filter tabs */}
-                <div className="flex bg-white/[0.02] border border-white/[0.04] p-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider">
-                  {(['all', 'categorical', 'numeric', 'recommended'] as const).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveFilterTab(tab)}
-                      className={`flex-1 py-1 rounded-md text-center transition-colors ${
-                        activeFilterTab === tab ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-extrabold' : 'text-white/40 hover:text-white/70'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
+              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.005] to-violet-500/[0.005] pointer-events-none" />
+              
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-white text-base font-extrabold tracking-tight">Select Hierarchy Columns (Sequential)</h3>
+                  <p className="text-xs text-white/40 mt-1">
+                    Assemble variables in the order you want SUTRIX to segregate your biological dataset. Available items list metadata from the mapped workspace.
+                  </p>
                 </div>
+                <button
+                  onClick={() => setIsFullscreen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/70 hover:text-white hover:bg-white/[0.06] transition-all text-xs font-bold shrink-0 shadow-lg"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" /> Fullscreen Mode
+                </button>
               </div>
 
-              {/* Scrollable list */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                {filteredAvailableColumns.length === 0 ? (
-                  <div className="text-center py-12 text-white/20 text-xs">
-                    No matching available variables found.
-                  </div>
-                ) : (
-                  filteredAvailableColumns.map(col => {
-                    const stat = colStats[col];
-                    return (
-                      <button
-                        key={col}
-                        onClick={() => addColumn(col)}
-                        className="w-full flex items-center justify-between p-3 rounded-xl border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] hover:border-cyan-500/20 text-left transition-all group border-r"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors block truncate">{col}</span>
-                          {stat && (
-                            <span className="text-[9.5px] text-white/30 block mt-0.5 font-medium">
-                              {stat.unique} unique values · {stat.missing}% missing
-                            </span>
-                          )}
-                        </div>
-                        <span className={`shrink-0 ml-3 text-[8.5px] font-extrabold tracking-widest px-2 py-0.5 rounded-full border
-                          ${stat?.type === 'Categorical' 
-                            ? 'bg-violet-500/10 border-violet-500/20 text-violet-400' 
-                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                          }`}
-                        >
-                          {stat?.type === 'Categorical' ? 'CAT' : 'NUM'}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+              {renderSequentialGrid(false)}
             </div>
-
-            {/* Center Panel: Selected Columns (4 cols) */}
-            <div className="col-span-4 flex flex-col max-h-[460px] bg-[#0c1224]/50 border border-white/[0.05] rounded-xl p-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06] mb-3.5 shrink-0">
-                <span className="text-[10px] font-extrabold text-white/80 uppercase tracking-widest">
-                  Selected Hierarchy
-                </span>
-                <span className="text-[9.5px] text-white/30 font-mono">
-                  {selectedColumns.length} dimensions
-                </span>
-              </div>
-
-              {/* Selected Scrollable List */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                {selectedColumns.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-white/20 gap-2.5">
-                    <Layers className="w-8 h-8 text-white/5 animate-pulse" />
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-bold text-white/40">Workspace Empty</p>
-                      <p className="text-[9.5px] text-white/25 max-w-xs leading-normal">
-                        Click on candidate variables in the Left Panel to chain sequential partitioning parameters.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  selectedColumns.map((col, idx) => {
-                    const stat = colStats[col];
-                    return (
-                      <div
-                        key={col}
-                        className="flex items-center gap-2 p-3 rounded-xl border border-cyan-500/30 bg-[#0d1627] hover:border-cyan-500/50 transition-colors shadow-lg relative overflow-hidden group"
-                      >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-cyan-400" />
-                        
-                        <div className="w-5 h-5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
-                          {idx + 1}
-                        </div>
-
-                        <div className="min-w-0 flex-1 pl-1">
-                          <span className="text-xs font-bold text-white block truncate">{col}</span>
-                          {stat && (
-                            <span className="text-[9px] text-slate-500 block truncate font-medium">
-                              Type: {stat.type} · Max splits: {stat.unique}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Control buttons */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => moveUp(idx)}
-                            disabled={idx === 0}
-                            title="Move Up"
-                            className="p-1 rounded bg-white/[0.02] border border-white/[0.04] text-white/40 hover:text-white disabled:opacity-20 transition-colors"
-                          >
-                            <ArrowUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => moveDown(idx)}
-                            disabled={idx === selectedColumns.length - 1}
-                            title="Move Down"
-                            className="p-1 rounded bg-white/[0.02] border border-white/[0.04] text-white/40 hover:text-white disabled:opacity-20 transition-colors"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => removeColumn(col)}
-                            title="Remove variable"
-                            className="p-1 rounded bg-red-500/5 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:text-white transition-colors ml-1"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Right Panel: Hierarchy Intelligence Panel (4 cols) */}
-            <div className="col-span-4 flex flex-col max-h-[460px] bg-[#0c1224]/50 border border-white/[0.05] rounded-xl p-5 shadow-inner">
-              <div className="pb-3.5 border-b border-white/[0.06] mb-4 shrink-0">
-                <span className="text-[10px] font-extrabold text-violet-400 uppercase tracking-widest block mb-0.5">
-                  Scientific Telemetry
-                </span>
-                <h4 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-violet-400" />
-                  Hierarchy Intelligence Panel
-                </h4>
-              </div>
-
-              {/* Stats values */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3.5 text-xs text-white/60 pr-1 shrink-0">
-                <div className="grid grid-cols-2 gap-3 text-center">
-                  <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl">
-                    <span className="block text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-1">Depth</span>
-                    <span className="text-base font-extrabold text-white">{expectedMetrics.depth}</span>
-                  </div>
-                  <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl">
-                    <span className="block text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-1">Leaf Nodes</span>
-                    <span className="text-base font-extrabold text-white">{selectedColumns.length > 0 ? expectedMetrics.leafNodes : 0}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 border-t border-white/[0.04] pt-3 text-[11px] leading-relaxed">
-                  <div className="flex justify-between items-center">
-                    <span>Expected Folder Count:</span>
-                    <span className="text-white font-bold">{selectedColumns.length > 0 ? expectedMetrics.expectedFolders : 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Average Rows Per Node:</span>
-                    <span className="text-white font-bold">{expectedMetrics.avgRows.toLocaleString()} rows</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Hierarchy Quality Score:</span>
-                    <span className={`font-extrabold ${expectedMetrics.qualityScore > 80 ? 'text-emerald-400' : expectedMetrics.qualityScore > 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                      {expectedMetrics.qualityScore}/100
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 border-t border-white/[0.04] pt-3 text-[10px] text-white/40 font-mono">
-                  <div className="flex justify-between">
-                    <span>Sparsity Risk:</span>
-                    <span className={`font-bold ${sparsityWarning ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {sparsityWarning ? 'High' : 'Negligible'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Entropy Reduction:</span>
-                    <span className="text-cyan-400 font-bold">{selectedColumns.length > 0 ? 'High' : 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Processing Cost:</span>
-                    <span className="text-white/60 font-bold">{selectedColumns.length > 4 ? 'Moderate' : 'Optimal'}</span>
-                  </div>
-                </div>
-
-                {/* Deduplication & Pruning Checkboxes for Playwright E2E */}
-                <div className="space-y-2.5 border-t border-white/[0.04] pt-3 shrink-0 text-white/60 text-[11px] leading-relaxed">
-                  <span className="block text-[10px] text-[#a78bfa] uppercase tracking-wider font-extrabold mb-1">Cleansing Parameters</span>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-white/70 hover:text-white group">
-                      <input
-                        type="checkbox"
-                        checked={enableDedup}
-                        onChange={() => setEnableDedup(!enableDedup)}
-                        className="w-3.5 h-3.5 rounded bg-white/[0.03] border-white/[0.08] text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-cyan-500 shrink-0"
-                      />
-                      <span className="group-hover:text-cyan-300 transition-colors">Smart Deduplication</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-white/70 hover:text-white group">
-                      <input
-                        type="checkbox"
-                        checked={enableVariancePruning}
-                        onChange={() => setEnableVariancePruning(!enableVariancePruning)}
-                        className="w-3.5 h-3.5 rounded bg-white/[0.03] border-white/[0.08] text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-cyan-500 shrink-0"
-                      />
-                      <span className="group-hover:text-cyan-300 transition-colors">Variance Pruning</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Warning Guard Box */}
-                {sparsityWarning && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[10.5px] leading-relaxed flex items-start gap-2 mt-2 shrink-0"
-                  >
-                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="block mb-0.5 uppercase tracking-wider font-extrabold text-[9.5px]">Sparsity Guard Alert</strong>
-                      ⚠ Column <strong>"{sparsityWarning.column}"</strong> creates excessive fragmentation. Mapped values exceed safe thresholds. Recommended: Remove this column to preserve row density.
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
 
         {/* SECTION 3: Scientific Templates & AI Recommendations */}
         <div className="bg-[#080d19]/40 border border-white/[0.05] rounded-2xl p-6">
@@ -1071,11 +1082,19 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
         ) : (
           <div className="bg-[#080d19]/40 border border-[#c084fc]/20 rounded-2xl p-6 relative">
             <div className="absolute inset-0 bg-gradient-to-b from-violet-500/[0.005] to-cyan-500/[0.005] pointer-events-none" />
-            <div className="mb-4">
-              <h3 className="text-white text-base font-extrabold tracking-tight">Advanced Custom Directed Tree Designer</h3>
-              <p className="text-xs text-white/40 mt-1">
-                Design a custom directed acyclic graph (DAG) topology to isolate and partition specific target datasets.
-              </p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-white text-base font-extrabold tracking-tight">Advanced Custom Directed Tree Designer</h3>
+                <p className="text-xs text-white/40 mt-1">
+                  Design a custom directed acyclic graph (DAG) topology to isolate and partition specific target datasets.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsFullscreen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-violet-600/15 text-violet-300 border border-violet-500/20 hover:bg-violet-600/25 hover:text-white transition-all text-xs font-bold shrink-0 shadow-lg"
+              >
+                <Maximize2 className="w-3.5 h-3.5" /> Fullscreen Mode
+              </button>
             </div>
             <AdvancedTreeWorkspace 
               clientId={clientId} 
@@ -1146,7 +1165,67 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
         </div>
       </div>
 
-      {/* Immersive Fullscreen Custom Tree Designer Modal disabled - rendered inline instead */}
+      {/* Immersive Fullscreen Custom DAG / Sequential Workspace Overlay Modal */}
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+          >
+            <div className="w-[96%] h-[92%] bg-[#050813] rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl flex flex-col relative p-6">
+              
+              {/* Fullscreen Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+                    <Network className="w-5 h-5 text-cyan-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-extrabold text-base leading-none">
+                      {activeBuilderMode === 'sequential' 
+                        ? 'Select Hierarchy Columns (Sequential) — Fullscreen Mode'
+                        : 'Advanced Custom Directed Tree Designer — Fullscreen Mode'
+                      }
+                    </h3>
+                    <p className="text-[11px] text-white/40 mt-1">
+                      {activeBuilderMode === 'sequential'
+                        ? 'Chain sequential taxonomy splits and explore statistical projections'
+                        : 'Design logical custom Directed Acyclic Graph (DAG) filters'
+                      }
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsFullscreen(false)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-xs font-bold"
+                >
+                  <Minimize2 className="w-4 h-4" /> Minimize View
+                </button>
+              </div>
+
+              {/* Fullscreen Body Content */}
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+                {activeBuilderMode === 'sequential' ? (
+                  renderSequentialGrid(true)
+                ) : (
+                  <AdvancedTreeWorkspace 
+                    clientId={clientId} 
+                    socket={socket} 
+                    onClose={() => {
+                      setIsFullscreen(false);
+                      setActiveBuilderMode('sequential');
+                    }} 
+                    isInline={true}
+                  />
+                )}
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Structure Recovery Wizard Modal */}
       <StructureRecoveryWizard
