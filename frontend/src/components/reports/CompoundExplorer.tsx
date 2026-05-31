@@ -491,13 +491,22 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                 text-xs text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30
                 transition-all duration-200"
             />
+            {loading && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-cyan-400 text-[10px] font-mono bg-[#0c1224] pl-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                SEARCHING...
+              </div>
+            )}
           </div>
-          {loading && (
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-cyan-400 text-[10px] font-mono">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              SEARCHING...
-            </div>
-          )}
+          <button
+            onClick={() => {
+              setDebouncedQuery(query);
+              setCurrentPage(0);
+            }}
+            className="px-5 py-2 rounded-xl bg-cyan-500/20 text-cyan-400 font-bold text-xs hover:bg-cyan-500/30 transition-all flex items-center gap-2 border border-cyan-500/20 hover:border-cyan-500/40 shrink-0"
+          >
+            Search
+          </button>
         </div>
       </motion.div>
 
@@ -649,6 +658,9 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                   
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-1 min-w-0">
+                      <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest block mb-1">
+                        Matched Compound
+                      </span>
                       <h2 className="text-2xl font-extrabold text-white tracking-tight leading-normal pt-1 pb-1 break-words">
                         {detail.name || 'Unnamed Chemical Subgroup'}
                       </h2>
@@ -688,7 +700,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 border-t border-white/[0.04] pt-4 text-[11px]">
                     <div className="space-y-1 bg-white/[0.01] border border-white/[0.03] p-2.5 rounded-lg">
                       <div className="flex justify-between items-center text-white/30 font-bold uppercase tracking-wider text-[9px]">
-                        <span>Canonical SMILES</span>
+                        <span>SMILES Structure</span>
                         <button onClick={() => copyToClipboard(detail.smiles, 'SMILES')} className="hover:text-cyan-400"><Copy className="w-3.5 h-3.5" /></button>
                       </div>
                       <p className="font-mono text-white/70 break-all select-all leading-relaxed pr-1">{detail.smiles}</p>
@@ -923,7 +935,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
                     <div>
                       <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-1.5">
-                        <Table2 className="w-3.5 h-3.5 text-cyan-400" /> Molecular Descriptor Inventory
+                        <Table2 className="w-3.5 h-3.5 text-cyan-400" /> Top Calculated Descriptors
                       </h4>
                       <p className="text-[9px] text-white/20 mt-0.5">Click rows to update the placement histogram. Virtualized scroll handles thousands of columns without lag.</p>
                     </div>
