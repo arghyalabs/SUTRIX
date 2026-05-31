@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, Grid, BarChart2, Zap, Activity, Download,
   LogOut, HelpCircle, FileDigit, Scale, Network, CheckSquare, Settings,
-  Brain, Search, RefreshCw
+  Brain, Search, RefreshCw, GitBranch
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { SUTRIXLogo, LogoLoader } from '../ui/SUTRIXLogo';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 
 // Tabs that need true fullscreen (no scroll wrapper, no padding)
-const FULLSCREEN_TABS = new Set(['hierarchy', 'analysis', 'enrichment', 'readiness', 'verification', 'sci-intelligence', 'sci-explorer']);
+const FULLSCREEN_TABS = new Set(['hierarchy', 'advanced-tree', 'analysis', 'enrichment', 'readiness', 'verification', 'sci-intelligence', 'sci-explorer']);
 
 interface SidebarItem {
   id: string;
@@ -56,6 +56,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { id: 'ingest',       name: 'Upload Dataset',        icon: <Upload className="w-5 h-5" />,      stepNum: 1 },
     { id: 'mapping',      name: 'Variable Mapping',       icon: <Grid className="w-5 h-5" />,        stepNum: 2 },
     { id: 'hierarchy',    name: 'Hierarchy Builder',      icon: <Network className="w-5 h-5" />,     stepNum: 3 },
+    { id: 'advanced-tree',name: 'Advanced Tree Designer', icon: <GitBranch className="w-5 h-5" />,   stepNum: 3 },
     { id: 'analysis',     name: 'Data Analysis',          icon: <BarChart2 className="w-5 h-5" />,   stepNum: 4 },
     { id: 'enrichment',   name: 'Enrichment',             icon: <Zap className="w-5 h-5" />,         stepNum: 5 },
     { id: 'readiness',    name: 'Readiness',              icon: <FileDigit className="w-5 h-5" />,   stepNum: 6 },
@@ -67,6 +68,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { id: 'ingest',          name: 'Upload Dataset',        icon: <Upload className="w-5 h-5" />,       stepNum: 1 },
     { id: 'mapping',         name: 'Variable Mapping',       icon: <Grid className="w-5 h-5" />,         stepNum: 2 },
     { id: 'hierarchy',       name: 'Hierarchy Builder',      icon: <Network className="w-5 h-5" />,      stepNum: 3 },
+    { id: 'advanced-tree',   name: 'Advanced Tree Designer', icon: <GitBranch className="w-5 h-5" />,    stepNum: 3 },
     { id: 'analysis',        name: 'Data Analysis',          icon: <BarChart2 className="w-5 h-5" />,    stepNum: 4 },
     { id: 'sci-intelligence', name: 'Scientific Intelligence',icon: <Brain className="w-5 h-5" />,        stepNum: 5 },
     { id: 'readiness',       name: 'Dataset Readiness',      icon: <FileDigit className="w-5 h-5" />,    stepNum: 6 },

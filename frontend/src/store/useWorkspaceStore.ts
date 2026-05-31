@@ -26,6 +26,7 @@ interface WorkspaceState {
   activeLineage: any;
   activeNodeId: string;
   activeNodeDetail: any;
+  filterNodes: any[];
 
   // Enrichment
   enrichmentMode: 'fast' | 'standard' | 'full';
@@ -62,6 +63,7 @@ interface WorkspaceState {
   setActiveLineage: (lineage: any) => void;
   setActiveNodeId: (id: string) => void;
   setActiveNodeDetail: (detail: any) => void;
+  setFilterNodes: (nodes: any[]) => void;
   setEnrichmentMode: (mode: 'fast' | 'standard' | 'full') => void;
   setIncludeMordred: (include: boolean) => void;
   setSelectedDescriptors: (descriptors: string[]) => void;
@@ -102,6 +104,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       activeLineage: null,
       activeNodeId: '',
       activeNodeDetail: null,
+      filterNodes: [],
 
       enrichmentMode: 'fast',
       includeMordred: false,
@@ -139,6 +142,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setActiveLineage: (lineage) => set({ activeLineage: lineage }),
       setActiveNodeId: (id) => set({ activeNodeId: id }),
       setActiveNodeDetail: (detail) => set({ activeNodeDetail: detail }),
+      setFilterNodes: (nodes) => set({ filterNodes: nodes }),
       setEnrichmentMode: (mode) => set({ enrichmentMode: mode }),
       setIncludeMordred: (include) => set({ includeMordred: include }),
       setSelectedDescriptors: (descriptors) => set({ selectedDescriptors: descriptors }),
@@ -160,7 +164,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           workspaceId: '', filename: '', parquetPath: '', rowCount: 0,
           columns: [], preview: [], mappings: {}, mappingIntelligence: {},
           segStats: {}, segregationExecuted: false, activeSegregationResult: null,
-          activeLineage: null, activeNodeId: '', activeNodeDetail: null,
+          activeLineage: null, activeNodeId: '', activeNodeDetail: null, filterNodes: [],
           enrichmentMode: 'fast', includeMordred: false, selectedDescriptors: [],
           activeJobId: '', activeJobType: null, readiness: null, readinessLoading: false,
           modelingAnalysis: null, modelingLoading: false, modelingActivePanel: 'overview',
