@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Network, Play, Layers, ChevronDown, ChevronUp, Activity, GitBranch, 
@@ -598,7 +599,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
   const hasConfig = selectedColumns.length > 0 || filterNodes.length > 0;
 
   return (
-    <div className="flex flex-col h-full bg-void overflow-hidden text-white font-sans border-r border-white/[0.03]">
+    <div className="flex flex-col h-full bg-void overflow-hidden text-white font-sans border-r border-white/[0.03] relative">
       {/* Top Header stats bar */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -1108,8 +1109,8 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
       </div>
 
       {/* SECTION 8: Bottom Sticky Continue Footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/[0.06] bg-[#060a13]/90 backdrop-blur-xl px-8 py-4 flex justify-between items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-        <div className="text-xs text-white/40 font-mono pl-[90px]">
+      <div className="absolute bottom-0 left-0 right-0 z-20 border-t border-white/[0.06] bg-[#060a13]/90 backdrop-blur-xl px-8 py-4 flex justify-between items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        <div className="text-xs text-white/40 font-mono">
           {selectedColumns.length > 0 
             ? `${selectedColumns.length} split columns locked in sequential workspace.`
             : filterNodes.length > 0 
@@ -1166,66 +1167,69 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
       </div>
 
       {/* Immersive Fullscreen Custom DAG / Sequential Workspace Overlay Modal */}
-      <AnimatePresence>
-        {isFullscreen && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
-          >
-            <div className="w-[96%] h-[92%] bg-[#050813] rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl flex flex-col relative p-6">
-              
-              {/* Fullscreen Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5 shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
-                    <Network className="w-5 h-5 text-cyan-400 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-extrabold text-base leading-none">
-                      {activeBuilderMode === 'sequential' 
-                        ? 'Select Hierarchy Columns (Sequential) — Fullscreen Mode'
-                        : 'Advanced Custom Directed Tree Designer — Fullscreen Mode'
+      {createPortal(
+        <AnimatePresence>
+          {isFullscreen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+            >
+              <div className="w-[96%] h-[92%] bg-[#050813] rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl flex flex-col relative p-6">
+                
+                {/* Fullscreen Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+                      <Network className="w-5 h-5 text-cyan-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-extrabold text-base leading-none">
+                        {activeBuilderMode === 'sequential' 
+                          ? 'Select Hierarchy Columns (Sequential) — Fullscreen Mode'
+                          : 'Advanced Custom Directed Tree Designer — Fullscreen Mode'
+                        }
+                      </h3>
+                      <p className="text-[11px] text-white/40 mt-1">
+                        {activeBuilderMode === 'sequential'
+                          ? 'Chain sequential taxonomy splits and explore statistical projections'
+                          : 'Design logical custom Directed Acyclic Graph (DAG) filters'
                       }
-                    </h3>
-                    <p className="text-[11px] text-white/40 mt-1">
-                      {activeBuilderMode === 'sequential'
-                        ? 'Chain sequential taxonomy splits and explore statistical projections'
-                        : 'Design logical custom Directed Acyclic Graph (DAG) filters'
-                      }
-                    </p>
+                      </p>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setIsFullscreen(false)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-xs font-bold"
+                  >
+                    <Minimize2 className="w-4 h-4" /> Minimize View
+                  </button>
                 </div>
-                <button
-                  onClick={() => setIsFullscreen(false)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/70 hover:text-white hover:bg-white/[0.08] transition-all text-xs font-bold"
-                >
-                  <Minimize2 className="w-4 h-4" /> Minimize View
-                </button>
-              </div>
 
-              {/* Fullscreen Body Content */}
-              <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
-                {activeBuilderMode === 'sequential' ? (
-                  renderSequentialGrid(true)
-                ) : (
-                  <AdvancedTreeWorkspace 
-                    clientId={clientId} 
-                    socket={socket} 
-                    onClose={() => {
-                      setIsFullscreen(false);
-                      setActiveBuilderMode('sequential');
-                    }} 
-                    isInline={true}
-                  />
-                )}
-              </div>
+                {/* Fullscreen Body Content */}
+                <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+                  {activeBuilderMode === 'sequential' ? (
+                    renderSequentialGrid(true)
+                  ) : (
+                    <AdvancedTreeWorkspace 
+                      clientId={clientId} 
+                      socket={socket} 
+                      onClose={() => {
+                        setIsFullscreen(false);
+                        setActiveBuilderMode('sequential');
+                      }} 
+                      isInline={true}
+                    />
+                  )}
+                </div>
 
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Structure Recovery Wizard Modal */}
       <StructureRecoveryWizard
