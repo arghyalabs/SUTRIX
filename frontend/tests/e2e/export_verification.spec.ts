@@ -56,7 +56,7 @@ test.describe('Export Page Deliverables E2E Verification', () => {
     await page.waitForTimeout(500);
 
     // Execute folder segregation & cleansing pipeline
-    await page.getByRole('button', { name: 'Execute Graph Generation' }).click();
+    await page.getByRole('button', { name: /Execute.*Graph Generation/i }).click();
     
     // Wait for hierarchy completion - should show Continue to Analysis button
     const contAnalysisBtn = page.getByRole('button', { name: 'Continue to Analysis' });

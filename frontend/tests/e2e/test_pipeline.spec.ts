@@ -55,40 +55,54 @@ test.describe('Scientific Data Orchestrator - End-to-End Production Pipeline Tes
     await page.locator('input[type="checkbox"]').first().check(); // Smart Deduplication
     
     // Execute folder segregation & cleansing pipeline
-    await page.getByRole('button', { name: 'Execute Cleansing' }).click();
+    await page.getByRole('button', { name: /Execute.*Graph Generation|Execute.*Cleansing/i }).click();
     
     // Wait for computations to complete and charts to render
-    await page.waitForTimeout(1000);
-    await expect(page.locator('text=Dataset Composition Distribution')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=Download Raw ZIP Archive')).toBeVisible();
+    const contAnalysisBtn = page.getByRole('button', { name: 'Continue to Analysis' });
+    await expect(contAnalysisBtn).toBeVisible({ timeout: 60000 });
+    await contAnalysisBtn.click();
+    await page.waitForTimeout(800);
+
+    // Verify composition/distribution text is visible on the Node Analytics page
+    await expect(page.locator('text=Pie Chart').first()).toBeVisible({ timeout: 30000 });
 
     // Proceed to QSAR enrichment phase
-    await page.getByRole('button', { name: 'Proceed to Enrichment' }).click();
-    await page.waitForTimeout(500);
+    const contEnrichmentBtn = page.getByRole('button', { name: 'Continue to Descriptor Enrichment' });
+    await expect(contEnrichmentBtn).toBeVisible({ timeout: 10000 });
+    await contEnrichmentBtn.click();
+    await page.waitForTimeout(800);
 
     // Phase 6: Computational Descriptor Enrichment
-    await expect(page.locator('text=Descriptor Enrichment')).toBeVisible();
-    await expect(page.locator('text=Compute Profile')).toBeVisible();
+    await expect(page.locator('text=Descriptor Selection')).toBeVisible();
+    await expect(page.locator('text=Compute Presets')).toBeVisible();
 
     // Run parallel calculations in Fast Mode
-    await page.getByRole('button', { name: 'Run Calculations' }).click();
+    await page.getByRole('button', { name: 'Fast Mode' }).click();
+    await page.waitForTimeout(500);
+
+    // Click the Run button (contains the number of descriptors selected, e.g. "Run (9 descriptors)")
+    const runBtn = page.getByRole('button', { name: /Run \(/i });
+    await expect(runBtn).toBeVisible();
+    await runBtn.click();
     
-    // Playwright asserts the dynamic progress telemetry
-    await expect(page.locator('text=Job Execution')).toBeVisible({ timeout: 15000 });
-    
-    // Wait for the websocket completed trigger and fetch results
-    await page.waitForSelector('text=Assemble Enriched Dataset', { timeout: 30000 });
-    await page.getByRole('button', { name: 'Assemble Enriched Dataset' }).click();
+    // Wait for computations to complete and click the Next Step button
+    const nextStepBtn = page.getByRole('button', { name: 'Next Step' }).first();
+    await expect(nextStepBtn).toBeVisible({ timeout: 60000 });
+    await nextStepBtn.click();
     await page.waitForTimeout(1000);
 
     // Phase 7: OECD Readiness Audits
-    await expect(page.getByRole('heading', { name: 'Model Readiness' })).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=Diagnostic Findings')).toBeVisible();
+    const runAnalysisBtn = page.getByRole('button', { name: 'Run AI Analysis' });
+    await expect(runAnalysisBtn).toBeVisible({ timeout: 15000 });
+    await runAnalysisBtn.click();
+
+    // Wait for results
+    await expect(page.locator('text=AI Readiness Workspace')).toBeVisible({ timeout: 45000 });
 
     // Phase 8: Reports Export downloads
     // Click on the sidebar Export tab item
     await page.locator('#sidebar-tab-reports').click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
     await expect(page.locator('text=Export & Reports').first()).toBeVisible();
     
     // Verify the compliance deliverables are ready for downstream downloads

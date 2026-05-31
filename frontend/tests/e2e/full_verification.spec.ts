@@ -348,7 +348,7 @@ test.describe('5. Hierarchy Builder', () => {
 
     // Verify charts rendered in analysis tab
     await expect(
-      page.locator('text=/Composition|Distribution|pie|bar/i').first()
+      page.locator('text=Pie Chart').first()
     ).toBeVisible({ timeout: 30000 });
 
     // No unhandled errors during build
