@@ -12,6 +12,7 @@ import { modelingApi } from '../../services/modelingApi';
 import toast from 'react-hot-toast';
 import type { ModelingAnalysis } from '../../types';
 import { ChemicalSpace3D } from './ChemicalSpace3D';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 // ── Tab components ───────────────────────────────────────────────────────────
 import { PCATab } from './tabs/PCATab';
 import { CorrelationTab } from './tabs/CorrelationTab';
@@ -398,12 +399,20 @@ interface Props {
 const ModelingReadinessWorkspace: React.FC<Props> = ({
   clientId, modelingAnalysis, modelingLoading, onRunAnalysis,
 }) => {
+  const { datasetMode, datasetPassport } = useWorkspaceStore();
+
   // ── ALL HOOKS MUST COME FIRST (Rules of Hooks) ────────────────────────────
   const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [openRisk, setOpenRisk] = useState<string | null>(null);
   const [embeddingData, setEmbeddingData] = useState<any[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+
+  useEffect(() => {
+    if (datasetMode === 'SCIENTIFIC' && ['coverage', 'domain', 'oecd'].includes(activeTab)) {
+      setActiveTab('overview');
+    }
+  }, [datasetMode, activeTab]);
 
   useEffect(() => {
     if (clientId && modelingAnalysis) {
@@ -448,13 +457,19 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
     { id: 'pca',         label: 'PCA',            icon: Activity },
     { id: 'correlation', label: 'Correlation',    icon: GitMerge },
     { id: 'variance',    label: 'Variance',       icon: BarChart3 },
-    { id: 'coverage',    label: 'Coverage',       icon: Layers },
+    ...(datasetMode !== 'SCIENTIFIC' ? [
+      { id: 'coverage',    label: 'Coverage',       icon: Layers },
+    ] : []),
     { id: 'missing',     label: 'Missing',        icon: AlertTriangle },
-    { id: 'domain',      label: 'AD Domain',      icon: Target },
+    ...(datasetMode !== 'SCIENTIFIC' ? [
+      { id: 'domain',      label: 'AD Domain',      icon: Target },
+    ] : []),
     { id: 'outliers',    label: 'Outliers',       icon: Zap },
     { id: 'imbalance',   label: 'Imbalance',      icon: Scale },
     { id: 'leakage',     label: 'Leakage',        icon: Shield },
-    { id: 'oecd',        label: 'OECD',           icon: CheckCircle2 },
+    ...(datasetMode !== 'SCIENTIFIC' ? [
+      { id: 'oecd',        label: 'OECD',           icon: CheckCircle2 },
+    ] : []),
   ];
 
   // ────────────────────────────────────────────────────────────────────────
@@ -483,8 +498,13 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           <KPICard label="AI Readiness" value={`${Math.round(r.ai_score)}%`}
             sub={`${r.confidence_tier} confidence`} color={tierColor} icon={Brain} delay={0} />
-          <KPICard label="QSAR Score" value={`${Math.round(r.qsar_score)}%`}
-            sub={`${d.qsar.oecd_pass_count}/5 OECD principles`} color="#8B5CF6" icon={FlaskConical} delay={0.06} />
+          {datasetMode === 'SCIENTIFIC' ? (
+            <KPICard label="Domain Target" value={datasetPassport?.detected_domain || 'General Sci'}
+              sub={`${datasetPassport?.column_count || r.n_features} variables analyzed`} color="#8B5CF6" icon={FlaskConical} delay={0.06} />
+          ) : (
+            <KPICard label="QSAR Score" value={`${Math.round(r.qsar_score)}%`}
+              sub={`${d.qsar.oecd_pass_count}/5 OECD principles`} color="#8B5CF6" icon={FlaskConical} delay={0.06} />
+          )}
           <KPICard label="Dataset Integrity" value={`${Math.round(r.integrity_score)}%`}
             sub={d.quality.health_score >= 80 ? 'Pristine quality' : 'Issues detected'} color="#3B82F6" icon={Shield} delay={0.12} />
           <KPICard label="N : P Ratio" value={r.n_to_p_ratio.toFixed(1)}
@@ -705,61 +725,65 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
         </section>
 
         {/* ── QSAR OECD Panel ─────────────────────────────────────────── */}
-        <section>
-          <SectionHeader title="QSAR Readiness — OECD 5-Principle Compliance" subtitle={`${d.qsar.oecd_pass_count}/5 principles met`} icon={FlaskConical} />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-            {d.qsar.oecd_checks.map((check, i) => (
-              <motion.div
-                key={check.principle}
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07 }}
-                className={`rounded-2xl border p-4 ${
-                  check.status
-                    ? 'border-emerald-500/15 bg-emerald-500/[0.04]'
-                    : 'border-rose-500/15 bg-rose-500/[0.04]'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  {check.status
-                    ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    : <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                  }
-                  <span className="text-[10px] text-white/30 font-medium">Principle {check.principle}</span>
-                </div>
-                <p className="text-xs font-medium text-white/65 mb-1">{check.name}</p>
-                <p className="text-[11px] text-white/35 leading-relaxed">{check.evidence}</p>
-              </motion.div>
-            ))}
-          </div>
-        </section>
+        {datasetMode !== 'SCIENTIFIC' && (
+          <section>
+            <SectionHeader title="QSAR Readiness — OECD 5-Principle Compliance" subtitle={`${d.qsar.oecd_pass_count}/5 principles met`} icon={FlaskConical} />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+              {d.qsar.oecd_checks.map((check, i) => (
+                <motion.div
+                  key={check.principle}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.07 }}
+                  className={`rounded-2xl border p-4 ${
+                    check.status
+                      ? 'border-emerald-500/15 bg-emerald-500/[0.04]'
+                      : 'border-rose-500/15 bg-rose-500/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    {check.status
+                      ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      : <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    }
+                    <span className="text-[10px] text-white/30 font-medium">Principle {check.principle}</span>
+                  </div>
+                  <p className="text-xs font-medium text-white/65 mb-1">{check.name}</p>
+                  <p className="text-[11px] text-white/35 leading-relaxed">{check.evidence}</p>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Descriptor Readiness ────────────────────────────────────── */}
-        <section>
-          <SectionHeader title="Descriptor Readiness" subtitle="Completeness by quality tier" icon={Layers} />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {d.qsar.descriptor_readiness.map((dr, i) => {
-              const col = dr.completeness >= 90 ? '#10B981' : dr.completeness >= 60 ? '#F59E0B' : '#EF4444';
-              return (
-                <motion.div
-                  key={dr.category}
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                  className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-5"
-                >
-                  <div className="text-2xl font-bold mb-1" style={{ color: col }}>{dr.count}</div>
-                  <div className="text-xs text-white/50 font-medium mb-1">{dr.category}</div>
-                  <div className="text-[11px] text-white/30 mb-3">{dr.recommendation}</div>
-                  <div className="h-1 rounded-full bg-white/[0.06]">
-                    <motion.div className="h-full rounded-full" style={{ backgroundColor: col }}
-                      initial={{ width: 0 }} animate={{ width: `${dr.completeness}%` }}
-                      transition={{ duration: 0.8, delay: i * 0.08 }}
-                    />
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </section>
+        {datasetMode !== 'SCIENTIFIC' && (
+          <section>
+            <SectionHeader title="Descriptor Readiness" subtitle="Completeness by quality tier" icon={Layers} />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {d.qsar.descriptor_readiness.map((dr, i) => {
+                const col = dr.completeness >= 90 ? '#10B981' : dr.completeness >= 60 ? '#F59E0B' : '#EF4444';
+                return (
+                  <motion.div
+                    key={dr.category}
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-5"
+                  >
+                    <div className="text-2xl font-bold mb-1" style={{ color: col }}>{dr.count}</div>
+                    <div className="text-xs text-white/50 font-medium mb-1">{dr.category}</div>
+                    <div className="text-[11px] text-white/30 mb-3">{dr.recommendation}</div>
+                    <div className="h-1 rounded-full bg-white/[0.06]">
+                      <motion.div className="h-full rounded-full" style={{ backgroundColor: col }}
+                        initial={{ width: 0 }} animate={{ width: `${dr.completeness}%` }}
+                        transition={{ duration: 0.8, delay: i * 0.08 }}
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ── Scientific Intelligence Panel ───────────────────────────── */}
         <section>

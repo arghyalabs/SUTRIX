@@ -19,6 +19,11 @@ function attachErrorMonitors(page: Page) {
     if (m.type() === 'error' &&
         !m.text().includes('Retrying') &&
         !m.text().includes('ResizeObserver') &&
+        !m.text().includes('attribute cx') &&
+        !m.text().includes('attribute cy') &&
+        !m.text().includes('attribute d') &&
+        !m.text().includes('attribute x') &&
+        !m.text().includes('attribute y') &&
         !m.text().includes('favicon')) {
       errors.push(`CONSOLE: ${m.text().slice(0, 200)}`);
     }

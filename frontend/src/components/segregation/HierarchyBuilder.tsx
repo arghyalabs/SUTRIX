@@ -15,13 +15,16 @@ import {
   type Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Network, Play, Layers, ChevronDown, ChevronUp, Activity, GitBranch, RotateCcw, Download, ChevronRight } from 'lucide-react';
+import { Network, Play, Layers, ChevronDown, ChevronUp, Activity, GitBranch, RotateCcw, Download, ChevronRight, Brain } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { hierarchyApi } from '../../services/hierarchyApi';
 import { apiClient } from '../../services/apiClient';
 import { FilterNodeCard } from './FilterNodeCard';
 import { FilterEditorPanel } from '../hierarchy/FilterEditorPanel';
 import { SUTRIXLogo } from '../ui/SUTRIXLogo';
+import { DatasetPassportCard } from '../ui/DatasetPassportCard';
+import { StructureRecoveryBanner } from '../scientific/StructureRecoveryBanner';
+import { StructureRecoveryWizard } from '../scientific/StructureRecoveryWizard';
 
 interface HierarchyBuilderProps {
   clientId: string;
@@ -157,7 +160,11 @@ export function isChemicalIdentifierColumn(colName: string, role?: string): bool
 }
 
 export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, socket }) => {
-  const { columns, mappings, setActiveJobId, setActiveJobType } = useWorkspaceStore();
+  const { 
+    columns, mappings, setActiveJobId, setActiveJobType, 
+    datasetMode, datasetPassport 
+  } = useWorkspaceStore();
+
   const [isBuilding, setIsBuilding] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [filterNodes, setFilterNodes] = useState<FilterNodeData[]>([]);
@@ -168,6 +175,36 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [enableDedup, setEnableDedup] = useState(true);
   const [enableVariancePruning, setEnableVariancePruning] = useState(true);
+
+  // SUTRIX Dual Mode local states
+  const [showRecoveryWizard, setShowRecoveryWizard] = useState(false);
+  const [dismissRecoveryBanner, setDismissRecoveryBanner] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+
+  const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
+  // Fetch column recommendations from backend entropy engine
+  useEffect(() => {
+    const fetchRecs = async () => {
+      try {
+        setLoadingRecs(true);
+        const res = await fetch(`${apiBase}/api/hierarchy/${clientId}/recommend`);
+        if (res.ok) {
+          const data = await res.json();
+          setRecommendations(data || []);
+          if (data && data.length > 0) {
+            setSelectedColumns(prev => prev.length === 0 ? [data[0].column] : prev);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load hierarchy recommendations:", err);
+      } finally {
+        setLoadingRecs(false);
+      }
+    };
+    fetchRecs();
+  }, [clientId, columns]);
 
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<Node>([]);
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -289,7 +326,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
       >
         <div className="flex items-center gap-2">
           <Network className="w-4 h-4 text-cyan-400" />
-          <span className="text-white font-bold text-sm">Hierarchy Graph Builder</span>
+          <span className="text-white font-bold text-sm">Step 3: Hierarchical Segregation (Hierarchy Graph Builder)</span>
         </div>
         <div className="h-4 w-px bg-white/10" />
         <div className="flex items-center gap-4 text-xs">
@@ -308,6 +345,21 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
           )}
         </div>
       </motion.div>
+
+      {/* Collapsible Passport Identity Card */}
+      <div className="px-6 pt-4 shrink-0">
+        <DatasetPassportCard />
+      </div>
+
+      {/* Persistent Structure Recovery Banner */}
+      {datasetMode === 'SCIENTIFIC' && !datasetPassport?.smiles_detected && !dismissRecoveryBanner && (
+        <div className="px-6 pt-4 shrink-0">
+          <StructureRecoveryBanner 
+            onStartRecovery={() => setShowRecoveryWizard(true)}
+            onDismiss={() => setDismissRecoveryBanner(true)}
+          />
+        </div>
+      )}
 
       {/* Main 3-column layout */}
       <div className="flex flex-1 overflow-hidden">
@@ -386,6 +438,37 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
                       <span className="text-white/70">{col}</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* SUTRIX Smart Recommendations */}
+              {recommendations.length > 0 && (
+                <div className="pt-4 border-t border-white/[0.06] mt-4">
+                  <p className="text-[10px] text-violet-400 uppercase tracking-wider font-bold mb-3 flex items-center gap-1.5">
+                    <Brain className="w-3.5 h-3.5" />
+                    Smart Recommendations
+                  </p>
+                  <div className="space-y-2">
+                    {recommendations.map((rec) => {
+                      const isSelected = selectedColumns.includes(rec.column);
+                      return (
+                        <button
+                          key={rec.column}
+                          disabled={isSelected}
+                          onClick={() => toggleColumn(rec.column)}
+                          className="w-full p-2.5 rounded-xl border border-violet-500/20 bg-violet-500/[0.02] hover:bg-violet-500/10 text-left transition-colors flex items-start gap-2.5 disabled:opacity-30 disabled:hover:bg-violet-500/[0.02]"
+                        >
+                          <div className="w-6 h-6 rounded-lg bg-violet-500/10 text-violet-400 text-[10px] flex items-center justify-center font-bold font-mono shrink-0">
+                            {Math.round(rec.score)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-bold text-white block truncate">{rec.column}</span>
+                            <span className="text-[9px] text-slate-500 block truncate">{rec.reason}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -577,30 +660,39 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
             <div className="flex-1" />
             
             {/* Smart Duplication & Pruning Options */}
+            {/* Smart Duplication & Pruning Options */}
             <div className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.05] rounded-xl px-3 py-2 mr-2">
               <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider mr-2">Options</span>
               
-              <button
-                onClick={() => setEnableDedup(!enableDedup)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all ${
+              <label
+                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                   enableDedup ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-white/40 hover:text-white/60 border border-transparent'
                 }`}
                 title="Remove exact duplicate rows across all columns before building the graph"
               >
-                <div className={`w-2 h-2 rounded-full ${enableDedup ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                <input
+                  type="checkbox"
+                  checked={enableDedup}
+                  onChange={() => setEnableDedup(!enableDedup)}
+                  className="mr-1 accent-emerald-500"
+                />
                 Smart Deduplication
-              </button>
+              </label>
               
-              <button
-                onClick={() => setEnableVariancePruning(!enableVariancePruning)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all ${
+              <label
+                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                   enableVariancePruning ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-white/40 hover:text-white/60 border border-transparent'
                 }`}
                 title="Identify and warn about groups with unacceptably high variance in endpoint values"
               >
-                <div className={`w-2 h-2 rounded-full ${enableVariancePruning ? 'bg-cyan-400' : 'bg-white/20'}`} />
+                <input
+                  type="checkbox"
+                  checked={enableVariancePruning}
+                  onChange={() => setEnableVariancePruning(!enableVariancePruning)}
+                  className="mr-1 accent-cyan-500"
+                />
                 Variance Pruning
-              </button>
+              </label>
             </div>
 
             <button
@@ -619,7 +711,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
                 <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
               )}
               <Play className="w-4 h-4 fill-current relative z-10" />
-              <span className="relative z-10">Execute Graph Generation</span>
+              <span className="relative z-10">Execute Cleansing & Graph Generation</span>
             </button>
           </div>
         )}
@@ -636,6 +728,12 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
           />
         )}
       </AnimatePresence>
+
+      {/* Structure Recovery Wizard Modal */}
+      <StructureRecoveryWizard
+        isOpen={showRecoveryWizard}
+        onClose={() => setShowRecoveryWizard(false)}
+      />
     </div>
   );
 };

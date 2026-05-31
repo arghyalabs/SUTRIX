@@ -135,6 +135,7 @@ export const DataAnalysisWorkspace: React.FC = () => {
     workspaceId,
     setActiveNodeId,
     setActiveNodeDetail,
+    datasetMode,
   } = useWorkspaceStore();
 
   const [isLoadingNode, setIsLoadingNode] = useState(false);
@@ -261,10 +262,10 @@ export const DataAnalysisWorkspace: React.FC = () => {
         {/* Continue button */}
         <div className="shrink-0 p-4 border-t border-white/[0.06]">
           <button
-            onClick={() => useWorkspaceStore.getState().setActiveTab('enrichment')}
+            onClick={() => useWorkspaceStore.getState().setActiveTab(datasetMode === 'SCIENTIFIC' ? 'sci-intelligence' : 'enrichment')}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Continue to Descriptor Enrichment <ChevronRight className="w-4 h-4" />
+            {datasetMode === 'SCIENTIFIC' ? 'Continue to Scientific Intelligence' : 'Continue to Descriptor Enrichment'} <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { CompoundPreviewRow, VariableMappings, ReadinessResponse, ModelingAnalysis } from '../types';
+import type { CompoundPreviewRow, VariableMappings, ReadinessResponse, ModelingAnalysis, DatasetMode, DatasetClassification, DatasetPassport } from '../types';
 
 interface WorkspaceState {
   // Navigation
@@ -43,6 +43,13 @@ interface WorkspaceState {
   modelingLoading: boolean;
   modelingActivePanel: string;
 
+  // Dataset Intelligence
+  datasetMode: DatasetMode;
+  datasetClassification: DatasetClassification | null;
+  datasetPassport: DatasetPassport | null;
+  detectedDomain: string;
+  primaryEntityType: string;
+
   // Setters
   setWorkspaceId: (id: string) => void;
   setInWorkspace: (inWS: boolean) => void;
@@ -65,6 +72,11 @@ interface WorkspaceState {
   setModelingAnalysis: (data: ModelingAnalysis | null) => void;
   setModelingLoading: (loading: boolean) => void;
   setModelingActivePanel: (panel: string) => void;
+  setDatasetMode: (mode: DatasetMode) => void;
+  setDatasetClassification: (c: DatasetClassification | null) => void;
+  setDatasetPassport: (p: DatasetPassport | null) => void;
+  setDetectedDomain: (domain: string) => void;
+  setPrimaryEntityType: (entity: string) => void;
   resetWorkspace: () => void;
 }
 
@@ -104,6 +116,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       modelingLoading: false,
       modelingActivePanel: 'overview',
 
+      datasetMode: 'MOLECULAR',
+      datasetClassification: null,
+      datasetPassport: null,
+      detectedDomain: 'General Scientific',
+      primaryEntityType: 'Compound',
+
       setWorkspaceId: (id) => set({ workspaceId: id }),
       setInWorkspace: (inWS) => set({ inWorkspace: inWS }),
       setActiveTab: (tab) => {
@@ -131,6 +149,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setModelingAnalysis: (data) => set({ modelingAnalysis: data }),
       setModelingLoading: (loading) => set({ modelingLoading: loading }),
       setModelingActivePanel: (panel) => set({ modelingActivePanel: panel }),
+      setDatasetMode: (mode) => set({ datasetMode: mode }),
+      setDatasetClassification: (c) => set({ datasetClassification: c }),
+      setDatasetPassport: (p) => set({ datasetPassport: p }),
+      setDetectedDomain: (domain) => set({ detectedDomain: domain }),
+      setPrimaryEntityType: (entity) => set({ primaryEntityType: entity }),
 
       resetWorkspace: () =>
         set({
@@ -141,6 +164,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           enrichmentMode: 'fast', includeMordred: false, selectedDescriptors: [],
           activeJobId: '', activeJobType: null, readiness: null, readinessLoading: false,
           modelingAnalysis: null, modelingLoading: false, modelingActivePanel: 'overview',
+          datasetMode: 'MOLECULAR', datasetClassification: null, datasetPassport: null,
+          detectedDomain: 'General Scientific', primaryEntityType: 'Compound',
           activeTab: 'ingest',
         }),
     }),

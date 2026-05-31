@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, Grid, BarChart2, Zap, Activity, Download,
-  LogOut, HelpCircle, FileDigit, Scale, Network, CheckSquare, Settings
+  LogOut, HelpCircle, FileDigit, Scale, Network, CheckSquare, Settings,
+  Brain, Search, RefreshCw
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { SUTRIXLogo, LogoLoader } from '../ui/SUTRIXLogo';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 
 // Tabs that need true fullscreen (no scroll wrapper, no padding)
-const FULLSCREEN_TABS = new Set(['hierarchy', 'analysis', 'enrichment', 'readiness', 'verification']);
+const FULLSCREEN_TABS = new Set(['hierarchy', 'analysis', 'enrichment', 'readiness', 'verification', 'sci-intelligence', 'sci-explorer']);
 
 interface SidebarItem {
   id: string;
@@ -25,6 +27,7 @@ interface DashboardLayoutProps {
   onGoHome: () => void;
   onOpenLicense: () => void;
   onOpenSystem?: () => void;
+  onSwitchWorkspace?: () => void;
   telemetryData?: {
     ram_usage_pct: number;
     fps: number;
@@ -40,22 +43,38 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   onGoHome,
   onOpenLicense,
   onOpenSystem,
+  onSwitchWorkspace,
   telemetryData = { ram_usage_pct: 42, fps: 60, active_jobs_count: 0 }
 }) => {
   const [collapsed, setCollapsed] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
 
-  const sidebarItems: SidebarItem[] = [
-    { id: 'ingest',       name: 'Upload Dataset',      icon: <Upload className="w-5 h-5" />,    stepNum: 1 },
-    { id: 'mapping',      name: 'Variable Map',         icon: <Grid className="w-5 h-5" />,      stepNum: 2 },
-    { id: 'hierarchy',    name: 'Hierarchy Builder',    icon: <Network className="w-5 h-5" />,   stepNum: 3 },
-    { id: 'analysis',     name: 'Data Analysis',        icon: <BarChart2 className="w-5 h-5" />, stepNum: 4 },
-    { id: 'enrichment',   name: 'Enrichment',           icon: <Zap className="w-5 h-5" />,       stepNum: 5 },
-    { id: 'readiness',    name: 'Readiness',            icon: <FileDigit className="w-5 h-5" />, stepNum: 6 },
-    { id: 'verification', name: 'Compound Explorer',    icon: <CheckSquare className="w-5 h-5" />, stepNum: 7 },
-    { id: 'reports',      name: 'Export',               icon: <Download className="w-5 h-5" />,  stepNum: 8 },
+  // Retrieve dataset mode and passport info from store
+  const { datasetMode, detectedDomain } = useWorkspaceStore();
+
+  const MOLECULAR_TABS: SidebarItem[] = [
+    { id: 'ingest',       name: 'Upload Dataset',        icon: <Upload className="w-5 h-5" />,      stepNum: 1 },
+    { id: 'mapping',      name: 'Variable Mapping',       icon: <Grid className="w-5 h-5" />,        stepNum: 2 },
+    { id: 'hierarchy',    name: 'Hierarchy Builder',      icon: <Network className="w-5 h-5" />,     stepNum: 3 },
+    { id: 'analysis',     name: 'Data Analysis',          icon: <BarChart2 className="w-5 h-5" />,   stepNum: 4 },
+    { id: 'enrichment',   name: 'Enrichment',             icon: <Zap className="w-5 h-5" />,         stepNum: 5 },
+    { id: 'readiness',    name: 'Readiness',              icon: <FileDigit className="w-5 h-5" />,   stepNum: 6 },
+    { id: 'verification', name: 'Compound Explorer',      icon: <CheckSquare className="w-5 h-5" />, stepNum: 7 },
+    { id: 'reports',      name: 'Export',                 icon: <Download className="w-5 h-5" />,    stepNum: 8 },
   ];
 
+  const SCIENTIFIC_TABS: SidebarItem[] = [
+    { id: 'ingest',          name: 'Upload Dataset',        icon: <Upload className="w-5 h-5" />,       stepNum: 1 },
+    { id: 'mapping',         name: 'Variable Mapping',       icon: <Grid className="w-5 h-5" />,         stepNum: 2 },
+    { id: 'hierarchy',       name: 'Hierarchy Builder',      icon: <Network className="w-5 h-5" />,      stepNum: 3 },
+    { id: 'analysis',        name: 'Data Analysis',          icon: <BarChart2 className="w-5 h-5" />,    stepNum: 4 },
+    { id: 'sci-intelligence', name: 'Scientific Intelligence',icon: <Brain className="w-5 h-5" />,        stepNum: 5 },
+    { id: 'readiness',       name: 'Dataset Readiness',      icon: <FileDigit className="w-5 h-5" />,    stepNum: 6 },
+    { id: 'sci-explorer',    name: 'Data Explorer',          icon: <Search className="w-5 h-5" />,       stepNum: 7 },
+    { id: 'reports',         name: 'Export',                 icon: <Download className="w-5 h-5" />,     stepNum: 8 },
+  ];
+
+  const sidebarItems = datasetMode === 'SCIENTIFIC' ? SCIENTIFIC_TABS : MOLECULAR_TABS;
   const currentStep = sidebarItems.find(i => i.id === activeTab);
 
   return (
@@ -71,20 +90,46 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           onHoverEnd={() => setCollapsed(true)}
         >
           {/* Header */}
-          <div className="flex items-center h-24 px-4 border-b border-white/[0.06] shrink-0 gap-4">
-            <div className="shrink-0 cursor-pointer" onClick={onGoHome}>
-              <LogoLoader size="w-14 h-14" compact />
+          <div className="flex flex-col border-b border-white/[0.06] shrink-0 p-4 gap-2">
+            <div className="flex items-center h-16 gap-4">
+              <div className="shrink-0 cursor-pointer" onClick={onGoHome}>
+                <LogoLoader size="w-12 h-12" compact />
+              </div>
+              <AnimatePresence>
+                {!collapsed && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="whitespace-nowrap min-w-0"
+                  >
+                    <p className="font-extrabold tracking-[0.2em] text-xl text-white leading-none">SUTRIX</p>
+                    <p className="text-[10px] font-semibold tracking-[0.15em] text-white/40 uppercase mt-1">SDO Platform</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <AnimatePresence>
               {!collapsed && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="whitespace-nowrap min-w-0"
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex flex-wrap gap-1.5 mt-1"
                 >
-                  <p className="font-extrabold tracking-[0.2em] text-2xl text-white leading-none">SUTRIX</p>
-                  <p className="text-[10px] font-semibold tracking-[0.15em] text-white/40 uppercase mt-1">SDO Platform</p>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider
+                    ${datasetMode === 'MOLECULAR' 
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                      : 'bg-violet-500/10 border-violet-500/20 text-violet-400'
+                    }`}
+                  >
+                    {datasetMode === 'MOLECULAR' ? '⚗ Molecular' : '📊 Scientific'}
+                  </span>
+                  {detectedDomain && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] bg-white/[0.04] border border-white/[0.08] text-white/60 truncate max-w-[120px]">
+                      {detectedDomain}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -124,7 +169,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         className="flex-1 flex items-center justify-between pr-3 overflow-hidden"
                       >
                         <span className="font-medium text-sm truncate">{item.name}</span>
-                        {isActive && <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-2 py-0.5 rounded-full">S{item.stepNum}</span>}
+                        {isActive && <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-2 py-0.5 rounded-full font-mono">S{item.stepNum}</span>}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -155,6 +200,44 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* Footer */}
           <div className="p-3 border-t border-white/[0.06] space-y-1 shrink-0">
+            {/* Switch Workspace */}
+            {onSwitchWorkspace && (
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <button
+                    onClick={onSwitchWorkspace}
+                    className={`w-full flex items-center h-12 rounded-xl text-cyan-400 hover:bg-cyan-500/10 transition-colors
+                      ${collapsed ? 'justify-center' : 'justify-start'}
+                    `}
+                  >
+                    <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                      <RefreshCw className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <AnimatePresence>
+                      {!collapsed && (
+                        <motion.span
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                          className="font-semibold text-sm truncate whitespace-nowrap"
+                        >
+                          Switch Workspace
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </button>
+                </Tooltip.Trigger>
+                {collapsed && (
+                  <Tooltip.Portal>
+                    <Tooltip.Content side="right" sideOffset={16}
+                      className="glass px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xl animate-in fade-in zoom-in-95 z-50"
+                    >
+                      Switch Workspace
+                      <Tooltip.Arrow className="fill-[rgba(10,15,30,0.8)]" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                )}
+              </Tooltip.Root>
+            )}
+
             {/* System Monitor — utility shortcut, not a workflow step */}
             <Tooltip.Root>
               <Tooltip.Trigger asChild>
@@ -191,6 +274,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </Tooltip.Portal>
               )}
             </Tooltip.Root>
+
             <button 
               onClick={onOpenLicense}
               className={`w-full flex items-center h-12 rounded-xl text-secondary hover:bg-white/[0.04] hover:text-white transition-colors
@@ -209,6 +293,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 )}
               </AnimatePresence>
             </button>
+
             <button 
               onClick={onExit}
               className={`w-full flex items-center h-12 rounded-xl text-rose-500/80 hover:bg-rose-500/10 hover:text-rose-500 transition-colors
