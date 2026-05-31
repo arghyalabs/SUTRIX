@@ -674,7 +674,7 @@ const App: React.FC = () => {
         );
       case 'verification':
         return (
-          <CompoundPreview
+          <CompoundExplorer
             clientId={clientId}
             activeJobId={activeJobId || null}
           />
