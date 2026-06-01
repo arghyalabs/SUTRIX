@@ -403,8 +403,12 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
         })
 
         # --- Biological Variance & Deduplication (Streamlit Parity) ---
+        df_original = df.copy()
         enable_dedup = payload.get("enable_dedup", False)
         prune_high_variance = payload.get("prune_high_variance", False)
+        
+        dedup_res = None
+        vs = None
 
         from backend.core.workspace_registry import registry as _reg
         _ctx = _reg.get_context(context_id)
@@ -538,6 +542,30 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
         # ── Phase 5: Store engine + broadcast JOB_COMPLETED (95-100%) ────────
         # Extract the live engine object (attached by LineageBuilder.run)
         engine = lineage_data.pop("_engine", None)
+
+        # Save the deduplicated/pruned dataframe to context's parquet source of truth
+        from backend.storage.parquet_engine import ParquetEngine
+        pe = ParquetEngine()
+        new_path = pe.convert_dataframe_to_parquet(df, f"segregated_{context_id}")
+        context.parquet_path = new_path
+        context.dataframe_cache = df
+        
+        # Populate segmentation_results and variance_summary for frontend and PDF audits
+        from dataclasses import asdict
+        dedup_stats_dict = asdict(dedup_res) if dedup_res else None
+        variance_summary_dict = asdict(vs) if vs else None
+        
+        if variance_summary_dict:
+            lineage_data["variance_summary"] = variance_summary_dict
+            
+        context.segmentation_results = {
+            "dedup_stats": dedup_stats_dict,
+            "variance_summary": variance_summary_dict,
+            "original_count": len(df_original),
+            "input_records": len(df),
+            "total_folders": lineage_data.get("total_nodes", 0),
+            "total_files": lineage_data.get("total_nodes", 0),
+        }
 
         context.active_lineage = lineage_data
         context.active_segregation_result = lineage_data  # backward-compat alias
