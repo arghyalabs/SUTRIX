@@ -304,7 +304,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
         client_id: clientId,
         enable_dedup: enableDedup,
         enable_variance_pruning: enableVariancePruning,
-        prune_high_variance: false,
+        prune_high_variance: enableVariancePruning,
         selected_hierarchy: hierarchyCols,
       });
 
