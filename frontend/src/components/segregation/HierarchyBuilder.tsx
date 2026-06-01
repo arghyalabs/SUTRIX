@@ -16,6 +16,8 @@ import { StructureRecoveryBanner } from '../scientific/StructureRecoveryBanner';
 import { StructureRecoveryWizard } from '../scientific/StructureRecoveryWizard';
 import { AdvancedTreeWorkspace } from './AdvancedTreeWorkspace';
 import { toast } from 'react-hot-toast';
+import { GenericModeBanner } from '../ui/GenericModeBanner';
+import { RecoverableModePanel } from '../ui/RecoverableModePanel';
 
 interface HierarchyBuilderProps {
   clientId: string;
@@ -34,7 +36,8 @@ export function isChemicalIdentifierColumn(colName: string, role?: string): bool
 export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, socket }) => {
   const { 
     columns, mappings, preview, rowCount, setActiveJobId, setActiveJobType, 
-    datasetMode, datasetPassport, filterNodes, setFilterNodes, setActiveTab 
+    datasetMode, datasetPassport, filterNodes, setFilterNodes, setActiveTab,
+    setDatasetMode, setGenericMode
   } = useWorkspaceStore();
 
   const [isBuilding, setIsBuilding] = useState(false);
@@ -46,6 +49,15 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
   const [activeBuilderMode, setActiveBuilderMode] = useState<'sequential' | 'advanced'>('sequential');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const [isRecoverableModalOpen, setIsRecoverableModalOpen] = useState(datasetMode === 'RECOVERABLE');
+
+  useEffect(() => {
+    if (datasetMode === 'RECOVERABLE') {
+      setIsRecoverableModalOpen(true);
+    } else {
+      setIsRecoverableModalOpen(false);
+    }
+  }, [datasetMode]);
   // Redesign state variables
   const [isEduPanelOpen, setIsEduPanelOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -632,6 +644,9 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
 
       {/* Main scrollable body */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-24 p-6 space-y-6">
+        
+        {/* Generic Mode Banner */}
+        <GenericModeBanner />
         
         {/* Passport Display */}
         <DatasetPassportCard />
@@ -1235,6 +1250,21 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
       <StructureRecoveryWizard
         isOpen={showRecoveryWizard}
         onClose={() => setShowRecoveryWizard(false)}
+      />
+
+      {/* Recoverable Mode Warning Panel */}
+      <RecoverableModePanel
+        isOpen={isRecoverableModalOpen}
+        onClose={() => setIsRecoverableModalOpen(false)}
+        onStartRecovery={() => {
+          setIsRecoverableModalOpen(false);
+          setShowRecoveryWizard(true);
+        }}
+        onContinueGeneric={() => {
+          setIsRecoverableModalOpen(false);
+          setDatasetMode('GENERIC');
+          setGenericMode(true, "User bypassed structure recovery for recoverable dataset containing chemical identifiers.");
+        }}
       />
 
       {/* Example Modal */}

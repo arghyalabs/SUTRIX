@@ -8,6 +8,7 @@ import {
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { SUTRIXLogo, LogoLoader } from '../ui/SUTRIXLogo';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { DatasetModeBadge } from '../ui/DatasetModeBadge';
 
 // Tabs that need true fullscreen (no scroll wrapper, no padding)
 const FULLSCREEN_TABS = new Set(['hierarchy', 'advanced-tree', 'analysis', 'enrichment', 'readiness', 'verification', 'sci-intelligence', 'sci-explorer']);
@@ -117,14 +118,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   exit={{ opacity: 0 }}
                   className="flex flex-wrap gap-1.5 mt-1"
                 >
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider
-                    ${datasetMode === 'MOLECULAR' 
-                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                      : 'bg-violet-500/10 border-violet-500/20 text-violet-400'
-                    }`}
-                  >
-                    {datasetMode === 'MOLECULAR' ? '⚗ Molecular' : '📊 Scientific'}
-                  </span>
+                  <DatasetModeBadge />
                   {detectedDomain && (
                     <span className="px-2 py-0.5 rounded-full text-[9px] bg-white/[0.04] border border-white/[0.08] text-white/60 truncate max-w-[120px]">
                       {detectedDomain}
@@ -324,6 +318,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <span className="text-white/30 text-xs">Step {currentStep?.stepNum || 1} / 8</span>
                 <span className="text-white/[0.15]">&bull;</span> 
                 <span className="text-white font-semibold">{currentStep?.name || activeTab}</span>
+                <span className="text-white/[0.15]">&bull;</span> 
+                <DatasetModeBadge />
               </div>
             </div>
 

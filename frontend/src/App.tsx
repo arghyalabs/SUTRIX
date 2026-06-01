@@ -226,14 +226,21 @@ const App: React.FC = () => {
           setDataset(d.filename, d.parquet_path, d.row_count, d.columns, d.preview);
           // Auto-infer schema
           if (d.columns?.length) {
-            mappingApi.inferSchema(d.columns).then(schemaRes => {
-              const aiMappings: any = {};
-              const inferenceDetails: any = {};
-              schemaRes.mappings.forEach((m: any) => {
-                aiMappings[m.column] = m.mapped_to;
-                inferenceDetails[m.column] = { confidence: m.confidence, reasons: m.reasons };
-              });
-              setMappings(aiMappings);
+              mappingApi.inferSchema(d.columns).then(schemaRes => {
+                const aiMappings: any = {};
+                const inferenceDetails: any = {};
+                schemaRes.mappings.forEach((m: any) => {
+                  aiMappings[m.column] = m.mapped_to;
+                  inferenceDetails[m.column] = { 
+                    confidence: m.confidence, 
+                    reasons: m.reasons,
+                    layer_reached: m.layer_reached,
+                    needs_user_confirmation: m.needs_user_confirmation,
+                    alternatives: m.alternatives,
+                    ecotox: m.ecotox
+                  };
+                });
+                setMappings(aiMappings);
               const store = useWorkspaceStore.getState();
               if (store.setMappingIntelligence) store.setMappingIntelligence(inferenceDetails);
             }).catch(() => {
@@ -333,7 +340,14 @@ const App: React.FC = () => {
                     const inferenceDetails: any = {};
                     schemaRes.mappings.forEach((m: any) => {
                       aiMappings[m.column] = m.mapped_to;
-                      inferenceDetails[m.column] = { confidence: m.confidence, reasons: m.reasons };
+                      inferenceDetails[m.column] = { 
+                        confidence: m.confidence, 
+                        reasons: m.reasons,
+                        layer_reached: m.layer_reached,
+                        needs_user_confirmation: m.needs_user_confirmation,
+                        alternatives: m.alternatives,
+                        ecotox: m.ecotox
+                      };
                     });
                     setMappings(aiMappings);
                     const store = useWorkspaceStore.getState();
@@ -409,7 +423,14 @@ const App: React.FC = () => {
                     const inferenceDetails: any = {};
                     schemaRes.mappings.forEach((m: any) => {
                       aiMappings[m.column] = m.mapped_to;
-                      inferenceDetails[m.column] = { confidence: m.confidence, reasons: m.reasons };
+                      inferenceDetails[m.column] = { 
+                        confidence: m.confidence, 
+                        reasons: m.reasons,
+                        layer_reached: m.layer_reached,
+                        needs_user_confirmation: m.needs_user_confirmation,
+                        alternatives: m.alternatives,
+                        ecotox: m.ecotox
+                      };
                     });
                     setMappings(aiMappings);
                     const store = useWorkspaceStore.getState();

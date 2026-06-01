@@ -185,7 +185,7 @@ export interface ModelingAnalysis {
   meta: { elapsed_seconds: number; n_samples: number; n_features: number; analysis_timestamp: number };
 }
 
-export type DatasetMode = 'MOLECULAR' | 'SCIENTIFIC' | 'HYBRID';
+export type DatasetMode = 'MOLECULAR' | 'SCIENTIFIC' | 'HYBRID' | 'GENERIC' | 'RECOVERABLE';
 
 export interface DatasetClassification {
   dataset_mode: DatasetMode;

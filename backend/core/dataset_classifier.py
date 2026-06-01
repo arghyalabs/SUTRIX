@@ -109,7 +109,7 @@ ENTITY_ROLE_MAP: Dict[str, str] = {
 class DatasetClassification:
     """Immutable result of a DatasetClassifier.classify() call."""
 
-    dataset_mode: Literal["MOLECULAR", "SCIENTIFIC", "HYBRID"]
+    dataset_mode: Literal["MOLECULAR", "SCIENTIFIC", "HYBRID", "GENERIC", "RECOVERABLE"]
     """Primary mode inferred from structure coverage."""
 
     smiles_detected: bool
@@ -249,8 +249,16 @@ class DatasetClassifier:
         coverage_pct = (structure_rows / total_rows * 100.0) if total_rows > 0 else 0.0
 
         # ── Determine mode ────────────────────────────────────────────────────
-        if coverage_pct >= cls._MOLECULAR_THRESHOLD:
-            dataset_mode: Literal["MOLECULAR", "SCIENTIFIC", "HYBRID"] = "MOLECULAR"
+        all_unmapped = not mappings or all(v == 'none' for v in mappings.values())
+        has_chemical_name = any(v == 'chemical_name' for v in mappings.values())
+        has_smiles = any(v in ['canonical_smiles', 'smiles'] for v in mappings.values())
+
+        if all_unmapped:
+            dataset_mode: Literal["MOLECULAR", "SCIENTIFIC", "HYBRID", "GENERIC", "RECOVERABLE"] = "GENERIC"
+        elif has_chemical_name and not has_smiles:
+            dataset_mode = "RECOVERABLE"
+        elif coverage_pct >= cls._MOLECULAR_THRESHOLD:
+            dataset_mode = "MOLECULAR"
         elif coverage_pct >= cls._HYBRID_MIN:
             dataset_mode = "HYBRID"
         else:
