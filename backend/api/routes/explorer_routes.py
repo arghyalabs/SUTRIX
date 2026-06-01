@@ -97,57 +97,67 @@ def _row_to_dict(row: pd.Series) -> Dict[str, Any]:
 
 
 def _resolve_compound_fields(row: pd.Series, mappings: Dict[str, str]) -> Dict[str, Any]:
-    """Resolves standard chemical properties from a row using mappings (supporting all variants)."""
-    sci_to_user = {v: k for k, v in mappings.items()}
+    """Resolves standard chemical properties from a row using mappings (supporting all variants with robust duplicate resolution)."""
     
-    # 1. Resolve Chemical Name (supporting all aliases)
+    # Helper to find the best user column for a set of target scientific roles
+    def get_best_col(roles: List[str], preferred_pattern: str = None) -> Optional[str]:
+        candidates = [col for col, role in mappings.items() if role in roles and col in row.index]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if preferred_pattern:
+            import re
+            pat = re.compile(preferred_pattern, re.IGNORECASE)
+            # Prioritize candidates matching the pattern
+            pattern_candidates = [c for c in candidates if pat.search(c)]
+            if pattern_candidates:
+                return pattern_candidates[0]
+        # Return first candidate as fallback
+        return candidates[0]
+
+    # 1. Resolve Chemical Name
     name = None
-    for key in ["chemical_name", "compound_name", "substance_name", "test_substance", "material_name"]:
-        user_col = sci_to_user.get(key)
-        if user_col and user_col in row.index and pd.notnull(row[user_col]):
-            name = str(row[user_col])
-            break
-            
+    name_col = get_best_col(["chemical_name", "chemical_id", "compound_name", "substance_name", "test_substance", "material_name"], r"(name|chem|comp|substance)")
+    if name_col and pd.notnull(row[name_col]):
+        name = str(row[name_col])
+
     # 2. Resolve CAS Number
     cas = None
-    user_col = sci_to_user.get("cas_number")
-    if user_col and user_col in row.index and pd.notnull(row[user_col]):
-        cas = str(row[user_col])
-        
+    cas_col = get_best_col(["cas_number", "cas"], r"cas")
+    if cas_col and pd.notnull(row[cas_col]):
+        cas = str(row[cas_col])
+
     # 3. Resolve SMILES
     smiles = None
-    for key in ["canonical_smiles", "isomeric_smiles"]:
-        user_col = sci_to_user.get(key)
-        if user_col and user_col in row.index and pd.notnull(row[user_col]):
-            smiles = str(row[user_col])
-            break
-            
+    smiles_col = get_best_col(["canonical_smiles", "isomeric_smiles", "smiles"], r"(smile|struct)")
+    if smiles_col and pd.notnull(row[smiles_col]):
+        smiles = str(row[smiles_col])
+
     # 4. Resolve Species/Organism
     species = None
-    for key in ["organism", "species"]:
-        user_col = sci_to_user.get(key)
-        if user_col and user_col in row.index and pd.notnull(row[user_col]):
-            species = str(row[user_col])
-            break
-        
+    species_col = get_best_col(["organism", "species"], r"(spec|org)")
+    if species_col and pd.notnull(row[species_col]):
+        species = str(row[species_col])
+
     # 5. Resolve Endpoint
     endpoint = None
-    user_col = sci_to_user.get("endpoint")
-    if user_col and user_col in row.index and pd.notnull(row[user_col]):
-        endpoint = str(row[user_col])
-        
+    endpoint_col = get_best_col(["endpoint"], r"end")
+    if endpoint_col and pd.notnull(row[endpoint_col]):
+        endpoint = str(row[endpoint_col])
+
     # 6. Resolve Value
     value = None
-    user_col = sci_to_user.get("value")
-    if user_col and user_col in row.index and pd.notnull(row[user_col]):
-        value = _to_json_safe(row[user_col])
-        
+    value_col = get_best_col(["value"], r"val")
+    if value_col and pd.notnull(row[value_col]):
+        value = _to_json_safe(row[value_col])
+
     # 7. Resolve Unit
     unit = None
-    user_col = sci_to_user.get("unit")
-    if user_col and user_col in row.index and pd.notnull(row[user_col]):
-        unit = str(row[user_col])
-        
+    unit_col = get_best_col(["unit"], r"unit")
+    if unit_col and pd.notnull(row[unit_col]):
+        unit = str(row[unit_col])
+
     return {
         "chemical_name": name,
         "compound_name": name,
@@ -164,7 +174,7 @@ def _resolve_compound_fields(row: pd.Series, mappings: Dict[str, str]) -> Dict[s
 
 
 def _load_df_and_mappings(client_id: str):
-    """Shared helper: loads workspace context, df slice, and resolved column names."""
+    """Shared helper: loads workspace context, df slice, and resolved column names with robust duplicate resolution."""
     context = registry.get_context(client_id)
     if not context:
         raise HTTPException(status_code=404, detail=f"Workspace '{client_id}' not found")
@@ -175,21 +185,31 @@ def _load_df_and_mappings(client_id: str):
         raise HTTPException(status_code=404, detail=str(exc))
 
     mappings = context.mappings or {}
-    sci_to_user = {v: k for k, v in mappings.items()}
 
-    smiles_col = sci_to_user.get("canonical_smiles")
-    val_col = sci_to_user.get("value")
-    unit_col = sci_to_user.get("unit")
-    ep_col = sci_to_user.get("endpoint")
+    # Helper to find the best user column for a set of target scientific roles
+    def get_best_col(roles: List[str], preferred_pattern: str = None) -> Optional[str]:
+        candidates = [col for col, role in mappings.items() if role in roles and col in df.columns]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if preferred_pattern:
+            import re
+            pat = re.compile(preferred_pattern, re.IGNORECASE)
+            # Prioritize candidates matching the pattern
+            pattern_candidates = [c for c in candidates if pat.search(c)]
+            if pattern_candidates:
+                return pattern_candidates[0]
+        # Return first candidate as fallback
+        return candidates[0]
+
+    smiles_col = get_best_col(["canonical_smiles", "isomeric_smiles", "smiles"], r"(smile|struct)")
+    val_col = get_best_col(["value"], r"val")
+    unit_col = get_best_col(["unit"], r"unit")
+    ep_col = get_best_col(["endpoint"], r"end")
     
-    # Try all chemical name standard keys in order of preference
-    name_col = None
-    for key in ["chemical_name", "compound_name", "substance_name", "test_substance", "material_name"]:
-        if key in sci_to_user:
-            name_col = sci_to_user[key]
-            break
-            
-    cas_col = sci_to_user.get("cas_number")
+    name_col = get_best_col(["chemical_name", "chemical_id", "compound_name", "substance_name", "test_substance", "material_name"], r"(name|chem|comp|substance)")
+    cas_col = get_best_col(["cas_number", "cas"], r"cas")
 
     return df, mappings, smiles_col, val_col, unit_col, ep_col, name_col, cas_col
 
