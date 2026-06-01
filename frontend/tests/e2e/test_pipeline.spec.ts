@@ -64,7 +64,7 @@ test.describe('Scientific Data Orchestrator - End-to-End Production Pipeline Tes
     await page.waitForTimeout(800);
 
     // Verify composition/distribution text is visible on the Node Analytics page
-    await expect(page.locator('text=Pie Chart').first()).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('text=Categorical Breakdown').first()).toBeVisible({ timeout: 30000 });
 
     // Proceed to QSAR enrichment phase
     const contEnrichmentBtn = page.getByRole('button', { name: 'Continue to Descriptor Enrichment' });
