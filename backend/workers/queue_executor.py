@@ -32,16 +32,31 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
     include_mordred: bool = payload["include_mordred"]
     mode: str = payload["mode"]
     
+    # Helper to find the best user column for a set of target scientific roles
+    def get_best_col(roles: List[str], preferred_pattern: str = None) -> Optional[str]:
+        candidates = [col for col, role in mappings.items() if role in roles and col in df.columns]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if preferred_pattern:
+            import re
+            pat = re.compile(preferred_pattern, re.IGNORECASE)
+            # Prioritize candidates matching the pattern
+            pattern_candidates = [c for c in candidates if pat.search(c)]
+            if pattern_candidates:
+                return pattern_candidates[0]
+        # Return first candidate as fallback
+        return candidates[0]
+
     # 1. Resolve column mappings to find SMILES & Name/CAS columns
-    sci_to_user = {v: k for k, v in mappings.items()}
-    smiles_col = sci_to_user.get('canonical_smiles') or sci_to_user.get('smiles')
-    name_col = sci_to_user.get('chemical_name') or sci_to_user.get('chemical_id') or sci_to_user.get('cas_number')
+    smiles_col = get_best_col(["canonical_smiles", "isomeric_smiles", "smiles"], r"(smile|struct)")
+    name_col = get_best_col(["chemical_name", "chemical_id", "compound_name", "substance_name", "test_substance", "material_name"], r"(name|chem|comp|substance)")
     
     # If no smiles column is mapped, but we have a chemical name/CAS column, dynamically add canonical_smiles column
     if (not smiles_col or smiles_col not in df.columns) and name_col and name_col in df.columns:
         df['canonical_smiles'] = None
         mappings['canonical_smiles'] = 'canonical_smiles'
-        sci_to_user['canonical_smiles'] = 'canonical_smiles'
         smiles_col = 'canonical_smiles'
         
     if not smiles_col or smiles_col not in df.columns:
@@ -818,12 +833,32 @@ async def process_structure_recovery_v2_task(job_id: str, payload: Dict[str, Any
         json.dump({"smiles_map": recovered_map, "unresolved": unresolved}, f, indent=2)
 
     # Propagate resolved structures to DataFrame
-    sci_to_user = {v: k for k, v in context.mappings.items()} if context.mappings else {}
-    smiles_col = sci_to_user.get('canonical_smiles') or sci_to_user.get('smiles')
+    # Helper to find the best user column for a set of target scientific roles
+    def get_best_col(roles: List[str], preferred_pattern: str = None) -> Optional[str]:
+        if not context.mappings:
+            return None
+        candidates = [col for col, role in context.mappings.items() if role in roles and col in df.columns]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if preferred_pattern:
+            import re
+            pat = re.compile(preferred_pattern, re.IGNORECASE)
+            # Prioritize candidates matching the pattern
+            pattern_candidates = [c for c in candidates if pat.search(c)]
+            if pattern_candidates:
+                return pattern_candidates[0]
+        # Return first candidate as fallback
+        return candidates[0]
+
+    smiles_col = get_best_col(["canonical_smiles", "isomeric_smiles", "smiles"], r"(smile|struct)")
     
     if not smiles_col:
         if 'canonical_smiles' not in df.columns:
             df['canonical_smiles'] = None
+        if not context.mappings:
+            context.mappings = {}
         context.mappings['canonical_smiles'] = 'canonical_smiles'
         smiles_col = 'canonical_smiles'
 
