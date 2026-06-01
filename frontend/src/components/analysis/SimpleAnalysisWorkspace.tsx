@@ -6,13 +6,14 @@ import { FilterStepNavigator } from './FilterStepNavigator';
 import { FilterStepInspector } from './FilterStepInspector';
 import { FunnelVisualization } from './FunnelVisualization';
 import { FiltrationChartSet } from './FiltrationChartSet';
-import { AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { AlertCircle, RefreshCw, Layers, ChevronRight } from 'lucide-react';
 
 export const SimpleAnalysisWorkspace: React.FC = () => {
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const simpleFunnelData = useWorkspaceStore((state) => state.simpleFunnelData);
   const setSimpleFunnelData = useWorkspaceStore((state) => state.setSimpleFunnelData);
   const genericMode = useWorkspaceStore((state) => state.genericMode);
+  const datasetMode = useWorkspaceStore((state) => state.datasetMode);
 
   const [selectedStepId, setSelectedStepId] = useState<string>('root');
   const [loading, setLoading] = useState<boolean>(false);
@@ -137,6 +138,16 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
             clientId={workspaceId}
           />
         </div>
+      </div>
+
+      {/* Continue button spanning full width at the bottom */}
+      <div className="col-span-1 xl:col-span-12 border-t border-white/[0.04] pt-6 mt-4 text-center">
+        <button
+          onClick={() => useWorkspaceStore.getState().setActiveTab(datasetMode === 'SCIENTIFIC' ? 'sci-intelligence' : 'enrichment')}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white text-black font-extrabold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all"
+        >
+          {datasetMode === 'SCIENTIFIC' ? 'Continue to Scientific Intelligence' : 'Continue to Descriptor Enrichment'} <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
