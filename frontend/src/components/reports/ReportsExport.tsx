@@ -4,6 +4,7 @@ import { Download, FileText, Archive, ArrowRight, RotateCcw, GitBranch, FolderOp
 import { hierarchyApi } from '../../services/hierarchyApi';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { SUTRIXLogo } from '../ui/SUTRIXLogo';
+import { VarianceFilterPanel } from '../segregation/VarianceFilterPanel';
 
 interface ReportsExportProps {
   clientId: string;
@@ -27,14 +28,14 @@ export const ReportsExport: React.FC<ReportsExportProps> = ({
   handleResetWorkspace
 }) => {
   const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-  const { activeLineage } = useWorkspaceStore();
+  const { activeLineage, varianceFilterEnabled } = useWorkspaceStore();
   const [hierarchyNodes, setHierarchyNodes] = useState<HierarchyNode[]>([]);
   const [isLoadingHierarchy, setIsLoadingHierarchy] = useState(false);
   const [hasHierarchy, setHasHierarchy] = useState(false);
 
   const downloadZipUrl = `${API_BASE}/api/compliance/${clientId}/download`;
   const downloadPdfUrl = `${API_BASE}/api/compliance/${clientId}/report`;
-  const downloadParquetUrl = activeJobId ? `${API_BASE}/api/jobs/${clientId}/download_enriched_parquet?job_id=${activeJobId}` : '#';
+  const downloadParquetUrl = activeJobId ? `${API_BASE}/api/jobs/${clientId}/download_enriched_parquet?job_id=${activeJobId}&apply_variance_filter=${varianceFilterEnabled}` : '#';
 
   // Load hierarchy tree if available
   useEffect(() => {
@@ -110,6 +111,15 @@ export const ReportsExport: React.FC<ReportsExportProps> = ({
             </a>
           </div>
         </div>
+      </motion.div>
+
+      {/* Log Variance Filter Panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.03 }}
+      >
+        <VarianceFilterPanel />
       </motion.div>
 
       {/* Final Enriched Dataset (QSAR Ready) - Unhighlighted */}

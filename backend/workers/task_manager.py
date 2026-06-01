@@ -94,6 +94,32 @@ class TaskManager:
         return job_id
 
     @staticmethod
+    def submit_structure_recovery_v2(
+        workspace_id: str,
+        column_to_resolve: str,
+        mode: str,
+        limit: int,
+        sources: List[str]
+    ) -> str:
+        """Submits a structure recovery V2 background task."""
+        job_id = job_registry.create_job()
+        if not job_id:
+            return ""
+
+        payload = {
+            "type": "structure_recovery_v2",
+            "workspace_id": workspace_id,
+            "column_to_resolve": column_to_resolve,
+            "mode": mode,
+            "limit": limit,
+            "sources": sources
+        }
+
+        task_queue.put_nowait((job_id, payload))
+        logger.info(f"Successfully queued structure recovery V2 task '{job_id}' for workspace '{workspace_id}'")
+        return job_id
+
+    @staticmethod
     def query_status(job_id: str) -> Dict[str, Any]:
         """Queries the status, ETA, and progress of an active or completed background job."""
         job = job_registry.get_job(job_id)

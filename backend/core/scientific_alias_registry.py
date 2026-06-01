@@ -15,8 +15,32 @@ CHEMICAL_IDENTIFIERS = {
     "chemical_name": [
         "compound", "compound_name", "molecule", "molecule_name", "drug", 
         "drug_name", "chemical", "chemical_name", "ligand", "substance", 
-        "analyte", "sample_name"
+        "analyte", "sample_name", "substance_name", "test_material", 
+        "active_ingredient", "ingredient", "test_substance", "study_substance"
     ]
+}
+
+ECOTOX_VARIABLES = {
+    "species": [
+        "species", "organism", "taxon", "test_species", "target_species",
+        "biological_system", "test_organism", "animal", "organism_name",
+        "species_name", "common_name", "latin_name"
+    ],
+    "test_type": [
+        "test_type", "study_type", "experiment_type", "exposure_type",
+        "assay_type", "study_design", "test_method", "method_type",
+        "protocol_type", "test_protocol"
+    ],
+    "duration": [
+        "duration", "exposure_duration", "exposure_time", "study_length",
+        "time", "observation_period", "test_duration", "incubation_time",
+        "treatment_duration", "contact_time", "time_point"
+    ],
+    "endpoint": [
+        "endpoint", "response_variable", "effect_measure",
+        "toxicity_endpoint", "outcome", "response", "effect",
+        "measured_endpoint", "toxicological_endpoint", "biological_endpoint"
+    ],
 }
 
 BIOACTIVITY_VARIABLES = {
@@ -53,7 +77,7 @@ METADATA_VARIABLES = {
 
 # Compile all into one global registry
 UNIVERSAL_ONTOLOGY = {}
-for category in [CHEMICAL_IDENTIFIERS, BIOACTIVITY_VARIABLES, ADMET_VARIABLES, PHYSICOCHEMICAL_VARIABLES, METADATA_VARIABLES]:
+for category in [CHEMICAL_IDENTIFIERS, ECOTOX_VARIABLES, BIOACTIVITY_VARIABLES, ADMET_VARIABLES, PHYSICOCHEMICAL_VARIABLES, METADATA_VARIABLES]:
     for standard_key, aliases in category.items():
         if standard_key not in UNIVERSAL_ONTOLOGY:
             UNIVERSAL_ONTOLOGY[standard_key] = []

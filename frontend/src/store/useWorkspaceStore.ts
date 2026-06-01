@@ -33,7 +33,7 @@ interface WorkspaceState {
   includeMordred: boolean;
   selectedDescriptors: string[];
   activeJobId: string;
-  activeJobType: 'segregation' | 'enrichment' | null;
+  activeJobType: 'segregation' | 'enrichment' | 'recovery_v2' | null;
 
   // Readiness (legacy)
   readiness: ReadinessResponse | null;
@@ -50,6 +50,20 @@ interface WorkspaceState {
   datasetPassport: DatasetPassport | null;
   detectedDomain: string;
   primaryEntityType: string;
+
+  // Simple / Advanced Dual Analysis Mode
+  analysisMode: 'simple' | 'advanced';
+  simpleFunnelData: any | null;
+
+  // Zero-Mapping & Recoverable Modes
+  genericMode: boolean;
+  genericModeReason: string;
+  recoverableMode: boolean;
+  genericBannerDismissed: boolean;
+
+  // Variance Filtering
+  varianceFilterEnabled: boolean;
+  varianceSummary: any | null;
 
   // Setters
   setWorkspaceId: (id: string) => void;
@@ -68,7 +82,7 @@ interface WorkspaceState {
   setIncludeMordred: (include: boolean) => void;
   setSelectedDescriptors: (descriptors: string[]) => void;
   setActiveJobId: (jobId: string) => void;
-  setActiveJobType: (type: 'segregation' | 'enrichment' | null) => void;
+  setActiveJobType: (type: 'segregation' | 'enrichment' | 'recovery_v2' | null) => void;
   setReadiness: (readiness: ReadinessResponse | null) => void;
   setReadinessLoading: (loading: boolean) => void;
   setModelingAnalysis: (data: ModelingAnalysis | null) => void;
@@ -79,6 +93,15 @@ interface WorkspaceState {
   setDatasetPassport: (p: DatasetPassport | null) => void;
   setDetectedDomain: (domain: string) => void;
   setPrimaryEntityType: (entity: string) => void;
+
+  setAnalysisMode: (mode: 'simple' | 'advanced') => void;
+  setSimpleFunnelData: (data: any | null) => void;
+  setGenericMode: (enabled: boolean, reason?: string) => void;
+  setRecoverableMode: (enabled: boolean) => void;
+  setGenericBannerDismissed: (dismissed: boolean) => void;
+  setVarianceFilterEnabled: (enabled: boolean) => void;
+  setVarianceSummary: (summary: any | null) => void;
+
   resetWorkspace: () => void;
 }
 
@@ -125,6 +148,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       detectedDomain: 'General Scientific',
       primaryEntityType: 'Compound',
 
+      analysisMode: 'simple',
+      simpleFunnelData: null,
+
+      genericMode: false,
+      genericModeReason: 'No scientific column mapping was detected or confirmed.',
+      recoverableMode: false,
+      genericBannerDismissed: false,
+
+      varianceFilterEnabled: true,
+      varianceSummary: null,
+
       setWorkspaceId: (id) => set({ workspaceId: id }),
       setInWorkspace: (inWS) => set({ inWorkspace: inWS }),
       setActiveTab: (tab) => {
@@ -159,6 +193,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setDetectedDomain: (domain) => set({ detectedDomain: domain }),
       setPrimaryEntityType: (entity) => set({ primaryEntityType: entity }),
 
+      setAnalysisMode: (mode) => set({ analysisMode: mode }),
+      setSimpleFunnelData: (data) => set({ simpleFunnelData: data }),
+      setGenericMode: (enabled, reason) => set({ 
+        genericMode: enabled, 
+        genericModeReason: reason || 'No scientific column mapping was detected or confirmed.' 
+      }),
+      setRecoverableMode: (enabled) => set({ recoverableMode: enabled }),
+      setGenericBannerDismissed: (dismissed) => set({ genericBannerDismissed: dismissed }),
+      setVarianceFilterEnabled: (enabled) => set({ varianceFilterEnabled: enabled }),
+      setVarianceSummary: (summary) => set({ varianceSummary: summary }),
+
       resetWorkspace: () =>
         set({
           workspaceId: '', filename: '', parquetPath: '', rowCount: 0,
@@ -171,17 +216,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           datasetMode: 'MOLECULAR', datasetClassification: null, datasetPassport: null,
           detectedDomain: 'General Scientific', primaryEntityType: 'Compound',
           activeTab: 'ingest',
+          analysisMode: 'simple', simpleFunnelData: null,
+          genericMode: false, recoverableMode: false, genericBannerDismissed: false,
+          varianceFilterEnabled: true, varianceSummary: null,
         }),
     }),
     { 
-      name: 'sdo-workspace-storage-v2',
-      version: 2,
+      name: 'sdo-workspace-storage-v3',
+      version: 3,
       migrate: (persistedState: any, version: number) => {
-        // Always clear stale job tracking state across versions
         return {
           ...persistedState,
           activeJobId: '',
           activeJobType: null,
+          analysisMode: 'simple',
+          simpleFunnelData: null,
+          genericMode: false,
+          recoverableMode: false,
+          genericBannerDismissed: false,
+          varianceFilterEnabled: true,
+          varianceSummary: null,
         };
       },
     }

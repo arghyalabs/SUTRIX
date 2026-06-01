@@ -5,6 +5,7 @@ import { hierarchyApi } from '../../services/hierarchyApi';
 import { NodeVisualization } from './NodeVisualization';
 import { NodeMetaPanel } from './NodeMetaPanel';
 import { Activity, ChevronRight, Database, GitBranch, AlertCircle } from 'lucide-react';
+import { SimpleAnalysisWorkspace } from './SimpleAnalysisWorkspace';
 
 interface HierarchyNodeMeta {
   id: string;
@@ -136,6 +137,8 @@ export const DataAnalysisWorkspace: React.FC = () => {
     setActiveNodeId,
     setActiveNodeDetail,
     datasetMode,
+    analysisMode,
+    setAnalysisMode,
   } = useWorkspaceStore();
 
   const [isLoadingNode, setIsLoadingNode] = useState(false);
@@ -215,72 +218,106 @@ export const DataAnalysisWorkspace: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* LEFT PANEL: Lineage Tree Navigator (25%) */}
-      <div className="w-[25%] border-r border-white/[0.06] bg-[#080f1f] flex flex-col">
-        <div className="px-4 py-4 border-b border-white/[0.06]">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-cyan-400" />
-            Lineage Navigator
-          </h3>
-          <div className="flex gap-3 mt-2 text-[10px] text-white/30">
-            <span>{lineage.total_nodes || lineage.nodes?.length} nodes</span>
-            <span>·</span>
-            <span>depth {lineage.max_depth}</span>
-          </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Top Dual Mode Bar */}
+      <div className="flex items-center justify-between px-6 py-3.5 bg-[#080f1f]/80 border-b border-white/[0.06] shrink-0 backdrop-blur-md z-10 text-left">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider">Step 4: Data Analysis Workspace</h2>
         </div>
-
-        <div className="flex-1 overflow-auto custom-scrollbar p-3">
-          <div className="w-max min-w-full">
-            {rootNode ? (
-              <TreeNode
-                node={rootNode}
-                nodeMap={nodeMap}
-                selectedId={activeNodeId || ''}
-                onSelect={handleSelectNode}
-                depth={0}
-              />
-            ) : (
-              <div className="py-8 text-center text-xs text-white/20">No nodes found</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* CENTER: Node Visualization (50%) */}
-      <div className="w-[50%] border-r border-white/[0.06] flex flex-col">
-        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
-          <h3 className="text-white font-bold text-sm">Node Analytics</h3>
-          {activeNodeId && (
-            <span className="text-xs text-white/30 font-mono truncate max-w-[200px]">{activeNodeId}</span>
-          )}
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <NodeVisualization nodeDetail={activeNodeDetail} isLoading={isLoadingNode} />
-        </div>
-
-        {/* Continue button */}
-        <div className="shrink-0 p-4 border-t border-white/[0.06]">
+        
+        {/* Toggle Pill */}
+        <div className="flex items-center bg-white/[0.02] border border-white/[0.06] p-0.5 rounded-xl">
           <button
-            onClick={() => useWorkspaceStore.getState().setActiveTab(datasetMode === 'SCIENTIFIC' ? 'sci-intelligence' : 'enrichment')}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setAnalysisMode('simple')}
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all
+              ${analysisMode === 'simple' ? 'bg-cyan-500/20 text-cyan-300' : 'text-white/40 hover:text-white/60'}`}
           >
-            {datasetMode === 'SCIENTIFIC' ? 'Continue to Scientific Intelligence' : 'Continue to Descriptor Enrichment'} <ChevronRight className="w-4 h-4" />
+            ● Simple Funnel
+          </button>
+          <button
+            onClick={() => setAnalysisMode('advanced')}
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all
+              ${analysisMode === 'advanced' ? 'bg-cyan-500/20 text-cyan-300' : 'text-white/40 hover:text-white/60'}`}
+          >
+            ○ Advanced Tree
           </button>
         </div>
       </div>
 
-      {/* RIGHT PANEL: NodeMetaPanel (25%) */}
-      <div className="w-[25%] bg-[#080f1f] flex flex-col">
-        <div className="px-4 py-4 border-b border-white/[0.06]">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2">
-            <Database className="w-4 h-4 text-violet-400" />
-            Node Inspector
-          </h3>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <NodeMetaPanel nodeDetail={activeNodeDetail} clientId={workspaceId} />
-        </div>
+      <div className="flex-1 overflow-auto custom-scrollbar p-6">
+        {analysisMode === 'simple' ? (
+          <SimpleAnalysisWorkspace />
+        ) : (
+          <div className="flex h-full overflow-hidden -m-6 text-left">
+            {/* LEFT PANEL: Lineage Tree Navigator (25%) */}
+            <div className="w-[25%] border-r border-white/[0.06] bg-[#080f1f] flex flex-col">
+              <div className="px-4 py-4 border-b border-white/[0.06] text-left">
+                <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-cyan-400" />
+                  Lineage Navigator
+                </h3>
+                <div className="flex gap-3 mt-2 text-[10px] text-white/30">
+                  <span>{lineage.total_nodes || lineage.nodes?.length} nodes</span>
+                  <span>·</span>
+                  <span>depth {lineage.max_depth}</span>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto custom-scrollbar p-3">
+                <div className="w-max min-w-full">
+                  {rootNode ? (
+                    <TreeNode
+                      node={rootNode}
+                      nodeMap={nodeMap}
+                      selectedId={activeNodeId || ''}
+                      onSelect={handleSelectNode}
+                      depth={0}
+                    />
+                  ) : (
+                    <div className="py-8 text-center text-xs text-white/20">No nodes found</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* CENTER: Node Visualization (50%) */}
+            <div className="w-[50%] border-r border-white/[0.06] flex flex-col">
+              <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
+                <h3 className="text-white font-bold text-sm">Node Analytics</h3>
+                {activeNodeId && (
+                  <span className="text-xs text-white/30 font-mono truncate max-w-[200px]">{activeNodeId}</span>
+                )}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <NodeVisualization nodeDetail={activeNodeDetail} isLoading={isLoadingNode} />
+              </div>
+
+              {/* Continue button */}
+              <div className="shrink-0 p-4 border-t border-white/[0.06]">
+                <button
+                  onClick={() => useWorkspaceStore.getState().setActiveTab(datasetMode === 'SCIENTIFIC' ? 'sci-intelligence' : 'enrichment')}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {datasetMode === 'SCIENTIFIC' ? 'Continue to Scientific Intelligence' : 'Continue to Descriptor Enrichment'} <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* RIGHT PANEL: NodeMetaPanel (25%) */}
+            <div className="w-[25%] bg-[#080f1f] flex flex-col">
+              <div className="px-4 py-4 border-b border-white/[0.06]">
+                <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4 text-violet-400" />
+                  Node Inspector
+                </h3>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <NodeMetaPanel nodeDetail={activeNodeDetail} clientId={workspaceId} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -148,6 +148,75 @@ async def get_node_detail(client_id: str, node_id: str):
     return public_detail
 
 
+@router.get("/{client_id}/funnel")
+async def get_lineage_funnel(client_id: str):
+    """
+    Returns the funnel steps walking from root to the first child leaf at each level,
+    including row counts, unique compounds, percentage retained, and charts.
+    """
+    context = _get_context(client_id)
+    engine = _require_engine(context, client_id)
+    lineage = _require_lineage(context, client_id)
+
+    steps = []
+    sankey_links = []
+    
+    current_id = "root"
+    step_num = 1
+    
+    while current_id:
+        detail = engine.node_details.get(current_id)
+        if not detail:
+            break
+            
+        metadata = detail.get("metadata", {})
+        stats = detail.get("stats", {})
+        
+        # Calculate percentage retained relative to root
+        root_rows = engine.node_details.get("root", {}).get("stats", {}).get("total_rows", 1)
+        if root_rows == 0:
+            root_rows = 1
+        pct_retained = round((stats.get("total_rows", 0) / root_rows) * 100, 2)
+        
+        # Strip internal-only keys from charts
+        public_charts = {}
+        if "charts" in detail:
+            public_charts = {k: v for k, v in detail["charts"].items() if not k.startswith("_")}
+
+        steps.append({
+            "step": step_num,
+            "id": current_id,
+            "label": metadata.get("node_name", "Root") if current_id != "root" else "Root Dataset",
+            "filter_col": metadata.get("filter_col"),
+            "filter_val": metadata.get("filter_val"),
+            "row_count": stats.get("total_rows", 0),
+            "unique_compounds": stats.get("unique_compounds", 0),
+            "pct_retained": pct_retained,
+            "charts": public_charts
+        })
+        
+        children = metadata.get("children", [])
+        if children:
+            next_id = children[0]
+            next_detail = engine.node_details.get(next_id)
+            if next_detail:
+                next_metadata = next_detail.get("metadata", {})
+                sankey_links.append({
+                    "source": metadata.get("node_name", "Root") if current_id != "root" else "Root Dataset",
+                    "target": next_metadata.get("node_name", "Unknown"),
+                    "value": next_detail.get("stats", {}).get("total_rows", 0)
+                })
+            current_id = next_id
+            step_num += 1
+        else:
+            current_id = None
+            
+    return {
+        "steps": steps,
+        "sankey_links": sankey_links
+    }
+
+
 @router.get("/{client_id}/export/{node_id}")
 async def export_node(
     client_id: str,

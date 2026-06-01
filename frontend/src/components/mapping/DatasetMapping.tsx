@@ -154,51 +154,127 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
   }, [columns, mappings]);
 
   const renderColumnItem = (col: string) => {
-    const mappedValue = mappings[col] || 'none';
+    const mappedValue = (mappings[col] || 'none') as any;
     const isMapped = mappedValue !== 'none' && mappedValue !== undefined;
-    const intel = intelligence[col] || {};
+    const intel = (intelligence[col] || {}) as any;
     
+    // Determine confidence tier for badges
+    const confidence = intel.confidence ?? 0;
+    const needsConfirm = intel.needs_user_confirmation ?? false;
+    const layer = intel.layer_reached ?? 5;
+    
+    let badgeType: 'AUTO' | 'REVIEW' | 'CONFIRM' = 'CONFIRM';
+    if (isMapped && mappedValue !== 'none') {
+      if (layer <= 2 && confidence >= 0.90 && !needsConfirm) {
+        badgeType = 'AUTO';
+      } else if (layer <= 4 && confidence >= 0.55) {
+        badgeType = 'REVIEW';
+      }
+    }
+
+    const layerNames: Record<number, string> = {
+      1: 'Exact Match',
+      2: 'Synonym Match',
+      3: 'Fuzzy Similarity',
+      4: 'AI Semantic Overlap',
+      5: 'Manual Placement'
+    };
+
     return (
       <div key={col} className={`flex flex-col gap-4 p-5 rounded-2xl border transition-all duration-300 ${isMapped ? 'bg-white/[0.01] border-white/[0.08]' : 'bg-transparent border-white/[0.03] hover:border-white/[0.08]'}`}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <Database className={`w-4.5 h-4.5 ${isMapped ? 'text-cyan-400' : 'text-muted'}`} />
-            <span className={`text-sm font-semibold tracking-tight ${isMapped ? 'text-white' : 'text-secondary'}`}>{col}</span>
+            <div className="flex flex-col">
+              <span className={`text-sm font-semibold tracking-tight ${isMapped ? 'text-white' : 'text-secondary'}`}>{col}</span>
+              {isMapped && intel.confidence !== undefined && (
+                <span className="text-[10px] text-muted flex items-center gap-1 mt-0.5" title={`Ontology scanning matched this column via Layer ${layer}: ${layerNames[layer]}`}>
+                  <Layers className="w-3 h-3 text-cyan-500/80" />
+                  Layer {layer}: {layerNames[layer] || 'Inference Engine'}
+                </span>
+              )}
+            </div>
           </div>
 
-          <Select.Root value={mappedValue} onValueChange={(val) => handleSelect(col, val)}>
-            <Select.Trigger className={`flex items-center justify-between w-64 px-3 py-2 rounded-xl text-xs font-semibold border transition-all outline-none focus:ring-2 focus:ring-cyan-500/30
-              ${isMapped ? 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.05)]' : 'bg-white/[0.03] border-white/[0.06] text-secondary hover:bg-white/[0.06]'}
-            `}>
-              <Select.Value placeholder="Select Mapping..." />
-              <Select.Icon><ChevronDown className="w-3.5 h-3.5 opacity-50" /></Select.Icon>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Content className="overflow-hidden bg-[#0a0d18] border border-white/[0.08] rounded-2xl shadow-2xl z-50 animate-in fade-in">
-                <Select.Viewport className="p-1">
-                  {mapOptions.map(opt => (
-                    <Select.Item key={opt.value} value={opt.value} className={`flex items-center px-4 py-2.5 text-xs font-semibold rounded-xl cursor-pointer outline-none select-none transition-colors ${opt.value === 'none' ? 'text-muted focus:bg-white/[0.04]' : 'text-secondary focus:bg-cyan-500/10 focus:text-cyan-400'}`}>
-                      <Select.ItemText>{opt.label}</Select.ItemText>
-                      <Select.ItemIndicator className="ml-auto"><Check className="w-3.5 h-3.5 text-cyan-400" /></Select.ItemIndicator>
-                    </Select.Item>
-                  ))}
-                </Select.Viewport>
-              </Select.Content>
-            </Select.Portal>
-          </Select.Root>
+          <div className="flex items-center gap-3">
+            {/* V2 Confidence Badge */}
+            {isMapped && (
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border uppercase tracking-wider
+                ${badgeType === 'AUTO' 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.05)]' 
+                  : badgeType === 'REVIEW'
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.05)]'
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.05)]'
+                }`}
+              >
+                {badgeType === 'AUTO' ? 'AUTO-MAPPED' : badgeType === 'REVIEW' ? 'REVIEW' : 'CONFIRM'}
+              </span>
+            )}
+
+            <Select.Root value={mappedValue} onValueChange={(val) => handleSelect(col, val)}>
+              <Select.Trigger className={`flex items-center justify-between w-64 px-3 py-2 rounded-xl text-xs font-semibold border transition-all outline-none focus:ring-2 focus:ring-cyan-500/30
+                ${isMapped ? 'bg-cyan-500/10 border-cyan-500/25 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.05)]' : 'bg-white/[0.03] border-white/[0.06] text-secondary hover:bg-white/[0.06]'}
+              `}>
+                <Select.Value placeholder="Select Mapping..." />
+                <Select.Icon><ChevronDown className="w-3.5 h-3.5 opacity-50" /></Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content className="overflow-hidden bg-[#0a0d18] border border-white/[0.08] rounded-2xl shadow-2xl z-50 animate-in fade-in">
+                  <Select.Viewport className="p-1">
+                    {mapOptions.map(opt => (
+                      <Select.Item key={opt.value} value={opt.value} className={`flex items-center px-4 py-2.5 text-xs font-semibold rounded-xl cursor-pointer outline-none select-none transition-colors ${opt.value === 'none' ? 'text-muted focus:bg-white/[0.04]' : 'text-secondary focus:bg-cyan-500/10 focus:text-cyan-400'}`}>
+                        <Select.ItemText>{opt.label}</Select.ItemText>
+                        <Select.ItemIndicator className="ml-auto"><Check className="w-3.5 h-3.5 text-cyan-400" /></Select.ItemIndicator>
+                      </Select.Item>
+                    ))}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
+          </div>
         </div>
         
         {isMapped && intel.confidence !== undefined && (
-          <div className="border-t border-white/[0.04] pt-4 space-y-3">
+          <div className="border-t border-white/[0.04] pt-4 space-y-3.5">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 flex-1">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-muted w-16 shrink-0">AI Conf.</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted w-16 shrink-0">Confidence</span>
                 <div className="flex-1 h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${intel.confidence > 0.8 ? 'bg-emerald-500' : intel.confidence > 0.5 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${intel.confidence * 100}%` }} />
                 </div>
                 <span className="text-xs font-mono text-secondary w-8 text-right shrink-0">{Math.round(intel.confidence * 100)}%</span>
               </div>
             </div>
+
+            {/* Display reasons for match */}
+            {intel.reasons && intel.reasons.length > 0 && (
+              <div className="text-[10px] text-muted leading-relaxed flex items-start gap-1.5 bg-white/[0.01] p-2.5 rounded-xl border border-white/[0.03]">
+                <span className="text-cyan-400 shrink-0 font-semibold">•</span>
+                <span className="italic">{intel.reasons[0]}</span>
+              </div>
+            )}
+
+            {/* Alternatives section */}
+            {intel.alternatives && intel.alternatives.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-[9px] uppercase font-extrabold tracking-widest text-muted block">Alternative Suggestions</span>
+                <div className="flex flex-wrap gap-2">
+                  {intel.alternatives.map((alt: any) => {
+                    const optionLabel = mapOptions.find(o => o.value === alt.mapped_to)?.label || alt.mapped_to;
+                    return (
+                      <button
+                        key={alt.mapped_to}
+                        onClick={() => handleSelect(col, alt.mapped_to)}
+                        className="px-2.5 py-1.5 rounded-xl bg-white/[0.02] hover:bg-cyan-500/10 border border-white/[0.06] hover:border-cyan-500/25 text-[10px] font-semibold text-secondary hover:text-cyan-400 transition-all flex items-center gap-1.5"
+                      >
+                        <span>{optionLabel}</span>
+                        <span className="px-1 py-0.5 rounded bg-white/[0.04] text-[8px] font-mono text-muted">{Math.round(alt.confidence * 100)}%</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -212,7 +288,7 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
         <Accordion.Header>
           <Accordion.Trigger className="flex items-center justify-between w-full p-6 bg-white/[0.01] hover:bg-white/[0.02] transition-colors outline-none group">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20">
                 <Icon className="w-5 h-5" />
               </div>
               <div className="text-left">
@@ -230,6 +306,42 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
     );
   };
 
+  // Compute stats for mapping summary bar
+  const summaryCounts = useMemo(() => {
+    let autoMapped = 0;
+    let underReview = 0;
+    let confirmationRequired = 0;
+    
+    columns.forEach(col => {
+      const intel = (intelligence[col] || {}) as any;
+      const mappedValue = (mappings[col] || 'none') as any;
+      
+      if (!mappedValue || mappedValue === 'none') {
+        confirmationRequired++;
+        return;
+      }
+      
+      const confidence = intel.confidence ?? 0;
+      const needsConfirm = intel.needs_user_confirmation ?? false;
+      const layer = intel.layer_reached ?? 5;
+      
+      if (layer <= 2 && confidence >= 0.90 && !needsConfirm) {
+        autoMapped++;
+      } else if (layer <= 4 && confidence >= 0.55) {
+        underReview++;
+      } else {
+        confirmationRequired++;
+      }
+    });
+    
+    return {
+      total: columns.length,
+      autoMapped,
+      underReview,
+      confirmationRequired
+    };
+  }, [columns, intelligence, mappings]);
+
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="text-center mb-10">
@@ -238,6 +350,26 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
         <p className="text-secondary text-sm max-w-md mx-auto">
           Bind your dataset columns to toxicological primitives. SDO's mapping intelligence handles complex ecotox ontologies automatically.
         </p>
+      </div>
+
+      {/* Schema Intelligence Overview Summary Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="glass p-4.5 rounded-2xl border border-white/[0.05] bg-white/[0.01]">
+          <span className="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">Total Columns</span>
+          <h4 className="text-xl font-bold text-white leading-none mt-1">{summaryCounts.total}</h4>
+        </div>
+        <div className="glass p-4.5 rounded-2xl border border-emerald-500/10 bg-emerald-500/[0.01]">
+          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">Auto-Mapped</span>
+          <h4 className="text-xl font-bold text-emerald-400 leading-none mt-1">{summaryCounts.autoMapped}</h4>
+        </div>
+        <div className="glass p-4.5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.01]">
+          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-1">Under Review</span>
+          <h4 className="text-xl font-bold text-amber-400 leading-none mt-1">{summaryCounts.underReview}</h4>
+        </div>
+        <div className="glass p-4.5 rounded-2xl border border-rose-500/10 bg-rose-500/[0.01]">
+          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider block mb-1">Needs Confirm</span>
+          <h4 className="text-xl font-bold text-rose-400 leading-none mt-1">{summaryCounts.confirmationRequired}</h4>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4 mb-6">

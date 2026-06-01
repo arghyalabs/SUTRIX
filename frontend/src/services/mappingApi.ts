@@ -5,6 +5,10 @@ export interface SchemaInference {
   mapped_to: string;
   confidence: number;
   reasons: string[];
+  layer_reached?: number;
+  needs_user_confirmation?: boolean;
+  alternatives?: Array<{ mapped_to: string; confidence: number; matched_alias: string }>;
+  ecotox?: any;
 }
 
 export interface SchemaInferResponse {
