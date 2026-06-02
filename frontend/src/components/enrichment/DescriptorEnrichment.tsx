@@ -293,6 +293,39 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
               </div>
             </div>
 
+            {/* Run button */}
+            <div className="p-5 border-b border-white/[0.06] shrink-0 bg-[#080f1f]/80 backdrop-blur-md">
+              {!isRunning && !isCompleted ? (
+                <button
+                  onClick={handleRunEnrichment}
+                  disabled={selectedDescriptors.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  Run ({selectedDescriptors.length} descriptors)
+                </button>
+              ) : isRunning ? (
+                <button
+                  onClick={handleCancelJob}
+                  className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl
+                    bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-sm
+                    hover:bg-rose-500/20 transition-all"
+                >
+                  <Ban className="w-4 h-4" />
+                  Cancel Job
+                </button>
+              ) : isCompleted ? (
+                <button
+                  onClick={handleFetchEnrichmentResults}
+                  className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl
+                    bg-emerald-500 text-void font-bold text-sm
+                    shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:bg-emerald-400 transition-all"
+                >
+                  Next Step <ChevronRight className="w-4 h-4" />
+                </button>
+              ) : null}
+            </div>
+
             {/* Custom Selection Header, Search, and Action Buttons (Sticky/Shrink-0) */}
             <div className="p-5 pb-2 border-b border-white/[0.06] bg-[#080f1f]">
               <div className="flex items-center gap-2 mb-3">
@@ -365,39 +398,6 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
               </div>
             )}
           </div>
-        </div>
-
-        {/* Run button */}
-        <div className="p-5 border-t border-white/[0.06] shrink-0 bg-[#080f1f]/80 backdrop-blur-md">
-          {!isRunning && !isCompleted ? (
-            <button
-              onClick={handleRunEnrichment}
-              disabled={selectedDescriptors.length === 0}
-              className="w-full flex items-center justify-center gap-2 py-3.5 mt-auto rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              Run ({selectedDescriptors.length} descriptors)
-            </button>
-          ) : isRunning ? (
-            <button
-              onClick={handleCancelJob}
-              className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl
-                bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-sm
-                hover:bg-rose-500/20 transition-all"
-            >
-              <Ban className="w-4 h-4" />
-              Cancel Job
-            </button>
-          ) : isCompleted ? (
-            <button
-              onClick={handleFetchEnrichmentResults}
-              className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl
-                bg-emerald-500 text-void font-bold text-sm
-                shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:bg-emerald-400 transition-all"
-            >
-              Next Step <ChevronRight className="w-4 h-4" />
-            </button>
-          ) : null}
         </div>
       </div>
 
