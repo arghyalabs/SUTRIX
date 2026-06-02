@@ -147,6 +147,7 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
             setJobStatus('COMPLETED');
             setPhase('Complete');
             toast.success('Computational toxicology job completed successfully!', {
+              id: 'job-completed-' + (msg.job_id || activeJobIdRef.current || 'active'),
               icon: '🏁',
               duration: 5000,
               style: { background: '#0B132B', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.2)' }
