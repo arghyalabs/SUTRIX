@@ -724,6 +724,68 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
           </div>
         </section>
 
+        {/* ── Machine Learning Benchmarks ────────────────────────────────── */}
+        {d.ml_benchmarks?.status === 'success' && (
+          <section>
+            <SectionHeader title="Machine Learning Predictive Baselines" subtitle={`Cross-validated performance estimate for ${d.ml_benchmarks.task}`} icon={Cpu} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {d.ml_benchmarks.benchmarks.map((bm, i) => (
+                <motion.div
+                  key={bm.model}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.07 }}
+                  className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-5 flex flex-col"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="font-bold text-white/90">{bm.model}</div>
+                    <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${bm.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                      {bm.status.toUpperCase()}
+                    </div>
+                  </div>
+                  
+                  {bm.status === 'success' ? (
+                    <div className="space-y-3">
+                      {d.ml_benchmarks!.task === 'classification' ? (
+                        <>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/40">ROC-AUC</span>
+                            <span className="font-mono text-cyan-400">{bm.roc_auc.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/40">Accuracy</span>
+                            <span className="font-mono text-cyan-400">{bm.accuracy.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/40">F1 Score</span>
+                            <span className="font-mono text-cyan-400">{bm.f1_score.toFixed(2)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/40">R² (Train)</span>
+                            <span className="font-mono text-cyan-400">{bm.r2.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/40">Q² (CV)</span>
+                            <span className="font-mono text-cyan-400">{bm.q2.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/40">RMSE</span>
+                            <span className="font-mono text-cyan-400">{bm.rmse.toFixed(3)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-rose-400 mt-2">{bm.error}</div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ── QSAR OECD Panel ─────────────────────────────────────────── */}
         {datasetMode !== 'SCIENTIFIC' && (
           <section>

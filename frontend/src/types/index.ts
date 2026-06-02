@@ -50,7 +50,7 @@ export interface DatasetIngestResponse {
 }
 
 export interface VariableMappings {
-  [columnName: string]: 'chemical_name' | 'chemical_id' | 'cas_number' | 'canonical_smiles' | 'endpoint' | 'value' | 'unit' | 'qualifier' | 'species' | 'duration' | 'route' | 'study_type' | 'none';
+  [columnName: string]: string;
 }
 
 export interface ReadinessResponse {
@@ -183,6 +183,13 @@ export interface ModelingAnalysis {
     outliers?: { x: number[]; y: number[]; x_label: string; y_label: string; is_outlier: boolean[] };
   };
   meta: { elapsed_seconds: number; n_samples: number; n_features: number; analysis_timestamp: number };
+  ml_benchmarks?: {
+    status: string;
+    task: 'classification' | 'regression';
+    benchmarks: any[];
+  };
+  qsar_readiness?: any;
+  ai_readiness?: any;
 }
 
 export type DatasetMode = 'MOLECULAR' | 'SCIENTIFIC' | 'HYBRID' | 'GENERIC' | 'RECOVERABLE';
@@ -218,5 +225,24 @@ export interface DatasetPassport {
   top_mapped_roles: string[];
   key_warnings: string[];
   timestamp: number;
+}
+
+export interface FeatureSelectionRequest {
+  client_id: string;
+  variance_threshold?: number;
+  correlation_threshold?: number;
+  mi_fraction?: number;
+  run_rfe?: boolean;
+  rfe_n_features?: number;
+}
+
+export interface FeatureSelectionResponse {
+  original_features: number;
+  after_variance: number;
+  after_correlation: number;
+  after_mi: number;
+  final_count: number;
+  final_features: string[];
+  mi_scores: Record<string, number>;
 }
 

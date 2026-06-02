@@ -36,9 +36,14 @@ from backend.api.routes.modeling_routes import router as modeling_router
 from backend.api.routes.explorer_routes import router as explorer_router
 from backend.api.routes.structure_recovery_routes import router as recovery_router
 from backend.api.routes.simple_analysis_routes import router as simple_analysis_router
+from backend.api.routes.readiness_routes import router as readiness_router
+from backend.api.routes.structure_assessment_routes import router as assessment_router
+from backend.api.routes.subgroup_routes import router as subgroup_router
+from backend.api.routes.feature_selection_routes import router as feature_selection_router
+from backend.api.routes.export_routes import router as export_router
 from backend.core.config import settings
 
-app = FastAPI(title="Scientific Data Orchestrator", version="4.0")
+app = FastAPI(title="Scientific Data Orchestrator", version="5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +60,11 @@ app.include_router(modeling_router)
 app.include_router(explorer_router)
 app.include_router(recovery_router)
 app.include_router(simple_analysis_router)
+app.include_router(readiness_router)
+app.include_router(assessment_router)
+app.include_router(subgroup_router)
+app.include_router(feature_selection_router)
+app.include_router(export_router)
 
 memory_guard = MemoryGuard()
 
@@ -65,7 +75,7 @@ async def api_health():
     import psutil
     return {
         "status": "ok",
-        "version": "4.0",
+        "version": "5.0",
         "engine": "SUTRIX",
         "ram_pct": psutil.virtual_memory().percent,
         "cpu_pct": psutil.cpu_percent(interval=None),

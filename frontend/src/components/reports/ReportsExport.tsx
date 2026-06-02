@@ -33,7 +33,7 @@ export const ReportsExport: React.FC<ReportsExportProps> = ({
   const [isLoadingHierarchy, setIsLoadingHierarchy] = useState(false);
   const [hasHierarchy, setHasHierarchy] = useState(false);
 
-  const downloadZipUrl = `${API_BASE}/api/compliance/${clientId}/download`;
+  const downloadZipUrl = `${API_BASE}/api/modeling/${clientId}/export-package`;
   const downloadPdfUrl = `${API_BASE}/api/compliance/${clientId}/report`;
   const downloadParquetUrl = activeJobId ? `${API_BASE}/api/jobs/${clientId}/download_enriched_parquet?job_id=${activeJobId}&apply_variance_filter=${varianceFilterEnabled}` : '#';
 

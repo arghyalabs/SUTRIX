@@ -9,11 +9,11 @@ import { modelingApi } from '../../services/modelingApi';
 import { toast } from 'react-hot-toast';
 import { OptimizedPlotly } from '../charts/OptimizedPlotly';
 
-interface ScientificIntelligenceWorkspaceProps {
+interface ScientificInsightsWorkspaceProps {
   clientId: string;
 }
 
-export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWorkspaceProps> = ({
+export const ScientificInsightsWorkspace: React.FC<ScientificInsightsWorkspaceProps> = ({
   clientId,
 }) => {
   const { 
@@ -292,7 +292,7 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
             <Brain className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-white font-bold text-sm leading-none">Scientific Intelligence</h3>
+            <h3 className="text-white font-bold text-sm leading-none">Scientific Insights</h3>
             <p className="text-[10px] text-slate-400 mt-1">Holistic multi-dimensional dataset analytical workspace</p>
           </div>
         </div>
@@ -339,6 +339,32 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
           transition={{ duration: 0.15 }}
           className="w-full"
         >
+
+          {/* AI Diagnostic Interpretation Panel (Global Insight) */}
+          {(activeSubTab === 'health' || activeSubTab === 'readiness') && (modelingAnalysis.feasibility?.interpretation || modelingAnalysis.readiness?.success_confidence) && (
+            <div className="mb-6 p-4 border rounded-xl bg-indigo-900/20 border-indigo-500/30">
+              <h4 className="text-sm font-bold text-indigo-300 mb-2 flex items-center gap-2">
+                <Brain className="w-4 h-4" />
+                AI Diagnostic Interpretation
+              </h4>
+              <div className="flex flex-col md:flex-row gap-4">
+                {modelingAnalysis.readiness?.success_confidence && (
+                  <div className="flex-1 bg-indigo-950/40 p-3 rounded-lg border border-indigo-800/50">
+                    <p className="text-xs text-indigo-200">
+                      <strong className="text-indigo-100 block mb-1">Success Confidence:</strong> {modelingAnalysis.readiness.success_confidence}
+                    </p>
+                  </div>
+                )}
+                {modelingAnalysis.feasibility?.interpretation && (
+                  <div className="flex-2 bg-indigo-950/40 p-3 rounded-lg border border-indigo-800/50">
+                    <p className="text-xs text-indigo-200 leading-relaxed">
+                      {modelingAnalysis.feasibility.interpretation}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* Sub-Tab 1: Health */}
           {activeSubTab === 'health' && (
@@ -453,7 +479,7 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
                 </div>
               )}
 
-              {/* Right Column: PCA Scatter Plot */}
+                {/* Right Column: PCA Scatter Plot */}
               <div className="space-y-6">
                 {visualizations?.outliers && (
                   <div className="p-6 border rounded-2xl bg-slate-900/60 border-slate-800/80">
@@ -478,6 +504,19 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
                         }}
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* PCA Interpretation Panel */}
+                {visualizations?.outliers && (
+                  <div className="p-4 border rounded-xl bg-slate-800/50 border-slate-700/50">
+                    <h4 className="text-xs font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5" />
+                      PCA Diagnostic Interpretation
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Projection of high-dimensional dataset features into 2D space. Points in <span className="text-rose-400 font-semibold">rose</span> are flagged as potential structural outliers based on interquartile variance.
+                    </p>
                   </div>
                 )}
               </div>
@@ -508,9 +547,11 @@ export const ScientificIntelligenceWorkspace: React.FC<ScientificIntelligenceWor
                 ))}
               </div>
 
-              {/* Deductions & Recommendations Area */}
+              {/* Deductions, Recommendations & Interpretations Area */}
               <div className="md:col-span-2 space-y-6">
                 
+                {/* Removed AI Interpretation from here as it's now global */}
+
                 {/* Deductions Box */}
                 {deductions.length > 0 && (
                   <div className="p-6 border rounded-2xl bg-slate-900/60 border-slate-800/80">

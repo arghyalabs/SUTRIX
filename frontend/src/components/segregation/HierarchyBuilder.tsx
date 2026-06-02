@@ -13,7 +13,6 @@ import { apiClient } from '../../services/apiClient';
 import { SUTRIXLogo } from '../ui/SUTRIXLogo';
 import { DatasetPassportCard } from '../ui/DatasetPassportCard';
 import { StructureRecoveryBanner } from '../scientific/StructureRecoveryBanner';
-import { StructureRecoveryWizard } from '../scientific/StructureRecoveryWizard';
 import { AdvancedTreeWorkspace } from './AdvancedTreeWorkspace';
 import { toast } from 'react-hot-toast';
 import { GenericModeBanner } from '../ui/GenericModeBanner';
@@ -1246,11 +1245,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
         document.body
       )}
 
-      {/* Structure Recovery Wizard Modal */}
-      <StructureRecoveryWizard
-        isOpen={showRecoveryWizard}
-        onClose={() => setShowRecoveryWizard(false)}
-      />
+      {/* Structure Recovery Wizard Modal Removed */}
 
       {/* Recoverable Mode Warning Panel */}
       <RecoverableModePanel

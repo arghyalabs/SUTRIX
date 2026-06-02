@@ -36,31 +36,68 @@ class MappingPayload(BaseClientPayload):
     def validate_mappings_dict(cls, v: Dict[str, str]) -> Dict[str, str]:
         """Ensures that the mapping values map to allowed scientific columns."""
         ALLOWED_SCI_VARS = set(SCIENTIFIC_VARIABLES.keys()) | {
-            # Molecular (existing)
-            "chemical_name", "chemical_id", "cas_number", "canonical_smiles",
-            "endpoint", "value", "unit", "qualifier", "species", "duration",
-            "route", "study_type", "toxicity_category",
-            # Universal entity roles (new)
-            "entity_id", "entity_name",
-            "patient_id", "subject_id", "participant_id",
-            "site_id", "location", "region", "department",
-            "sample_id", "material_id", "device_id",
-            "category", "group", "treatment", "outcome",
-            "timestamp", "date", "batch",
             "none", "smiles", "inchi", "organism", "exposure_time", "exposure_route",
             "pxc50", "regression_target", "pic50", "potency", "ic50", "ec50", "ki",
             "classification_target", "assay", "assay_type", "target", "toxicity", "toxicology",
-            "absorption", "distribution", "metabolism", "excretion"
+            "absorption", "distribution", "metabolism", "excretion", "generic_variable"
         }
         
         # Translation map to normalize all scientific variables to canonical backend keys
         translation_map = {
+            # Chemical identity
+            "compound_name": "chemical_name",
+            "substance_name": "chemical_name",
+            "drug_name": "chemical_name",
+            "molecule_name": "chemical_name",
+            "analyte": "chemical_name",
+            "ingredient": "chemical_name",
+            "active_ingredient": "chemical_name",
+            "test_substance": "chemical_name",
+            "test_material": "chemical_name",
+            "study_material": "chemical_name",
+            "chemical_id": "chemical_name",
+            
+            # Structure
             "smiles": "canonical_smiles",
             "inchi": "canonical_smiles",
-            "chemical_id": "chemical_name",
+            "inchikey": "canonical_smiles",
+            "molfile": "canonical_smiles",
+            "sdf": "canonical_smiles",
+            
+            # Identifiers
+            "cas": "cas_number",
+            "cid": "cas_number",
+            "chembl_id": "cas_number",
+            "pubchem_id": "cas_number",
+            "dsstox_id": "cas_number",
+            "ec_number": "cas_number",
+            "einecs": "cas_number",
+            "unii": "cas_number",
+            "drugbank_id": "cas_number",
+            "chebi_id": "cas_number",
+            
+            # Species
             "organism": "species",
+            "taxon": "species",
+            "test_species": "species",
+            "host_species": "species",
+            "exposed_species": "species",
+            "target_species": "species",
+            
+            # Exposure
+            "exposure_duration": "duration",
             "exposure_time": "duration",
+            "contact_time": "duration",
+            "observation_period": "duration",
+            "treatment_duration": "duration",
             "exposure_route": "route",
+            
+            # Concentration / Potency / Values
+            "concentration": "value",
+            "dose": "value",
+            "administered_dose": "value",
+            "exposure_concentration": "value",
+            "test_concentration": "value",
             "pxc50": "value",
             "regression_target": "value",
             "pic50": "value",
@@ -68,6 +105,13 @@ class MappingPayload(BaseClientPayload):
             "ic50": "value",
             "ec50": "value",
             "ki": "value",
+            
+            # Endpoints
+            "effect": "endpoint",
+            "response": "endpoint",
+            "outcome": "endpoint",
+            "measurement": "endpoint",
+            "toxicity_endpoint": "endpoint",
             "classification_target": "endpoint",
             "assay": "endpoint",
             "assay_type": "endpoint",
@@ -77,19 +121,34 @@ class MappingPayload(BaseClientPayload):
             "absorption": "endpoint",
             "distribution": "endpoint",
             "metabolism": "endpoint",
-            "excretion": "endpoint"
+            "excretion": "endpoint",
+            
+            # Units
+            "dose_unit": "unit",
+            "concentration_unit": "unit",
+            "time_unit": "unit",
+            
+            # Study design
+            "study_type": "study_type",
+            "study_design": "study_type",
+            "protocol": "study_type",
+            "assay_type": "study_type",
+            
+            # Fallbacks
+            "none": "generic_variable"
         }
         
         sanitized = {}
         for col, sci_var in v.items():
             col = col.strip()
             if not sci_var or not sci_var.strip():
-                sci_var = "none"
+                sci_var = "generic_variable"
             else:
                 sci_var = sci_var.strip().lower()
+                
             if sci_var not in ALLOWED_SCI_VARS:
-                raise ValueError(f"Mapping value '{sci_var}' is invalid. Allowed variables are: {list(ALLOWED_SCI_VARS)}")
-            
+                sci_var = "generic_variable" # Auto fallback
+                
             # Apply standard translations to align frontend/backend keys
             sci_var = translation_map.get(sci_var, sci_var)
             sanitized[col] = sci_var

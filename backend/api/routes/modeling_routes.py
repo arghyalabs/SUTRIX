@@ -26,6 +26,9 @@ from backend.processing.readiness_engine import (
     ScaffoldLeakageAuditor,
     SuccessEstimator,
     ScientificIntelligenceEngine,
+    QSARReadinessScorer,
+    AIReadinessScorer,
+    MLBenchmarkingEngine,
 )
 from backend.processing.scientific_readiness_engine import ScientificReadinessEngine
 from backend.intelligence.missingness_analysis import MissingnessAnalysis
@@ -513,14 +516,25 @@ async def run_modeling_analysis(payload: BaseClientPayload):
     # ── 6. Feasibility ───────────────────────────────────────────────────────
     feasibility = _compute_feasibility(raw_score, diversity, success_est, descriptor_rel, n, p)
 
+    # ── 7. Advanced QSAR and AI Readiness & Benchmarks (Step 8 Upgrade) ──────
+    try:
+        qsar_readiness_res = QSARReadinessScorer.evaluate(df, mappings, health_metrics, diversity, descriptor_rel)
+        ai_readiness_res = AIReadinessScorer.evaluate(df, mappings, health_metrics)
+        ml_benchmarks_res = MLBenchmarkingEngine.run_benchmark(df, mappings)
+    except Exception as e:
+        logger.warning(f"QSAR/AI/Benchmark engine failed: {e}")
+        qsar_readiness_res = {"score": 50.0, "breakdown": {}, "deductions": []}
+        ai_readiness_res = {"score": 50.0, "breakdown": {}, "deductions": []}
+        ml_benchmarks_res = {"status": "failed", "reason": str(e)}
+
     elapsed = round(time.time() - t0, 2)
     logger.info(f"[{client_id}] Modeling analysis done in {elapsed}s. AI Score={ai_score}")
 
     result = {
         "readiness": {
             "score": ai_score,
-            "ai_score": ai_score,
-            "qsar_score": min(100, qsar_score),
+            "ai_score": ai_readiness_res["score"],
+            "qsar_score": qsar_readiness_res["score"],
             "stability_score": min(100, max(0, stability_score)),
             "integrity_score": min(100, max(0, integrity_score)),
             "confidence_tier": confidence_tier,
@@ -536,6 +550,9 @@ async def run_modeling_analysis(payload: BaseClientPayload):
             "n_features": p,
             "n_to_p_ratio": round(n / max(1, p), 2),
         },
+        "qsar_readiness": qsar_readiness_res,
+        "ai_readiness": ai_readiness_res,
+        "ml_benchmarks": ml_benchmarks_res,
         "feasibility": feasibility,
         "qsar": {
             "oecd_checks": oecd_checks,
@@ -660,6 +677,30 @@ async def export_modeling_report(client_id: str, format: str = "json"):
         )
 
     raise HTTPException(status_code=400, detail="Unsupported format. Use: json, csv, xlsx")
+
+@router.get("/{client_id}/export-package")
+async def export_modeling_package(client_id: str):
+    """
+    Exports the final unified Modeling Package (dataset, descriptors, metadata).
+    """
+    from backend.exports.modeling_package_generator import ModelingPackageGenerator
+    context = registry.get_context(client_id)
+    if not context:
+        raise HTTPException(status_code=404, detail="Context not found")
+        
+    try:
+        selected_features = context.segmentation_results.get("selected_features", [])
+        zip_bytes = ModelingPackageGenerator.generate(context, selected_features)
+        
+        from fastapi import Response
+        return Response(
+            content=zip_bytes,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=sutrix_modeling_package_{client_id}.zip"}
+        )
+    except Exception as e:
+        logger.error(f"Modeling package generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ─── Background Analysis Helpers ──────────────────────────────────────────────
@@ -1161,3 +1202,53 @@ async def get_section_results(client_id: str, section: str):
                    f"POST to /api/modeling/{section} first.",
         )
     return cached[section]
+
+
+# ─── FEATURE SELECTION ROUTE ───────────────────────────────────────────────────
+from pydantic import BaseModel
+from backend.core.feature_selection_engine import FeatureSelectionEngine
+
+class FeatureSelectionPayload(BaseModel):
+    client_id: str
+    variance_threshold: float = 0.01
+    correlation_threshold: float = 0.85
+    mi_fraction: float = 0.5
+    run_rfe: bool = True
+    rfe_n_features: int = 50
+
+@router.post("/feature-selection/run")
+async def run_feature_selection(payload: FeatureSelectionPayload):
+    client_id = payload.client_id
+    context = registry.get_context(client_id)
+    if not context:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+        
+    # Load dataset
+    parquet_path = context.descriptor_dataframe_path or context.mapped_dataframe_path or context.parquet_path
+    if not parquet_path:
+        raise HTTPException(status_code=400, detail="No dataset available. Complete column mapping / subgroup selection first.")
+        
+    try:
+        df = pd.read_parquet(parquet_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read dataset: {e}")
+        
+    res = FeatureSelectionEngine.run_pipeline(
+        df=df,
+        mappings=context.mappings,
+        variance_threshold=payload.variance_threshold,
+        correlation_threshold=payload.correlation_threshold,
+        mi_fraction=payload.mi_fraction,
+        run_rfe=payload.run_rfe,
+        rfe_n_features=payload.rfe_n_features
+    )
+    
+    if "error" in res:
+        raise HTTPException(status_code=400, detail=res["error"])
+        
+    # Store selected features in context
+    context.segmentation_results["selected_features"] = res["final_features"]
+    context.touch(save_to_disk=True)
+    
+    return _sanitize_for_json(res)
+

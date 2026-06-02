@@ -9,13 +9,15 @@ import {
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, CartesianGrid, PieChart, Pie,
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ScatterChart, Scatter, ZAxis
 } from 'recharts';
 import { toast } from 'react-hot-toast';
 
 interface CompoundExplorerProps {
   clientId: string;
   activeJobId: string | null;
+  onContinue?: () => void;
 }
 
 interface CompoundRow {
@@ -71,6 +73,7 @@ interface DistributionResponse {
 export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
   clientId,
   activeJobId,
+  onContinue,
 }) => {
   const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
   
@@ -107,6 +110,16 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
   // Distribution Chart State
   const [distributionLoading, setDistributionLoading] = useState(false);
   const [distributionData, setDistributionData] = useState<DistributionResponse | null>(null);
+  
+  // Similarity Network State
+  const [similarityLoading, setSimilarityLoading] = useState(false);
+  const [similarityNetwork, setSimilarityNetwork] = useState<any | null>(null);
+  const [projectionType, setProjectionType] = useState<'pca' | 'umap' | 'tsne'>('pca');
+  const [activeNetworkTab, setActiveNetworkTab] = useState<'scatter' | 'fp_heatmap' | 'desc_heatmap'>('scatter');
+  const [fpHeatmapLoading, setFpHeatmapLoading] = useState(false);
+  const [fpHeatmapData, setFpHeatmapData] = useState<any | null>(null);
+  const [descHeatmapLoading, setDescHeatmapLoading] = useState(false);
+  const [descHeatmapData, setDescHeatmapData] = useState<any | null>(null);
   
   // Fullscreen Details Mode State
   const [isDetailFullscreen, setIsDetailFullscreen] = useState(false);
@@ -155,6 +168,74 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
     fetchResults();
     return () => { isMounted = false; };
   }, [clientId, debouncedQuery, currentPage]);
+
+  // Fetch similarity network
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSimilarity = async () => {
+      setSimilarityLoading(true);
+      try {
+        const url = `${API_BASE}/api/explorer/${clientId}/similarity-network?method=${projectionType}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load similarity network');
+        const data = await res.json();
+        if (isMounted) {
+          setSimilarityNetwork(data);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) setSimilarityLoading(false);
+      }
+    };
+
+    fetchSimilarity();
+    return () => { isMounted = false; };
+  }, [clientId, projectionType]);
+
+  // Fetch FP Heatmap
+  useEffect(() => {
+    if (activeNetworkTab !== 'fp_heatmap' || fpHeatmapData) return;
+    let isMounted = true;
+    const fetchFpHeatmap = async () => {
+      setFpHeatmapLoading(true);
+      try {
+        const url = `${API_BASE}/api/explorer/${clientId}/similarity-matrix?limit=50`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load FP heatmap');
+        const data = await res.json();
+        if (isMounted) setFpHeatmapData(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) setFpHeatmapLoading(false);
+      }
+    };
+    fetchFpHeatmap();
+    return () => { isMounted = false; };
+  }, [clientId, activeNetworkTab]);
+
+  // Fetch Desc Heatmap
+  useEffect(() => {
+    if (activeNetworkTab !== 'desc_heatmap' || descHeatmapData) return;
+    let isMounted = true;
+    const fetchDescHeatmap = async () => {
+      setDescHeatmapLoading(true);
+      try {
+        const url = `${API_BASE}/api/explorer/${clientId}/descriptor-heatmap?limit=50`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to load descriptor heatmap');
+        const data = await res.json();
+        if (isMounted) setDescHeatmapData(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (isMounted) setDescHeatmapLoading(false);
+      }
+    };
+    fetchDescHeatmap();
+    return () => { isMounted = false; };
+  }, [clientId, activeNetworkTab]);
 
   // Fetch compound details
   useEffect(() => {
@@ -409,6 +490,46 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
     return list;
   }, [detail, activeCategory, descriptorSearch, tableFilter, tableSort]);
 
+  // Memoized Descriptor Correlation Matrix
+  const descCorrelationMatrix = useMemo(() => {
+    if (!descHeatmapData || !descHeatmapData.data || !descHeatmapData.descriptor_names) return null;
+    const descNames = descHeatmapData.descriptor_names;
+    const data = descHeatmapData.data;
+    const n = descNames.length;
+    
+    const columns = descNames.map((desc: string) => {
+      return data.map((row: any) => typeof row[desc] === 'number' ? row[desc] : 0);
+    });
+    
+    const means = columns.map((col: number[]) => col.length ? col.reduce((a, b) => a + b, 0) / col.length : 0);
+    
+    const matrix = [];
+    for (let i = 0; i < n; i++) {
+      const row = [];
+      for (let j = 0; j < n; j++) {
+        if (i === j) {
+          row.push(1.0);
+          continue;
+        }
+        let num = 0;
+        let den1 = 0;
+        let den2 = 0;
+        for (let k = 0; k < columns[i].length; k++) {
+          const diff1 = columns[i][k] - means[i];
+          const diff2 = columns[j][k] - means[j];
+          num += diff1 * diff2;
+          den1 += diff1 * diff1;
+          den2 += diff2 * diff2;
+        }
+        const den = Math.sqrt(den1 * den2);
+        row.push(den === 0 ? 0 : num / den);
+      }
+      matrix.push(row);
+    }
+    
+    return { names: descNames, matrix };
+  }, [descHeatmapData]);
+
   const handleSort = (key: 'name' | 'value' | 'category' | 'status') => {
     setTableSort(prev => ({
       key,
@@ -466,9 +587,11 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
              Cheminformatics inspection workspace for dataset verification and QSAR descriptor mapping
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-mono font-bold uppercase tracking-wider">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-          Active Index: {totalResults} Compounds
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-mono font-bold uppercase tracking-wider">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            Active Index: {totalResults} Compounds
+          </div>
         </div>
       </motion.div>
 
@@ -935,6 +1058,185 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                         <div className="text-[10px] text-white/20 font-mono text-center">Click any numeric descriptor in the table below to chart its distribution</div>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* ── SECTION 9: Similarity Network (Chemical Space) ── */}
+                <div className="border-t border-white/[0.04] pt-5">
+                  <div className="rounded-xl border border-white/[0.05] bg-black/40 p-4 flex flex-col h-[400px]">
+                     <div className="flex justify-between items-start mb-2">
+                       <div>
+                         <div className="flex gap-2 mb-2">
+                           <button 
+                             onClick={() => setActiveNetworkTab('scatter')}
+                             className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${activeNetworkTab === 'scatter' ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'bg-transparent text-white/40 border-white/[0.05] hover:bg-white/[0.05]'}`}
+                           >
+                             Network Scatter
+                           </button>
+                           <button 
+                             onClick={() => setActiveNetworkTab('fp_heatmap')}
+                             className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${activeNetworkTab === 'fp_heatmap' ? 'bg-pink-500/20 text-pink-400 border-pink-500/30' : 'bg-transparent text-white/40 border-white/[0.05] hover:bg-white/[0.05]'}`}
+                           >
+                             FP Heatmap
+                           </button>
+                           <button 
+                             onClick={() => setActiveNetworkTab('desc_heatmap')}
+                             className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${activeNetworkTab === 'desc_heatmap' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-transparent text-white/40 border-white/[0.05] hover:bg-white/[0.05]'}`}
+                           >
+                             Desc Heatmap
+                           </button>
+                         </div>
+                         <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-1.5 mt-1">
+                           <Layers className="w-3.5 h-3.5 text-pink-400" /> 
+                           {activeNetworkTab === 'scatter' ? `Chemical Space Similarity Network (${projectionType.toUpperCase()})` :
+                            activeNetworkTab === 'fp_heatmap' ? 'Fingerprint Tanimoto Matrix' : 
+                            'Descriptor Correlation Matrix'}
+                         </h4>
+                         <p className="text-[9px] text-white/20 mt-0.5">
+                           {activeNetworkTab === 'scatter' ? '2D projection of Morgan Fingerprints. Proximity indicates structural similarity. Click points to inspect.' :
+                            'Pairwise similarity visualization across the chemical subspace.'}
+                         </p>
+                       </div>
+                       
+                       {activeNetworkTab === 'scatter' && (
+                         <div className="flex flex-col items-end gap-2">
+                           <div className="flex gap-1 bg-black/40 border border-white/[0.05] p-0.5 rounded text-[8px] font-mono">
+                             {(['pca', 'umap', 'tsne'] as const).map(proj => (
+                               <button
+                                 key={proj}
+                                 onClick={() => setProjectionType(proj)}
+                                 className={`px-2 py-0.5 rounded uppercase ${projectionType === proj ? 'bg-cyan-500/20 text-cyan-400 font-bold' : 'text-white/40 hover:text-white/80'}`}
+                               >
+                                 {proj}
+                               </button>
+                             ))}
+                           </div>
+                           {similarityNetwork && similarityNetwork.explained_variance && projectionType === 'pca' && (
+                             <div className="text-right text-[9px] text-white/40 font-mono">
+                               Expl. Var: <span className="text-pink-400 font-bold">{(similarityNetwork.explained_variance[0]*100).toFixed(1)}%</span>, <span className="text-cyan-400 font-bold">{(similarityNetwork.explained_variance[1]*100).toFixed(1)}%</span>
+                             </div>
+                           )}
+                         </div>
+                       )}
+                     </div>
+
+                     <div className="flex-1 min-h-0 relative flex items-center justify-center mt-2 border border-white/[0.02] rounded bg-[#0a0f1d]/50 overflow-hidden">
+                       {activeNetworkTab === 'scatter' ? (
+                         similarityLoading ? (
+                           <div className="flex flex-col items-center gap-2 text-white/30 text-[9px] font-mono">
+                             <Loader2 className="w-4 h-4 animate-spin text-pink-400" />
+                             COMPUTING {projectionType.toUpperCase()} & FINGERPRINTS...
+                           </div>
+                         ) : similarityNetwork && similarityNetwork.nodes ? (
+                           <ResponsiveContainer width="100%" height="100%">
+                             <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: -25 }}>
+                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
+                               <XAxis type="number" dataKey="x" name="Dim 1" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9 }} axisLine={false} tickLine={false} />
+                               <YAxis type="number" dataKey="y" name="Dim 2" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9 }} axisLine={false} tickLine={false} />
+                               <ZAxis type="number" range={[40, 40]} />
+                               <Tooltip 
+                                 cursor={{ strokeDasharray: '3 3' }}
+                                 content={({ active, payload }) => {
+                                   if (active && payload && payload.length) {
+                                     const data = payload[0].payload;
+                                     return (
+                                       <div className="bg-[#0d1627] border border-white/10 rounded-lg p-2 text-[10px]">
+                                         <p className="font-bold text-white mb-1">{data.name}</p>
+                                         {data.cas && <p className="text-white/60 font-mono">CAS: <span className="text-cyan-400">{data.cas}</span></p>}
+                                         <p className="text-white/60 font-mono">Endpoint: <span className="text-pink-400">{data.endpoint || '—'}</span></p>
+                                       </div>
+                                     );
+                                   }
+                                   return null;
+                                 }}
+                               />
+                               <Scatter 
+                                 data={similarityNetwork.nodes} 
+                                 fill="#f472b6" 
+                                 onClick={(node: any) => {
+                                   if (node && node.smiles) {
+                                     setSelectedCompoundSmiles(node.smiles);
+                                     if (containerRef.current) containerRef.current.scrollTop = 0;
+                                   }
+                                 }}
+                               >
+                                 {similarityNetwork.nodes.map((entry: any, index: number) => {
+                                   const isSelected = selectedCompoundSmiles === entry.smiles;
+                                   return (
+                                     <Cell 
+                                       key={`cell-${index}`} 
+                                       fill={isSelected ? '#22d3ee' : 'rgba(244, 114, 182, 0.4)'} 
+                                       stroke={isSelected ? '#fff' : 'transparent'}
+                                       strokeWidth={isSelected ? 2 : 0}
+                                     />
+                                   );
+                                 })}
+                               </Scatter>
+                             </ScatterChart>
+                           </ResponsiveContainer>
+                         ) : (
+                           <div className="text-[10px] text-white/20 font-mono text-center">Failed to load similarity network.</div>
+                         )
+                       ) : activeNetworkTab === 'fp_heatmap' ? (
+                         fpHeatmapLoading ? (
+                           <div className="flex flex-col items-center gap-2 text-white/30 text-[9px] font-mono">
+                             <Loader2 className="w-4 h-4 animate-spin text-pink-400" />
+                             GENERATING FP HEATMAP...
+                           </div>
+                         ) : fpHeatmapData && fpHeatmapData.matrix ? (
+                           <div className="w-full h-full p-4 overflow-auto custom-scrollbar flex flex-col gap-1 items-center justify-center">
+                             <div className="text-[10px] font-mono text-pink-400 mb-2 border border-pink-500/20 bg-pink-500/5 px-3 py-1 rounded">
+                               Tanimoto Matrix ({fpHeatmapData.labels?.length || 0}x{fpHeatmapData.labels?.length || 0})
+                             </div>
+                             <div className="grid gap-[1px] mt-2" style={{ gridTemplateColumns: `repeat(${fpHeatmapData.labels?.length || 10}, minmax(0, 1fr))` }}>
+                               {fpHeatmapData.matrix.map((row: number[], i: number) => (
+                                 row.map((val: number, j: number) => (
+                                   <div 
+                                     key={`fp-${i}-${j}`} 
+                                     className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 rounded-[1px]" 
+                                     style={{ backgroundColor: `rgba(244, 114, 182, ${Math.max(0.05, val)})` }} 
+                                     title={`${fpHeatmapData.labels[i]} vs ${fpHeatmapData.labels[j]}\nSim: ${val.toFixed(3)}`} 
+                                   />
+                                 ))
+                               ))}
+                             </div>
+                           </div>
+                         ) : (
+                           <div className="text-[10px] text-white/20 font-mono text-center">Heatmap data unavailable.</div>
+                         )
+                       ) : (
+                         descHeatmapLoading ? (
+                           <div className="flex flex-col items-center gap-2 text-white/30 text-[9px] font-mono">
+                             <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                             GENERATING DESCRIPTOR HEATMAP...
+                           </div>
+                         ) : descCorrelationMatrix ? (
+                           <div className="w-full h-full p-4 overflow-auto custom-scrollbar flex flex-col gap-1 items-center justify-center">
+                             <div className="text-[10px] font-mono text-cyan-400 mb-2 border border-cyan-500/20 bg-cyan-500/5 px-3 py-1 rounded">
+                               Pearson Correlation Matrix ({descCorrelationMatrix.names.length}x{descCorrelationMatrix.names.length})
+                             </div>
+                             <div className="grid gap-[1px] mt-2" style={{ gridTemplateColumns: `repeat(${descCorrelationMatrix.names.length}, minmax(0, 1fr))` }}>
+                               {descCorrelationMatrix.matrix.map((row: number[], i: number) => (
+                                 row.map((val: number, j: number) => {
+                                   const isPositive = val >= 0;
+                                   const alpha = Math.min(1, Math.abs(val));
+                                   return (
+                                     <div 
+                                       key={`desc-${i}-${j}`} 
+                                       className="w-3 h-3 md:w-4 md:h-4 rounded-[1px]" 
+                                       style={{ backgroundColor: isPositive ? `rgba(34, 211, 238, ${Math.max(0.05, alpha)})` : `rgba(139, 92, 246, ${Math.max(0.05, alpha)})` }} 
+                                       title={`${descCorrelationMatrix.names[i]} vs ${descCorrelationMatrix.names[j]}\nCorr: ${val.toFixed(3)}`} 
+                                     />
+                                   );
+                                 })
+                               ))}
+                             </div>
+                           </div>
+                         ) : (
+                           <div className="text-[10px] text-white/20 font-mono text-center">Heatmap data unavailable.</div>
+                         )
+                       )}
+                     </div>
                   </div>
                 </div>
 

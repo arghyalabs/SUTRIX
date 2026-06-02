@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Download, Filter, GitBranch, Database, AlertTriangle } from 'lucide-react';
+import { Download, Filter, GitBranch, Database, AlertTriangle, ArrowDown } from 'lucide-react';
 import { hierarchyApi } from '../../services/hierarchyApi';
 
 interface NodeDetail {
@@ -30,9 +30,10 @@ interface NodeDetail {
 interface NodeMetaPanelProps {
   nodeDetail: NodeDetail | null;
   clientId: string;
+  branchDetail?: any;
 }
 
-export const NodeMetaPanel: React.FC<NodeMetaPanelProps> = ({ nodeDetail, clientId }) => {
+export const NodeMetaPanel: React.FC<NodeMetaPanelProps> = ({ nodeDetail, clientId, branchDetail }) => {
   if (!nodeDetail) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-white/20 p-6">
@@ -168,6 +169,38 @@ export const NodeMetaPanel: React.FC<NodeMetaPanelProps> = ({ nodeDetail, client
                 <span className="uppercase font-bold">{fmt}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Data Reduction Path */}
+      {branchDetail && (
+        <div className="pt-4 border-t border-white/[0.04]">
+          <h4 className="text-[10px] font-extrabold text-white/40 uppercase tracking-wider mb-4">Data Reduction Path</h4>
+          <div className="flex flex-col gap-3">
+            {branchDetail.compound_attrition?.length > 0 ? (
+              branchDetail.compound_attrition.map((node: any, idx: number) => (
+                <div key={node.label} className="flex items-center gap-3">
+                  {idx > 0 && <ArrowDown className="w-3.5 h-3.5 text-rose-400/50 shrink-0" />}
+                  <div className="flex-1 bg-white/[0.01] border border-white/[0.04] px-4 py-2.5 rounded-xl flex justify-between items-center text-xs">
+                    <div className="font-bold text-white flex items-center gap-1.5">
+                      <span className="text-[10px] text-white/30 font-mono">#{idx+1}</span>
+                      {node.label}
+                    </div>
+                    <div className="flex items-center gap-3 font-semibold">
+                      <span className="text-emerald-400">{node.unique_compounds} compounds</span>
+                      {idx > 0 && (
+                        <span className="text-rose-400 text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-lg">
+                          -{node.reduction_pct}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center text-white/30 text-xs py-4">No attrition data available.</div>
+            )}
           </div>
         </div>
       )}

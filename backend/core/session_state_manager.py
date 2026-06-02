@@ -9,6 +9,8 @@ from backend.core.workspace_registry import PipelineContext, registry
 
 logger = logging.getLogger("sdo.core.session_state_manager")
 
+PIPELINE_VERSION = 5
+
 class SessionStateManager:
     """
     Manages persistence, recovery, and cleanup of scientific pipeline sessions.
@@ -51,6 +53,22 @@ class SessionStateManager:
                 "dataset_passport": getattr(context, "dataset_passport", None),
                 "detected_domain": getattr(context, "detected_domain", "General Scientific"),
                 "primary_entity_type": getattr(context, "primary_entity_type", "Compound"),
+                # V5 Subgroup Gate & Structure State fields
+                "active_subgroup_path": getattr(context, "active_subgroup_path", None),
+                "subgroup_metadata": getattr(context, "subgroup_metadata", {}),
+                "subgroup_selected": getattr(context, "subgroup_selected", False),
+                "structure_state": getattr(context, "structure_state", "UNKNOWN"),
+                "smiles_coverage_pct": getattr(context, "smiles_coverage_pct", 0.0),
+                "total_unique_compounds": getattr(context, "total_unique_compounds", 0),
+                "structures_available": getattr(context, "structures_available", 0),
+                "structures_missing": getattr(context, "structures_missing", 0),
+                "recovery_attempted": getattr(context, "recovery_attempted", False),
+                "recovery_completed": getattr(context, "recovery_completed", False),
+                "post_recovery_coverage_pct": getattr(context, "post_recovery_coverage_pct", 0.0),
+                "recovered_subgroup_path": getattr(context, "recovered_subgroup_path", None),
+                "descriptor_dataframe_path": getattr(context, "descriptor_dataframe_path", None),
+                "descriptor_engine_used": getattr(context, "descriptor_engine_used", None),
+                "descriptor_count": getattr(context, "descriptor_count", 0),
             }
             
             temp_path = self.get_state_file_path(context.workspace_id) + ".tmp"
@@ -83,10 +101,20 @@ class SessionStateManager:
             with open(state_path, "r") as f:
                 state_data = json.load(f)
                 
+            # V5 hard session wipe if version mismatch
+            loaded_version = state_data.get("pipeline_version", 3.0)
+            if loaded_version < PIPELINE_VERSION:
+                logger.warning(f"Workspace {workspace_id}: V4/V3 session ({loaded_version}) detected. Clearing stale session.")
+                try:
+                    os.remove(state_path)
+                except Exception:
+                    pass
+                return None
+
             # Reconstruct context
             context = PipelineContext(
                 workspace_id=state_data["workspace_id"],
-                pipeline_version=state_data.get("pipeline_version", "3.0"),
+                pipeline_version=5,
                 scientific_schema_version=state_data.get("scientific_schema_version", "1.0"),
                 descriptor_engine_version=state_data.get("descriptor_engine_version", "2023.9")
             )
@@ -110,6 +138,23 @@ class SessionStateManager:
             context.active_lineage = state_data.get("active_lineage")
             context.active_segregation_result = context.active_lineage
             
+            # Restore V5 Subgroup Gate & Structure State fields
+            context.active_subgroup_path = state_data.get("active_subgroup_path", None)
+            context.subgroup_metadata = state_data.get("subgroup_metadata", {})
+            context.subgroup_selected = state_data.get("subgroup_selected", False)
+            context.structure_state = state_data.get("structure_state", "UNKNOWN")
+            context.smiles_coverage_pct = state_data.get("smiles_coverage_pct", 0.0)
+            context.total_unique_compounds = state_data.get("total_unique_compounds", 0)
+            context.structures_available = state_data.get("structures_available", 0)
+            context.structures_missing = state_data.get("structures_missing", 0)
+            context.recovery_attempted = state_data.get("recovery_attempted", False)
+            context.recovery_completed = state_data.get("recovery_completed", False)
+            context.post_recovery_coverage_pct = state_data.get("post_recovery_coverage_pct", 0.0)
+            context.recovered_subgroup_path = state_data.get("recovered_subgroup_path", None)
+            context.descriptor_dataframe_path = state_data.get("descriptor_dataframe_path", None)
+            context.descriptor_engine_used = state_data.get("descriptor_engine_used", None)
+            context.descriptor_count = state_data.get("descriptor_count", 0)
+
             node_details = state_data.get("node_details")
             if node_details:
                 try:

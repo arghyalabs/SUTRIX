@@ -21,6 +21,8 @@ import { DatasetMapping } from './components/mapping/DatasetMapping';
 import { HierarchyBuilder } from './components/segregation/HierarchyBuilder';
 import { DataAnalysisWorkspace } from './components/analysis/DataAnalysisWorkspace';
 import { DescriptorEnrichment } from './components/enrichment/DescriptorEnrichment';
+import { SubgroupSelectionHub } from './components/analysis/SubgroupSelectionHub';
+import { FeatureSelection } from './components/modeling/FeatureSelection';
 import { ReadinessDashboard } from './components/readiness/ReadinessDashboard';
 import ModelingReadinessWorkspace from './components/modeling/ModelingReadinessWorkspace';
 import { modelingApi } from './services/modelingApi';
@@ -28,11 +30,12 @@ import { ReportsExport } from './components/reports/ReportsExport';
 import { BenchmarkPanel } from './components/telemetry/BenchmarkPanel';
 import { CompoundExplorer } from './components/reports/CompoundExplorer';
 import { CompoundPreview } from './components/reports/CompoundPreview';
+import { DatasetStructureAssessment } from './components/assessment/DatasetStructureAssessment';
+import { ChemicalStructureRecovery } from './components/recovery/ChemicalStructureRecovery';
+import { QSARReadinessWorkspace } from './components/readiness/QSARReadinessWorkspace';
 
 // SUTRIX Dual Environment Workspaces and Modals
-import { WorkspaceChoiceModal } from './components/ui/WorkspaceChoiceModal';
-import { StructureRecoveryWizard } from './components/scientific/StructureRecoveryWizard';
-import { ScientificIntelligenceWorkspace } from './components/scientific/ScientificIntelligenceWorkspace';
+import { ScientificInsightsWorkspace } from './components/scientific/ScientificInsightsWorkspace';
 import { ScientificDataExplorer } from './components/scientific/ScientificDataExplorer';
 import { AlertTriangle } from 'lucide-react';
 import type { DatasetMode } from './types';
@@ -158,9 +161,7 @@ const App: React.FC = () => {
     setLicenseAccepted(true);
   };
 
-  const [showWorkspaceChoiceModal, setShowWorkspaceChoiceModal] = useState(false);
   const [showSwitchWorkspaceModal, setShowSwitchWorkspaceModal] = useState(false);
-  const [showRecoveryWizard, setShowRecoveryWizard] = useState(false);
 
   const {
     activeTab, setActiveTab,
@@ -276,7 +277,7 @@ const App: React.FC = () => {
   React.useEffect(() => {
     const handlePopState = () => {
     const hash = window.location.hash.replace('#', '');
-      const validTabs = ['ingest', 'mapping', 'hierarchy', 'analysis', 'enrichment', 'readiness', 'verification', 'reports'];
+      const validTabs = ['ingest', 'mapping', 'hierarchy', 'analysis', 'subgroup-selection', 'structure-assessment', 'structure-recovery', 'enrichment', 'compound-explorer', 'feature-selection', 'readiness', 'verification', 'reports', 'sci-intelligence', 'sci-explorer'];
       if (validTabs.includes(hash)) {
         setActiveTab(hash);
       }
@@ -521,11 +522,8 @@ const App: React.FC = () => {
       
       toast.success('Mapping complete.', { id: toastId });
       
-      if (mapRes.dataset_mode === 'HYBRID') {
-        setShowWorkspaceChoiceModal(true);  // user picks mode
-      } else {
-        setActiveTab('hierarchy');          // direct transition
-      }
+      toast.success('Mapping complete.', { id: toastId });
+      setActiveTab('hierarchy');
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Mapping failed'));
     }
@@ -602,7 +600,7 @@ const App: React.FC = () => {
       setDataset(d.job_id + '.parquet', d.parquet_path, d.total_rows, d.columns, d.preview);
       
 
-      setActiveTab('readiness');
+      setActiveTab('compound-explorer');
     } catch (error: any) {
       toast.error(getErrorMessage(error, 'Failed to fetch results'));
     }
@@ -661,6 +659,17 @@ const App: React.FC = () => {
         return <HierarchyBuilder clientId={clientId} socket={socket} />;
       case 'analysis':
         return <DataAnalysisWorkspace />;
+      case 'subgroup-selection':
+        return (
+          <SubgroupSelectionHub
+            clientId={clientId}
+            onContinue={() => setActiveTab('enrichment')}
+          />
+        );
+      case 'structure-assessment':
+        return <DatasetStructureAssessment />;
+      case 'structure-recovery':
+        return <ChemicalStructureRecovery />;
       case 'enrichment':
         return (
           <DescriptorEnrichment
@@ -671,7 +680,25 @@ const App: React.FC = () => {
             socket={socket} ramUsage={mockTelemetry.ram_usage_pct} fps={60}
           />
         );
+      case 'compound-explorer':
+        return (
+          <CompoundExplorer
+            clientId={clientId}
+            activeJobId={activeJobId || null}
+            onContinue={() => setActiveTab('readiness')}
+          />
+        );
+      case 'feature-selection':
+        return (
+          <FeatureSelection
+            clientId={clientId}
+            onContinue={() => setActiveTab('sci-intelligence')}
+          />
+        );
       case 'readiness':
+        if (datasetMode === 'SCIENTIFIC') {
+          return <QSARReadinessWorkspace />;
+        }
         return (
           <ModelingReadinessWorkspace
             clientId={clientId}
@@ -693,15 +720,8 @@ const App: React.FC = () => {
             setActivePanel={setModelingActivePanel}
           />
         );
-      case 'verification':
-        return (
-          <CompoundExplorer
-            clientId={clientId}
-            activeJobId={activeJobId || null}
-          />
-        );
       case 'sci-intelligence':
-        return <ScientificIntelligenceWorkspace clientId={clientId} />;
+        return <ScientificInsightsWorkspace clientId={clientId} />;
       case 'sci-explorer':
         return <ScientificDataExplorer clientId={clientId} />;
       case 'benchmark':
@@ -747,27 +767,6 @@ const App: React.FC = () => {
       </DashboardLayout>
       
       <LicenseModal isOpen={isLicenseModalOpen} onClose={() => setIsLicenseModalOpen(false)} />
-
-      {/* Workspace Choice Modal for HYBRID Datasets */}
-      <WorkspaceChoiceModal
-        isOpen={showWorkspaceChoiceModal}
-        onClose={() => setShowWorkspaceChoiceModal(false)}
-        onSelectMode={(mode) => {
-          setDatasetMode(mode);
-          setShowWorkspaceChoiceModal(false);
-          setActiveTab('hierarchy');
-        }}
-        onStartRecovery={() => {
-          setShowWorkspaceChoiceModal(false);
-          setShowRecoveryWizard(true);
-        }}
-      />
-
-      {/* Structure Recovery Wizard Modal */}
-      <StructureRecoveryWizard
-        isOpen={showRecoveryWizard}
-        onClose={() => setShowRecoveryWizard(false)}
-      />
 
       {/* Switch Workspace Warning Overlay */}
       <AnimatePresence>

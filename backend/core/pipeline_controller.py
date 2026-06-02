@@ -5,6 +5,7 @@
 # -----------------------------------------------------------------------------
 import logging
 import math
+import os
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List
@@ -335,6 +336,7 @@ class ScientificPipelineController:
                 
             # Update source of truth to the new enriched parquet
             context.parquet_path = res_path
+            context.descriptor_dataframe_path = res_path
             context.add_snapshot("enrich", res_path, {"job_id": context.active_job_id})
             
             df = context.load_slice()

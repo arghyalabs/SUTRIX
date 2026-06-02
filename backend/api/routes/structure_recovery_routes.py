@@ -46,8 +46,14 @@ async def start_recovery(payload: StructureRecoveryPayload):
     """
     context = _get_context(payload.client_id)
     
+    if getattr(context, 'structure_state', 'UNKNOWN') == 'MOLECULAR':
+        raise HTTPException(
+            status_code=400,
+            detail="Dataset is already MOLECULAR. No recovery needed."
+        )
+
     # Verify that column exists
-    df = context.load_slice()
+    df = context.load_active_dataset()
     if payload.column_to_resolve not in df.columns:
         raise HTTPException(
             status_code=400,
@@ -152,8 +158,14 @@ async def start_recovery_v2(payload: StructureRecoveryPayloadV2):
     """
     context = _get_context(payload.client_id)
     
+    if getattr(context, 'structure_state', 'UNKNOWN') == 'MOLECULAR':
+        raise HTTPException(
+            status_code=400,
+            detail="Dataset is already MOLECULAR. No recovery needed."
+        )
+
     # Verify that column exists
-    df = context.load_slice()
+    df = context.load_active_dataset()
     if payload.column_to_resolve not in df.columns:
         raise HTTPException(
             status_code=400,
@@ -176,6 +188,7 @@ async def start_recovery_v2(payload: StructureRecoveryPayloadV2):
         )
 
     context.active_job_id = job_id
+    context.recovery_attempted = True
     context.touch(save_to_disk=True)
 
     return {
@@ -192,7 +205,10 @@ async def estimate_recovery_v2(payload: StructureRecoveryPayloadV2):
     """
     context = _get_context(payload.client_id)
     
-    df = context.load_slice()
+    try:
+        df = context.load_active_dataset()
+    except ValueError:
+        df = context.load_slice()
     if payload.column_to_resolve not in df.columns:
         raise HTTPException(
             status_code=400,
@@ -231,4 +247,116 @@ async def cache_stats():
     """
     from backend.cache.structure_cache import global_cache
     return global_cache.stats()
+
+
+@router.get("/v2/{client_id}/scope-preview")
+async def recovery_scope_preview(client_id: str):
+    """
+    Returns a preview of which compounds are missing SMILES in the active subgroup,
+    along with time estimates for recovery at different batch sizes.
+    Used by Step 7 UI before starting a recovery job.
+    """
+    context = registry.get_context(client_id)
+    
+    if not getattr(context, 'subgroup_selected', False):
+        raise HTTPException(
+            status_code=400,
+            detail="Scope preview requires a selected subgroup. Complete Step 5 first."
+        )
+    
+    try:
+        df = context.load_active_dataset()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load active subgroup: {e}")
+    
+    mappings = getattr(context, 'mappings', {}) or {}
+    role_to_col = {v: k for k, v in mappings.items()}
+    
+    chem_col = role_to_col.get('chemical_name') or role_to_col.get('cas_number')
+    smiles_col = role_to_col.get('smiles') or role_to_col.get('canonical_smiles')
+    
+    # Heuristic fallback
+    if not chem_col:
+        for col in df.columns:
+            if col.lower() in ['name', 'compound', 'chemical', 'substance', 'cas']:
+                chem_col = col
+                break
+    if not smiles_col:
+        for col in df.columns:
+            if col.lower() in ['smiles', 'canonical_smiles', 'isomeric_smiles']:
+                smiles_col = col
+                break
+    
+    if not chem_col:
+        raise HTTPException(status_code=400, detail="No compound name column found in dataset mapping.")
+    
+    # Find compounds missing SMILES
+    if smiles_col and smiles_col in df.columns:
+        compound_df = df[[chem_col, smiles_col]].dropna(subset=[chem_col]).copy()
+        compound_df['_has_smiles'] = (
+            compound_df[smiles_col].astype(str).str.strip().notna() &
+            (compound_df[smiles_col].astype(str).str.strip() != '') &
+            (compound_df[smiles_col].astype(str).str.strip() != 'nan') &
+            (compound_df[smiles_col].astype(str).str.strip() != 'None')
+        )
+        coverage_per_compound = compound_df.groupby(chem_col)['_has_smiles'].any()
+        missing_compounds = coverage_per_compound[~coverage_per_compound].index.tolist()
+    else:
+        # No SMILES column at all — all unique compounds are missing
+        missing_compounds = df[chem_col].dropna().astype(str).str.strip().unique().tolist()
+    
+    total_missing = len(missing_compounds)
+    
+    # Check cache hits
+    try:
+        from backend.cache.structure_cache import global_cache
+        cached = global_cache.get_many(missing_compounds)
+        cache_hits_estimate = len(cached)
+    except Exception:
+        cache_hits_estimate = 0
+    
+    # Time estimates (empirical: ~0.45s/compound for fresh lookups, 0.05s for cache)
+    fresh_count = total_missing - cache_hits_estimate
+    def estimate_seconds(batch: int) -> int:
+        actual_batch = min(batch, total_missing)
+        fresh_in_batch = max(0, actual_batch - cache_hits_estimate)
+        return int(fresh_in_batch * 0.45 + min(cache_hits_estimate, actual_batch) * 0.05)
+    
+    return {
+        "missing_compounds": missing_compounds[:50],  # cap for response size
+        "total_missing": total_missing,
+        "cache_hits_estimate": cache_hits_estimate,
+        "estimated_recovery_rate": 0.85,
+        "estimated_time_seconds": {
+            "100": estimate_seconds(100),
+            "500": estimate_seconds(500),
+            "1000": estimate_seconds(1000),
+            "all": estimate_seconds(total_missing)
+        },
+        "sources_available": ["pubchem", "chembl", "comptox"]
+    }
+
+
+@router.post("/v2/mark-complete")
+async def mark_recovery_complete(payload: dict):
+    """
+    Called by the recovery job worker when it finishes, to update context
+    with the new coverage percentage and recovered subgroup path.
+    """
+    from pydantic import BaseModel
+    client_id = payload.get('client_id')
+    if not client_id:
+        raise HTTPException(status_code=400, detail="client_id required")
+    
+    context = registry.get_context(client_id)
+    new_coverage = payload.get('new_coverage_pct', 0.0)
+    recovered_path = payload.get('recovered_subgroup_path')
+    
+    context.recovery_completed = True
+    context.post_recovery_coverage_pct = float(new_coverage)
+    if recovered_path:
+        context.recovered_subgroup_path = recovered_path
+    context.touch(save_to_disk=True)
+    
+    return {"success": True, "new_coverage_pct": new_coverage}
 

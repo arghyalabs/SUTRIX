@@ -551,3 +551,308 @@ class ScientificIntelligenceEngine:
 # Helper utilities
 def column_keys_mapped(mappings: Dict[str, str]) -> List[str]:
     return list(mappings.keys())
+
+
+class QSARReadinessScorer:
+    """Calculates QSAR Readiness Score (0-100) based on OECD chemical modeling principles."""
+    
+    @staticmethod
+    def evaluate(df: pd.DataFrame, mappings: Dict[str, str], health_metrics: Dict[str, Any], diversity: Dict[str, Any], descriptor_rel: Dict[str, Any]) -> Dict[str, Any]:
+        scores = {}
+        deductions = []
+        
+        # 1. Applicability Domain Coverage (based on diversity status and Tanimoto bounds)
+        div_score = diversity.get("chemical_diversity_score", 0.5)
+        scores["applicability_domain"] = min(100.0, max(20.0, div_score * 120.0))
+        if div_score < 0.3:
+            deductions.append("Low chemical diversity makes the applicability domain narrow.")
+            
+        # 2. Descriptor Variance (NZV)
+        desc_score = descriptor_rel.get("descriptor_reliability_score", 100.0)
+        scores["descriptor_variance"] = desc_score
+        if desc_score < 70:
+            deductions.append("High count of low-variance or near-constant features.")
+
+        # 3. Feature Correlation (pearson redundancy)
+        corr_data = health_metrics.get("correlations", {})
+        redundant_pct = corr_data.get("redundant_count", 0)
+        scores["feature_correlation"] = max(0.0, 100.0 - redundant_pct * 3.0)
+        if redundant_pct > 10:
+            deductions.append(f"High multi-collinearity ({redundant_pct} highly correlated feature pairs).")
+
+        # 4. Missingness
+        missingness_pct = health_metrics.get("missingness", {}).get("overall_missing_pct", 0.0)
+        scores["missingness"] = max(0.0, 100.0 - missingness_pct * 2.0)
+        if missingness_pct > 15.0:
+            deductions.append(f"Significant data missingness ({missingness_pct:.1f}% empty cells).")
+
+        # 5. Sample Size
+        n_samples = len(df)
+        if n_samples >= 1000:
+            scores["sample_size"] = 100.0
+        elif n_samples >= 100:
+            scores["sample_size"] = 60.0 + (n_samples - 100) * 40.0 / 900.0
+        else:
+            scores["sample_size"] = max(0.0, n_samples * 0.6)
+            deductions.append(f"Small dataset size ({n_samples} rows) restricts model generalization.")
+
+        # 6. Compound Diversity
+        scores["compound_diversity"] = min(100.0, max(0.0, div_score * 100.0))
+
+        # 7. Endpoint Quality (checks units consistency)
+        sci_to_user = {v: k for k, v in mappings.items()}
+        unit_col = sci_to_user.get('unit')
+        if unit_col and unit_col in df.columns:
+            unique_units = df[unit_col].dropna().nunique()
+            scores["endpoint_quality"] = 100.0 if unique_units == 1 else 40.0
+            if unique_units > 1:
+                deductions.append("Mixed concentration endpoints detected. Please harmonize units first.")
+        else:
+            scores["endpoint_quality"] = 90.0
+
+        # Weighted calculation
+        qsar_score = round(
+            scores["applicability_domain"] * 0.15 +
+            scores["descriptor_variance"] * 0.15 +
+            scores["feature_correlation"] * 0.15 +
+            scores["missingness"] * 0.15 +
+            scores["sample_size"] * 0.15 +
+            scores["compound_diversity"] * 0.15 +
+            scores["endpoint_quality"] * 0.10,
+            1
+        )
+
+        return {
+            "score": qsar_score,
+            "breakdown": scores,
+            "deductions": deductions
+        }
+
+
+class AIReadinessScorer:
+    """Calculates general AI Modeling Readiness Score (0-100) for deep learning and trees."""
+    
+    @staticmethod
+    def evaluate(df: pd.DataFrame, mappings: Dict[str, str], health_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        scores = {}
+        deductions = []
+
+        # 1. Dataset Size
+        n = len(df)
+        if n >= 2000:
+            scores["dataset_size"] = 100.0
+        elif n >= 500:
+            scores["dataset_size"] = 80.0
+        elif n >= 100:
+            scores["dataset_size"] = 60.0
+        else:
+            scores["dataset_size"] = 30.0
+            deductions.append("Dataset size is small for reliable Machine Learning.")
+
+        # 2. Class Balance
+        sci_to_user = {v: k for k, v in mappings.items()}
+        target_col = sci_to_user.get('value')
+        if target_col and target_col in df.columns:
+            series = df[target_col].dropna()
+            n_unique = series.nunique()
+            if n_unique <= 5:  # classification
+                counts = series.value_counts(normalize=True)
+                maj_pct = counts.iloc[0] if len(counts) > 0 else 1.0
+                scores["class_balance"] = max(0.0, 100.0 - (maj_pct - 0.5) * 200.0)
+                if maj_pct > 0.8:
+                    deductions.append("Highly skewed class labels will bias classifier predictions.")
+            else:
+                scores["class_balance"] = 100.0
+        else:
+            scores["class_balance"] = 50.0
+
+        # 3. Noise & Conflicts
+        conflicts = health_metrics.get("conflicts", {}).get("conflicts_count", 0)
+        scores["noise"] = max(20.0, 100.0 - conflicts * 5.0)
+        if conflicts > 0:
+            deductions.append(f"Experimental noise detected: {conflicts} compound conflicts in endpoint measurements.")
+
+        # 4. Descriptor Density
+        missing_pct = health_metrics.get("missingness", {}).get("overall_missing_pct", 0.0)
+        scores["descriptor_density"] = max(0.0, 100.0 - missing_pct)
+
+        # 5. Target Distribution
+        if target_col and target_col in df.columns:
+            series = df[target_col].dropna()
+            if pd.api.types.is_numeric_dtype(series) and series.nunique() > 10:
+                skew = abs(series.skew())
+                scores["target_distribution"] = max(10.0, 100.0 - (skew * 20.0))
+                if skew > 2.0:
+                    deductions.append("Target endpoint is heavily skewed. Consider log transformations.")
+            else:
+                scores["target_distribution"] = 100.0
+        else:
+            scores["target_distribution"] = 50.0
+
+        # 6. Information Gain (feature count relative to rows)
+        num_cols = len(df.select_dtypes(include=[np.number]).columns)
+        if num_cols >= 50:
+            scores["information_gain"] = 100.0
+        elif num_cols >= 10:
+            scores["information_gain"] = 80.0
+        else:
+            scores["information_gain"] = 50.0
+            deductions.append("Low feature count limits predictive representations.")
+
+        ai_score = round(
+            scores["dataset_size"] * 0.20 +
+            scores["class_balance"] * 0.20 +
+            scores["noise"] * 0.15 +
+            scores["descriptor_density"] * 0.15 +
+            scores["target_distribution"] * 0.15 +
+            scores["information_gain"] * 0.15,
+            1
+        )
+
+        return {
+            "score": ai_score,
+            "breakdown": scores,
+            "deductions": deductions
+        }
+
+
+class MLBenchmarkingEngine:
+    """Trains benchmarking machine learning models using cross-validation and reports expected performance."""
+
+    @staticmethod
+    def run_benchmark(df: pd.DataFrame, mappings: Dict[str, str]) -> Dict[str, Any]:
+        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor, GradientBoostingClassifier, GradientBoostingRegressor
+        from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
+        from sklearn.model_selection import cross_val_predict, KFold, StratifiedKFold
+        from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, roc_auc_score, accuracy_score, f1_score
+
+        sci_to_user = {v: k for k, v in mappings.items()}
+        target_col = sci_to_user.get("value")
+        smiles_col = sci_to_user.get("canonical_smiles")
+        unit_col = sci_to_user.get("unit")
+        ep_col = sci_to_user.get("endpoint")
+
+        if not target_col or target_col not in df.columns:
+            return {"status": "skipped", "reason": "No mapped target column."}
+
+        system_cols = {smiles_col, target_col, unit_col, ep_col, "audit_flag", "session_id"}
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        feature_cols = [c for c in numeric_cols if c not in system_cols and c]
+
+        if not feature_cols:
+            return {"status": "skipped", "reason": "No numeric descriptors available for benchmarking."}
+
+        # Filter and align
+        y = pd.to_numeric(df[target_col], errors="coerce")
+        valid = y.notna()
+        y = y[valid]
+        X = df.loc[valid, feature_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+
+        if len(y) < 6:
+            return {"status": "skipped", "reason": f"Too few samples for cross-validation ({len(y)} samples)."}
+
+        # Subsample to keep processing fast (<3 seconds)
+        if len(X) > 1500:
+            idx = X.sample(n=1500, random_state=42).index
+            X = X.loc[idx]
+            y = y.loc[idx]
+
+        if len(feature_cols) > 80:
+            # Simple variance filter to keep features small during cross-validation
+            top_vars = X.var().sort_values(ascending=False).head(80).index
+            X = X[top_vars]
+
+        # Determine task type
+        unique_y = y.nunique()
+        is_classification = unique_y <= 5
+
+        results = []
+        if is_classification:
+            # Classification benchmark
+            cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+            
+            # 1. Random Forest
+            rf = RandomForestClassifier(n_estimators=30, max_depth=8, random_state=42, n_jobs=-1)
+            # 2. Extra Trees
+            et = ExtraTreesClassifier(n_estimators=30, max_depth=8, random_state=42, n_jobs=-1)
+            # 3. Hist Gradient Boosting (fallback for XGBoost)
+            hgb = HistGradientBoostingClassifier(max_iter=30, max_depth=5, random_state=42)
+
+            models = {
+                "RandomForest": rf,
+                "ExtraTrees": et,
+                "GradientBoosting": hgb
+            }
+
+            for name, model in models.items():
+                try:
+                    preds = cross_val_predict(model, X, y, cv=cv, method="predict")
+                    try:
+                        probs = cross_val_predict(model, X, y, cv=cv, method="predict_proba")
+                        if len(np.unique(y)) == 2:
+                            auc = roc_auc_score(y, probs[:, 1])
+                        else:
+                            auc = roc_auc_score(y, probs, multi_class="ovr")
+                    except Exception:
+                        auc = 0.50
+                    
+                    acc = accuracy_score(y, preds)
+                    f1 = f1_score(y, preds, average="weighted")
+
+                    results.append({
+                        "model": name,
+                        "roc_auc": round(float(auc), 2),
+                        "accuracy": round(float(acc), 2),
+                        "f1_score": round(float(f1), 2),
+                        "status": "success"
+                    })
+                except Exception as e:
+                    results.append({"model": name, "status": "failed", "error": str(e)})
+
+        else:
+            # Regression benchmark
+            cv = KFold(n_splits=3, shuffle=True, random_state=42)
+
+            # 1. Random Forest
+            rf = RandomForestRegressor(n_estimators=30, max_depth=8, random_state=42, n_jobs=-1)
+            # 2. Extra Trees
+            et = ExtraTreesRegressor(n_estimators=30, max_depth=8, random_state=42, n_jobs=-1)
+            # 3. Hist Gradient Boosting
+            hgb = HistGradientBoostingRegressor(max_iter=30, max_depth=5, random_state=42)
+
+            models = {
+                "RandomForest": rf,
+                "ExtraTrees": et,
+                "GradientBoosting": hgb
+            }
+
+            for name, model in models.items():
+                try:
+                    # R2 score of out-of-fold predictions is Q2
+                    preds = cross_val_predict(model, X, y, cv=cv)
+                    q2 = r2_score(y, preds)
+                    
+                    # Fit on whole set to calculate training R2
+                    model.fit(X, y)
+                    r2 = r2_score(y, model.predict(X))
+
+                    mae = mean_absolute_error(y, preds)
+                    rmse = np.sqrt(mean_squared_error(y, preds))
+
+                    results.append({
+                        "model": name,
+                        "r2": round(max(0.0, float(r2)), 2),
+                        "q2": round(max(0.0, float(q2)), 2),
+                        "mae": round(float(mae), 3),
+                        "rmse": round(float(rmse), 3),
+                        "status": "success"
+                    })
+                except Exception as e:
+                    results.append({"model": name, "status": "failed", "error": str(e)})
+
+        return {
+            "status": "success",
+            "task": "classification" if is_classification else "regression",
+            "benchmarks": results
+        }
+

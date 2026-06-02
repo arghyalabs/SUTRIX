@@ -22,7 +22,6 @@ class PipelineSnapshot:
 @dataclass
 class PipelineContext:
     workspace_id: str
-    pipeline_version: str = "3.0"
     scientific_schema_version: str = "1.0"
     descriptor_engine_version: str = "2023.9"
     
@@ -46,6 +45,29 @@ class PipelineContext:
     export_paths: Dict[str, str] = field(default_factory=dict)
     active_job_id: Optional[str] = None
     active_segregation_result: Optional[Any] = None
+
+    # ── V5: Subgroup Gate (Step 5) ────────────────────────────────────────────────
+    pipeline_version: int = 5
+    active_subgroup_path: Optional[str] = None
+    subgroup_metadata: Dict[str, Any] = field(default_factory=dict)
+    subgroup_selected: bool = False
+
+    # ── V5: Structure State (Step 6) ─────────────────────────────────────────────
+    structure_state: str = "UNKNOWN"         # MOLECULAR | HYBRID | NAME_ONLY | UNKNOWN
+    smiles_coverage_pct: float = 0.0
+    total_unique_compounds: int = 0
+    structures_available: int = 0
+    structures_missing: int = 0
+
+    # ── V5: Recovery State (Step 7) ──────────────────────────────────────────────
+    recovery_attempted: bool = False
+    recovery_completed: bool = False
+    post_recovery_coverage_pct: float = 0.0
+    recovered_subgroup_path: Optional[str] = None
+
+    # ── V5: Descriptor State (Step 8) ────────────────────────────────────────────
+    descriptor_engine_used: Optional[str] = None
+    descriptor_count: int = 0
 
     # ── Dataset Intelligence (populated after column mapping) ─────────────────
     # Mode is "MOLECULAR" for all legacy sessions (backwards compatible)
@@ -112,6 +134,7 @@ class PipelineContext:
         """Flushes the dataframe cache, hierarchy engine, and search index to free RAM (Hybrid Model)."""
         self.dataframe_cache = None
         self.search_index = None
+        # V5: don't clear subgroup paths — just clear in-memory cache
         # Release the engine's in-memory node dataframe slices (already persisted to disk)
         if self.hierarchy_engine is not None:
             try:
@@ -130,6 +153,25 @@ class PipelineContext:
         self.dataframe_cache = pd.read_parquet(self.parquet_path)
         return self.dataframe_cache
 
+    def load_active_dataset(self) -> pd.DataFrame:
+        """V5: Single source of truth for all post-step-5 operations.
+        Priority: recovered_subgroup_path > active_subgroup_path > parquet_path (pre-step-5 only).
+        Raises ValueError if subgroup_selected is True but no subgroup path exists.
+        """
+        if self.recovered_subgroup_path and os.path.exists(self.recovered_subgroup_path):
+            self.touch()
+            return pd.read_parquet(self.recovered_subgroup_path)
+        if self.active_subgroup_path and os.path.exists(self.active_subgroup_path):
+            self.touch()
+            return pd.read_parquet(self.active_subgroup_path)
+        if not self.subgroup_selected:
+            # Pre-step-5 pages are allowed to fall through to the root parquet
+            return self.load_slice()
+        raise ValueError(
+            "Active subgroup dataset not found. "
+            "Please complete Step 5 (Subgroup Selection) before proceeding."
+        )
+
 class WorkspaceRegistry:
     def __init__(self, ttl_seconds: int = 3600):
         self.workspaces: Dict[str, PipelineContext] = {}
@@ -140,16 +182,21 @@ class WorkspaceRegistry:
         self._MTIME_CHECK_INTERVAL = 5.0  # seconds
 
     def get_context(self, workspace_id: str) -> PipelineContext:
-        from backend.core.session_state_manager import session_manager
+        from backend.core.session_state_manager import session_manager, PIPELINE_VERSION
 
         if workspace_id not in self.workspaces:
             # Workspace not in memory at all — load from disk
+            loaded_ctx = None
             try:
                 loaded_ctx = session_manager.load_session(workspace_id)
-                if loaded_ctx:
-                    self.workspaces[workspace_id] = loaded_ctx
             except Exception:
                 pass
+            # V5 hard session wipe
+            if loaded_ctx and getattr(loaded_ctx, 'pipeline_version', 0) < PIPELINE_VERSION:
+                logger.warning(f"Workspace {workspace_id}: V4→V5 upgrade. Clearing stale session.")
+                loaded_ctx = None  # force fresh context creation
+            if loaded_ctx:
+                self.workspaces[workspace_id] = loaded_ctx
             if workspace_id not in self.workspaces:
                 self.workspaces[workspace_id] = PipelineContext(workspace_id=workspace_id)
         else:
