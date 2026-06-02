@@ -495,7 +495,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
         break;
     }
 
-    return typeof document !== 'undefined' ? createPortal(
+    return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-6 md:p-10 text-left">
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
@@ -536,9 +536,8 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
             {chartComponent}
           </div>
         </motion.div>
-      </div>,
-      document.body
-    ) : null;
+      </div>
+    );
   };
 
   return (
@@ -980,9 +979,12 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
       />
 
       {/* AnimatePresence Fullscreen Overlay Modal */}
-      <AnimatePresence>
-        {['row_reduction', 'retention_curve', 'missingness_curve'].includes(activeFullscreenChart || '') && renderFullscreenModal()}
-      </AnimatePresence>
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {['row_reduction', 'retention_curve', 'missingness_curve'].includes(activeFullscreenChart || '') && renderFullscreenModal()}
+        </AnimatePresence>,
+        document.body
+      )}
 
     </div>
   );
