@@ -179,8 +179,14 @@ def _load_df_and_mappings(client_id: str):
     if not context:
         raise HTTPException(status_code=404, detail=f"Workspace '{client_id}' not found")
 
+    if not getattr(context, 'subgroup_selected', False):
+        raise HTTPException(
+            status_code=400,
+            detail="Explorer features require a selected subgroup. Complete Step 5 first."
+        )
+
     try:
-        df = context.load_slice()
+        df = context.load_active_dataset()
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -366,7 +372,7 @@ def _calculate_rdkit_descriptor(smiles: str, name: str) -> Optional[float]:
     try:
         from rdkit import Chem
         from rdkit.Chem import Descriptors, rdMolDescriptors
-        mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.MolFromSmiles(str(smiles))
         if mol is None:
             return None
         
@@ -431,7 +437,7 @@ def _calculate_rdkit_descriptor(smiles: str, name: str) -> Optional[float]:
 def _fallback_descriptor_value(smiles: str, name: str) -> float:
     # Stable deterministic hash
     h = 0
-    for char in (smiles + name):
+    for char in (str(smiles) + str(name)):
         h = ord(char) + ((h << 5) - h)
     hash_val = abs(h)
     
@@ -748,6 +754,192 @@ async def get_compound_detail(
     return response_payload
 
 
+@router.get("/{client_id}/similarity-network")
+async def get_similarity_network(
+    client_id: str,
+    method: str = Query(default="pca", description="Projection method: umap, tsne, pca")
+):
+    """
+    Computes a 2D Scatter Plot for the Compound Similarity Network based on Morgan Fingerprints.
+    Supports UMAP, t-SNE, and PCA.
+    """
+    df, mappings, smiles_col, val_col, unit_col, ep_col, name_col, cas_col = (
+        _load_df_and_mappings(client_id)
+    )
+    
+    if not smiles_col or smiles_col not in df.columns:
+        raise HTTPException(
+            status_code=400,
+            detail="SMILES column not mapped in this workspace.",
+        )
+
+    # 1. Deduplicate by SMILES to avoid plotting the same compound multiple times
+    unique_df = df.drop_duplicates(subset=[smiles_col]).dropna(subset=[smiles_col])
+    
+    # 2. Compute Morgan Fingerprints
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+        from rdkit import DataStructs
+    except ImportError:
+        raise HTTPException(status_code=500, detail="RDKit is required for similarity network.")
+
+    fps = []
+    valid_indices = []
+    
+    for idx, row in unique_df.iterrows():
+        smiles = row[smiles_col]
+        try:
+            mol = Chem.MolFromSmiles(str(smiles))
+            if mol:
+                fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+                arr = np.zeros((1,), dtype=np.int8)
+                DataStructs.ConvertToNumpyArray(fp, arr)
+                fps.append(arr)
+                valid_indices.append(idx)
+        except Exception as e:
+            logger.debug(f"Failed to generate fingerprint for {smiles}: {e}")
+            
+    if not fps:
+        raise HTTPException(status_code=400, detail="No valid molecules found for similarity network.")
+
+    X = np.vstack(fps)
+    
+    # 3. Perform dimensionality reduction (2 components)
+    method = method.lower()
+    if method == "umap":
+        try:
+            import umap
+            reducer = umap.UMAP(n_components=2, random_state=42)
+            coords = reducer.fit_transform(X)
+            explained_variance = [0.0, 0.0]  # UMAP doesn't provide this
+        except ImportError:
+            raise HTTPException(status_code=500, detail="UMAP library is not installed.")
+    elif method == "tsne":
+        try:
+            from sklearn.manifold import TSNE
+            reducer = TSNE(n_components=2, random_state=42)
+            coords = reducer.fit_transform(X)
+            explained_variance = [0.0, 0.0]  # t-SNE doesn't provide this
+        except ImportError:
+            raise HTTPException(status_code=500, detail="scikit-learn is required for t-SNE.")
+    else:  # default to PCA
+        try:
+            from sklearn.decomposition import PCA
+            pca = PCA(n_components=2)
+            coords = pca.fit_transform(X)
+            explained_variance = [float(v) for v in pca.explained_variance_ratio_]
+        except ImportError:
+            raise HTTPException(status_code=500, detail="scikit-learn is required for PCA.")
+    
+    valid_df = unique_df.loc[valid_indices]
+    
+    # 4. Construct payload
+    nodes = []
+    for i, (_, row) in enumerate(valid_df.iterrows()):
+        resolved = _resolve_compound_fields(row, mappings)
+        nodes.append({
+            "id": str(resolved["smiles"]) or str(i),
+            "smiles": str(resolved["smiles"]) if resolved["smiles"] else None,
+            "name": str(resolved["chemical_name"]) if resolved["chemical_name"] else "Unnamed",
+            "cas": str(resolved["cas_number"]) if resolved["cas_number"] else None,
+            "x": float(coords[i, 0]),
+            "y": float(coords[i, 1]),
+            "endpoint": str(resolved["endpoint"]) if resolved["endpoint"] else None,
+            "value": float(resolved["value"]) if resolved.get("value") is not None and not pd.isna(resolved["value"]) else None
+        })
+        
+    return {
+        "nodes": nodes,
+        "explained_variance": explained_variance,
+        "method": method.upper()
+    }
+
+@router.get("/{client_id}/similarity-matrix")
+async def get_similarity_matrix(client_id: str, limit: int = 50):
+    """
+    Computes a pairwise fingerprint similarity matrix for the top compounds.
+    """
+    df, mappings, smiles_col, val_col, unit_col, ep_col, name_col, cas_col = _load_df_and_mappings(client_id)
+    if not smiles_col or smiles_col not in df.columns:
+        raise HTTPException(status_code=400, detail="SMILES column not mapped.")
+
+    unique_df = df.drop_duplicates(subset=[smiles_col]).dropna(subset=[smiles_col]).head(limit)
+    
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+        from rdkit import DataStructs
+    except ImportError:
+        raise HTTPException(status_code=500, detail="RDKit is required.")
+
+    fps = []
+    labels = []
+    for _, row in unique_df.iterrows():
+        smiles = row[smiles_col]
+        mol = Chem.MolFromSmiles(str(smiles))
+        if mol:
+            fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+            fps.append(fp)
+            resolved = _resolve_compound_fields(row, mappings)
+            labels.append(resolved["chemical_name"] or resolved["smiles"] or "Unknown")
+
+    if not fps:
+        raise HTTPException(status_code=400, detail="No valid molecules found.")
+
+    n = len(fps)
+    matrix = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                matrix[i][j] = 1.0
+            elif i < j:
+                sim = DataStructs.TanimotoSimilarity(fps[i], fps[j])
+                matrix[i][j] = sim
+                matrix[j][i] = sim
+
+    return {
+        "labels": labels,
+        "matrix": matrix.tolist()
+    }
+
+@router.get("/{client_id}/descriptor-heatmap")
+async def get_descriptor_heatmap(client_id: str, limit: int = 50):
+    """
+    Returns a sample of compound descriptors for visualizing a heatmap.
+    """
+    df, mappings, smiles_col, val_col, unit_col, ep_col, name_col, cas_col = _load_df_and_mappings(client_id)
+    if not smiles_col or smiles_col not in df.columns:
+        raise HTTPException(status_code=400, detail="SMILES column not mapped.")
+
+    unique_df = df.drop_duplicates(subset=[smiles_col]).dropna(subset=[smiles_col]).head(limit)
+    
+    labels = []
+    descriptor_data = []
+    
+    # Use standard physicochemical descriptors
+    desc_names = ["MW", "LogP", "TPSA", "HBA", "HBD", "HeavyAtomCount", "FractionCSP3"]
+    
+    for _, row in unique_df.iterrows():
+        smiles = row[smiles_col]
+        resolved = _resolve_compound_fields(row, mappings)
+        labels.append(resolved["chemical_name"] or resolved["smiles"] or "Unknown")
+        
+        row_descs = {}
+        for name in desc_names:
+            val = _calculate_rdkit_descriptor(str(smiles), name)
+            if val is None:
+                val = _fallback_descriptor_value(str(smiles), name)
+            row_descs[name] = val
+        descriptor_data.append(row_descs)
+        
+    return {
+        "labels": labels,
+        "descriptor_names": desc_names,
+        "data": descriptor_data
+    }
+
+
 @router.get("/{client_id}/descriptor-distribution")
 async def get_descriptor_distribution(
     client_id: str,
@@ -853,7 +1045,7 @@ async def debug_workspace_explorer(client_id: str):
         }
         
     try:
-        df = context.load_slice()
+        df = context.load_active_dataset()
         dataset_loaded = True
     except Exception as e:
         df = None

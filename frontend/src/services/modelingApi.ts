@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import type { ModelingAnalysis } from '../types';
+import type { ModelingAnalysis, FeatureSelectionRequest, FeatureSelectionResponse } from '../types';
 
 export const modelingApi = {
   runAnalysis: async (clientId: string): Promise<ModelingAnalysis> => {
@@ -25,4 +25,9 @@ export const modelingApi = {
     const { data } = await apiClient.get(`/api/modeling/${clientId}/embedding`);
     return data;
   },
+
+  runFeatureSelection: async (request: FeatureSelectionRequest): Promise<FeatureSelectionResponse> => {
+    const { data } = await apiClient.post('/api/modeling/feature-selection/run', request);
+    return data;
+  }
 };

@@ -1,606 +1,483 @@
 import re
 from typing import Dict, Any, List
 
-# Pre-compiled regex patterns for chemical identifiers and numbers
-CAS_REGEX = re.compile(r"\b\d{2,7}-\d{2}-\d\b")
+# Pre-compiled regex patterns for chemical identifiers
+CAS_REGEX = re.compile(r"^\d{2,7}-\d{2}-\d$")
 INCHI_REGEX = re.compile(r"^inchi=1s?/[a-z0-9\.]+/.*", re.IGNORECASE)
 INCHIKEY_REGEX = re.compile(r"^[a-z]{14}-[a-z]{10}-[a-z\d]$", re.IGNORECASE)
-# General smiles character validator: check typical letters and bond symbols
 SMILES_HEURISTIC_REGEX = re.compile(r"^(?=[CHONSPFIClBrIH])(?=.*[a-zA-Z])[a-zA-Z0-9\(\)\=\#\+\-\[\]\/\@\.\:\\]+$")
+SPECIES_NOMENCLATURE_REGEX = re.compile(r"^[A-Z][a-z]+ [a-z]+$")
+ENDPOINT_TYPICAL_REGEX = re.compile(r"^(LC|EC|IC|LD|ED)50$|^NOEC$|^LOEC$", re.IGNORECASE)
 
 SCIENTIFIC_VARIABLES: Dict[str, Dict[str, Any]] = {
-    # ── CHEMICAL IDENTITY ──────────────────────────────────────────────────
-    "compound_name": {
-        "aliases": ["compound name", "compound_name", "compound", "molecule", "molecule name", "drug name", "ligand", "preferred compound name", "analyte"],
-        "regex": [],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "Compound Name"
-    },
+    # ── 1. CHEMICAL IDENTITY VARIABLES ──────────────────────────────────────────
     "chemical_name": {
-        "aliases": ["chemical name", "chemical_name", "chemical", "chem name", "iupac name", "preferred name", "synonym"],
-        "regex": [],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "Chemical Name"
+        "aliases": ["chemical name", "chemical_name", "chemical", "chem name", "iupac name", "synonym"],
+        "regex": [], "priority": 85, "category": "chemical_identity", "label": "Chemical Name"
+    },
+    "compound_name": {
+        "aliases": ["compound name", "compound_name", "compound", "preferred compound name"],
+        "regex": [], "priority": 85, "category": "chemical_identity", "label": "Compound Name"
     },
     "substance_name": {
-        "aliases": ["substance name", "substance_name", "substance", "test substance", "test_substance", "material name", "material_name", "sample name", "sample_name"],
-        "regex": [],
-        "priority": 80,
-        "category": "chemical_identifier",
-        "label": "Substance Name"
+        "aliases": ["substance name", "substance_name", "substance"],
+        "regex": [], "priority": 80, "category": "chemical_identity", "label": "Substance Name"
+    },
+    "drug_name": {
+        "aliases": ["drug name", "drug_name", "drug", "therapeutic agent", "medicine name"],
+        "regex": [], "priority": 85, "category": "chemical_identity", "label": "Drug Name"
+    },
+    "molecule_name": {
+        "aliases": ["molecule name", "molecule_name", "molecule", "molecular_structure_name"],
+        "regex": [], "priority": 80, "category": "chemical_identity", "label": "Molecule Name"
+    },
+    "analyte": {
+        "aliases": ["analyte", "analyte name", "target analyte", "measured substance"],
+        "regex": [], "priority": 80, "category": "chemical_identity", "label": "Analyte"
+    },
+    "ingredient": {
+        "aliases": ["ingredient", "excipient", "component name"],
+        "regex": [], "priority": 75, "category": "chemical_identity", "label": "Ingredient"
+    },
+    "active_ingredient": {
+        "aliases": ["active ingredient", "active_ingredient", "active substance", "api_name"],
+        "regex": [], "priority": 85, "category": "chemical_identity", "label": "Active Ingredient"
     },
     "test_substance": {
-        "aliases": ["test substance", "test_substance", "test material", "test_material", "substance test"],
-        "regex": [],
-        "priority": 80,
-        "category": "chemical_identifier",
-        "label": "Test Substance"
+        "aliases": ["test substance", "test_substance", "test chemical", "study chemical"],
+        "regex": [], "priority": 85, "category": "chemical_identity", "label": "Test Substance"
     },
-    "material_name": {
-        "aliases": ["material name", "material_name", "sample name", "sample_name", "material", "sample", "analyte"],
-        "regex": [],
-        "priority": 80,
-        "category": "chemical_identifier",
-        "label": "Material Name"
+    "test_material": {
+        "aliases": ["test material", "test_material", "experimental material"],
+        "regex": [], "priority": 80, "category": "chemical_identity", "label": "Test Material"
+    },
+    "study_material": {
+        "aliases": ["study material", "study_material", "study substance", "analyzed material"],
+        "regex": [], "priority": 80, "category": "chemical_identity", "label": "Study Material"
     },
 
-    # ── STRUCTURE IDENTIFIERS ──────────────────────────────────────────────
-    "canonical_smiles": {
-        "aliases": ["smiles", "smiles string", "smiles_string", "structure", "mol_structure", "chem_structure", "structure_formula", "canonical smiles", "canonical_smiles", "canon smiles", "canon_smiles", "rdkit smiles", "rdkit_smiles", "clean_smiles", "normalized_smiles", "compound_structure", "ligand_smiles"],
-        "regex": [SMILES_HEURISTIC_REGEX],
-        "priority": 100,
-        "category": "chemical_identifier",
-        "label": "Canonical SMILES"
-    },
-    "isomeric_smiles": {
-        "aliases": ["isomeric smiles", "isomeric_smiles", "isomeric smiles string", "isomeric_smiles_string", "structural smiles"],
-        "regex": [SMILES_HEURISTIC_REGEX],
-        "priority": 99,
-        "category": "chemical_identifier",
-        "label": "Isomeric SMILES"
+    # ── 2. STRUCTURE VARIABLES ──────────────────────────────────────────────────
+    "smiles": {
+        "aliases": ["smiles", "canonical smiles", "canonical_smiles", "smiles string", "isomeric smiles", "structure"],
+        "regex": [SMILES_HEURISTIC_REGEX], "priority": 100, "category": "structure", "label": "SMILES Structure"
     },
     "inchi": {
-        "aliases": ["inchi", "inchi key", "inchi-code", "inchi_string", "inchi_structure", "ec number", "einecs"],
-        "regex": [INCHI_REGEX],
-        "priority": 95,
-        "category": "chemical_identifier",
-        "label": "InChI Code"
+        "aliases": ["inchi", "inchi string", "inchi code", "inchi-code", "inchi_string"],
+        "regex": [INCHI_REGEX], "priority": 95, "category": "structure", "label": "InChI Code"
     },
     "inchikey": {
         "aliases": ["inchikey", "inchi key", "inchi-key", "inchikey_string"],
-        "regex": [INCHIKEY_REGEX],
-        "priority": 98,
-        "category": "chemical_identifier",
-        "label": "InChIKey"
+        "regex": [INCHIKEY_REGEX], "priority": 98, "category": "structure", "label": "InChIKey"
     },
-    "molblock": {
-        "aliases": ["molblock", "mol block", "molfile", "sdf block", "sdffile"],
-        "regex": [],
-        "priority": 90,
-        "category": "chemical_identifier",
-        "label": "MolBlock"
+    "molfile": {
+        "aliases": ["molfile", "mol block", "molblock", "sdfile", "sdf block"],
+        "regex": [], "priority": 90, "category": "structure", "label": "Molfile / SDF Block"
     },
-    "selfies": {
-        "aliases": ["selfies", "selfie", "selfies string", "selfies_string"],
-        "regex": [],
-        "priority": 90,
-        "category": "chemical_identifier",
-        "label": "SELFIES"
+    "sdf": {
+        "aliases": ["sdf", "sdf file", "sdf block data"],
+        "regex": [], "priority": 90, "category": "structure", "label": "SDF Payload"
     },
 
-    # ── REGULATORY IDENTIFIERS ──────────────────────────────────────────────
-    "cas_number": {
-        "aliases": ["cas", "cas number", "cas_number", "cas_no", "cas_rn", "casrn", "registry number", "registry_number"],
-        "regex": [CAS_REGEX],
-        "priority": 90,
-        "category": "chemical_identifier",
-        "label": "CAS Number"
+    # ── 3. CHEMICAL IDENTIFIER VARIABLES ───────────────────────────────────────
+    "cas": {
+        "aliases": ["cas", "cas number", "cas_number", "cas_no", "cas_rn", "casrn", "registry_number"],
+        "regex": [CAS_REGEX], "priority": 95, "category": "chemical_identifier", "label": "CAS Number"
     },
-    "ec_number": {
-        "aliases": ["ec number", "ec_number", "einecs", "einsecs", "ec-no", "ec_no"],
-        "regex": [],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "EC Number"
+    "cid": {
+        "aliases": ["cid", "pubchem cid", "pubchem_cid", "pubchem compound id"],
+        "regex": [], "priority": 85, "category": "chemical_identifier", "label": "PubChem CID"
     },
-    "einecs": {
-        "aliases": ["einecs number", "einecs_number", "einecs_no", "einecs-no"],
-        "regex": [],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "EINECS"
+    "chembl_id": {
+        "aliases": ["chembl id", "chembl_id", "chembl", "chembl target id"],
+        "regex": [re.compile(r"^chembl\d+$", re.IGNORECASE)], "priority": 85, "category": "chemical_identifier", "label": "ChEMBL ID"
     },
-    "pubchem_cid": {
-        "aliases": ["pubchem_cid", "pubchem cid", "cid", "sid", "pubchem id", "cid number", "pubchem compound id"],
-        "regex": [],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "PubChem CID"
-    },
-    "chebi_id": {
-        "aliases": ["chebi", "chebi id", "chebi_id", "chebi_key", "chemical entities of biological interest"],
-        "regex": [re.compile(r"^chebi:\d+$", re.IGNORECASE)],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "ChEBI ID"
+    "pubchem_id": {
+        "aliases": ["pubchem id", "pubchem_id", "pubchem sid", "pubchem_sid"],
+        "regex": [], "priority": 85, "category": "chemical_identifier", "label": "PubChem ID"
     },
     "dsstox_id": {
         "aliases": ["dsstox", "dsstox id", "dsstox_id", "dtxsid", "dtxcid", "epa_dsstox"],
-        "regex": [re.compile(r"^dtxsid\d+$", re.IGNORECASE)],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "DSSTox ID"
+        "regex": [re.compile(r"^dtxsid\d+$", re.IGNORECASE)], "priority": 85, "category": "chemical_identifier", "label": "DSSTox ID"
     },
-    "chemspider_id": {
-        "aliases": ["chemspider", "chemspider id", "chemspider_id", "chemspider key"],
-        "regex": [],
-        "priority": 85,
-        "category": "chemical_identifier",
-        "label": "ChemSpider ID"
+    "ec_number": {
+        "aliases": ["ec number", "ec_number", "ec-no", "ec_no"],
+        "regex": [], "priority": 85, "category": "chemical_identifier", "label": "EC Number"
     },
-
-    # ── PHYSICOCHEMICAL DESCRIPTORS ─────────────────────────────────────────
-    "molecular_weight": {
-        "aliases": ["mw", "mol_weight", "molecular_weight", "formula_weight", "molecularmass", "m_w"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Molecular Weight"
+    "einecs": {
+        "aliases": ["einecs", "einecs number", "einecs_number", "einecs_no"],
+        "regex": [], "priority": 85, "category": "chemical_identifier", "label": "EINECS"
     },
-    "exact_mass": {
-        "aliases": ["exact mass", "exact_mass", "calculated mass", "theoretical mass"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Exact Mass"
+    "unii": {
+        "aliases": ["unii", "unii code", "unique ingredient identifier"],
+        "regex": [], "priority": 85, "category": "chemical_identifier", "label": "UNII Code"
     },
-    "monoisotopic_mass": {
-        "aliases": ["monoisotopic mass", "monoisotopic_mass", "monoiso mass"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Monoisotopic Mass"
+    "drugbank_id": {
+        "aliases": ["drugbank id", "drugbank_id", "drugbank"],
+        "regex": [re.compile(r"^db\d+$", re.IGNORECASE)], "priority": 85, "category": "chemical_identifier", "label": "DrugBank ID"
     },
-    "tpsa": {
-        "aliases": ["tpsa", "polar surface area", "topological polar surface area", "polar_surface_area"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "TPSA"
-    },
-    "logp": {
-        "aliases": ["logp", "partition coefficient", "partition_coefficient", "octanol water partition", "log_kow"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "LogP"
-    },
-    "xlogp": {
-        "aliases": ["xlogp", "xlogp3", "xlogp_value"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "XLogP"
-    },
-    "clogp": {
-        "aliases": ["clogp", "clogp_value", "calculated logp"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "cLogP"
-    },
-    "hba": {
-        "aliases": ["hba", "hydrogen bond acceptor", "hydrogen_bond_acceptors", "h_acceptor", "hacceptor", "hba_count"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "HBA"
-    },
-    "hbd": {
-        "aliases": ["hbd", "hydrogen bond donor", "hydrogen_bond_donors", "h_donor", "hdonor", "hbd_count"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "HBD"
-    },
-    "rotatable_bonds": {
-        "aliases": ["rotatable bonds", "rotatable_bonds", "rotatable bond count", "nrot"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Rotatable Bonds"
-    },
-    "aromatic_rings": {
-        "aliases": ["aromatic rings", "aromatic_rings", "aromatic ring count", "n_aromatic_rings"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Aromatic Rings"
-    },
-    "ring_count": {
-        "aliases": ["ring count", "ring_count", "rings", "n_rings"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Ring Count"
-    },
-    "heavy_atom_count": {
-        "aliases": ["heavy atom count", "heavy_atom_count", "heavy atoms", "n_heavy_atoms", "n_non_h_atoms"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Heavy Atom Count"
-    },
-    "fraction_csp3": {
-        "aliases": ["fraction csp3", "fraction_csp3", "f_csp3", "csp3 fraction"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Fraction Csp3"
-    },
-    "molar_refractivity": {
-        "aliases": ["molar refractivity", "molar_refractivity", "mr", "molarrefractivity"],
-        "regex": [],
-        "priority": 70,
-        "category": "physicochemical",
-        "label": "Molar Refractivity"
+    "chebi_id": {
+        "aliases": ["chebi", "chebi id", "chebi_id", "chebi_key"],
+        "regex": [re.compile(r"^chebi:\d+$", re.IGNORECASE)], "priority": 85, "category": "chemical_identifier", "label": "ChEBI ID"
     },
 
-    # ── TOXICOLOGY ENDPOINTS (Unified under "endpoint" key) ──────────────────
-    "endpoint": {
-        "aliases": [
-            "endpoint", "ic50", "ec50", "lc50", "ld50", "noael", "loael", "mic", "gi50", 
-            "cc50", "ac50", "ki", "kd", "km", "ic90", "ec10", "ec20", "ec90", 
-            "bmd", "bmdl", "benchmarkdose", "ed50", "td50", "tgi", "auc", 
-            "cmax", "tmax", "cl", "clearance", "halflife", "bioavailability", 
-            "mortality", "reproduction", "growth inhibition", "immobilization", 
-            "hatching success", "developmental toxicity", "endocrine disruption", 
-            "neurotoxicity", "hepatotoxicity", "cardiotoxicity", "genotoxicity", 
-            "mutagenicity", "carcinogenicity", "cytotoxicity", "oxidative stress", 
-            "apoptosis", "mitochondrial toxicity", "membrane disruption", "ic_50", 
-            "ic-50", "ic50_value", "inhibitory concentration 50", "median lethal concentration", 
-            "lethal dose", "noael_mgkg", "lowest observed adverse effect level", 
-            "growth_inhib_percent", "acute tox", "chronic tox", "lethal_concentration", 
-            "median_lethal_dose", "death", "survival", "fecundity", "offspring", 
-            "egg_production", "hatching", "brood_size", "mobility", "swimming", 
-            "feeding", "locomotion", "avoidance", "atp", "gst", "catalase", "enzyme_activity",
-            "noec", "loec", "bcf", "baf", "biodegradation", "bioconcentration factor", "bioconcentration_factor",
-            "bioaccumulation factor", "bioaccumulation_factor", "biodegradability", "half life", "half_life"
-        ],
-        "regex": [],
-        "priority": 95,
-        "category": "bioactivity",
-        "label": "Toxicity / Bioassay Endpoint"
+    # ── 4. SPECIES VARIABLES ────────────────────────────────────────────────────
+    "species": {
+        "aliases": ["species", "exposed species", "exposed_species", "species name", "species_name"],
+        "regex": [SPECIES_NOMENCLATURE_REGEX], "priority": 90, "category": "species", "label": "Species Name"
     },
-
-    # ── QUALIFIERS ──────────────────────────────────────────────────────────
-    "qualifier": {
-        "aliases": ["qualifier", "operator", "relation", "comparator", "comparison", "inequality", "=", ">", "<", ">=", "<=", "approx", "nd", "not detected", "trace"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Inequality Qualifier"
-    },
-
-    # ── SPECIES (Unified under "organism" key) ──────────────────────────────
     "organism": {
-        "aliases": [
-            "species", "organism", "test_species", "bio_model", "animal model", 
-            "taxa", "strain", "test organism", "homo sapiens", "rattus norvegicus", 
-            "mus musculus", "danio rerio", "daphnia magna", "pimephales promelas", 
-            "oncorhynchus mykiss", "human", "rat", "mouse", "rabbit", "dog", 
-            "monkey", "zebrafish", "daphnia", "algae", "bacteria", "yeast", 
-            "fish", "trout", "carp", "medaka", "frog", "amphibian", "avian", 
-            "bird", "chicken", "pig", "bovine", "insect", "bee", "earthworm", 
-            "aquatic organisms", "host", "organism_name", "test_organism", "species_name"
-        ],
-        "regex": [],
-        "priority": 90,
-        "category": "metadata",
-        "label": "Test Organism / Species"
+        "aliases": ["organism", "organism name", "organism_name", "test organism", "exposed organism"],
+        "regex": [], "priority": 90, "category": "species", "label": "Exposed Organism"
+    },
+    "taxon": {
+        "aliases": ["taxon", "taxonomic name", "scientific name", "taxa"],
+        "regex": [], "priority": 85, "category": "species", "label": "Taxonomic Class"
+    },
+    "test_species": {
+        "aliases": ["test species", "test_species", "biological model species"],
+        "regex": [], "priority": 90, "category": "species", "label": "Test Species"
+    },
+    "host_species": {
+        "aliases": ["host species", "host_species", "host organism"],
+        "regex": [], "priority": 80, "category": "species", "label": "Host Species"
+    },
+    "exposed_species": {
+        "aliases": ["exposed species", "exposed_species", "treated species"],
+        "regex": [], "priority": 90, "category": "species", "label": "Exposed Species"
+    },
+    "target_species": {
+        "aliases": ["target species", "target_species", "biological target species"],
+        "regex": [], "priority": 90, "category": "species", "label": "Target Species"
     },
 
-    # ── SEX ─────────────────────────────────────────────────────────────────
-    "sex": {
-        "aliases": ["sex", "gender", "biological sex", "male", "female", "mixed", "unknown"],
-        "regex": [],
-        "priority": 60,
-        "category": "metadata",
-        "label": "Biological Sex"
+    # ── 5. TAXONOMY VARIABLES ───────────────────────────────────────────────────
+    "kingdom": {
+        "aliases": ["kingdom", "biological kingdom", "domain"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Kingdom"
+    },
+    "phylum": {
+        "aliases": ["phylum", "division"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Phylum"
+    },
+    "class": {
+        "aliases": ["class", "taxonomic class", "biological class"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Taxonomic Class"
+    },
+    "order": {
+        "aliases": ["order", "taxonomic order", "biological order"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Order"
+    },
+    "family": {
+        "aliases": ["family", "biological family", "taxonomic family"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Family"
+    },
+    "genus": {
+        "aliases": ["genus", "genus name", "genus_name"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Genus"
+    },
+    "strain": {
+        "aliases": ["strain", "microbial strain", "viral strain", "genetic strain"],
+        "regex": [], "priority": 80, "category": "taxonomy", "label": "Organism Strain"
     },
 
-    # ── AGE ─────────────────────────────────────────────────────────────────
-    "age": {
-        "aliases": ["age", "age group", "age_group", "life stage", "life_stage", "adult", "juvenile", "neonate", "larvae", "larval", "embryo", "maturity"],
-        "regex": [],
-        "priority": 60,
-        "category": "metadata",
-        "label": "Age / Life Stage"
+    # ── 6. EXPOSURE VARIABLES ───────────────────────────────────────────────────
+    "exposure_duration": {
+        "aliases": ["exposure duration", "exposure_duration", "duration", "study length", "study_length"],
+        "regex": [], "priority": 85, "category": "exposure", "label": "Exposure Duration"
     },
-
-    # ── EXPOSURE DURATION (Unified under "exposure_time" key) ────────────────
     "exposure_time": {
-        "aliases": [
-            "exposure_time", "incubation_time", "duration", "observation_period", 
-            "exposure duration", "incubation", "study_length", "treatment_period", 
-            "timepoint", "hours", "hr", "h", "days", "d", "weeks", "months", "time", "exposure_duration",
-            "observation time", "observation_time", "recovery time", "recovery_time"
-        ],
-        "regex": [],
-        "priority": 85,
-        "category": "metadata",
-        "label": "Exposure Duration"
+        "aliases": ["exposure time", "exposure_time", "contact time", "contact_time"],
+        "regex": [], "priority": 85, "category": "exposure", "label": "Exposure Time"
+    },
+    "contact_time": {
+        "aliases": ["contact time", "contact_time", "incubation time", "incubation_time"],
+        "regex": [], "priority": 80, "category": "exposure", "label": "Contact Time"
+    },
+    "observation_period": {
+        "aliases": ["observation period", "observation_period", "monitoring window", "timepoints"],
+        "regex": [], "priority": 80, "category": "exposure", "label": "Observation Period"
+    },
+    "treatment_duration": {
+        "aliases": ["treatment duration", "treatment_duration", "dosing duration", "dosing_duration"],
+        "regex": [], "priority": 85, "category": "exposure", "label": "Treatment Duration"
     },
 
-    # ── TEST TYPES ──────────────────────────────────────────────────────────
-    "test_type": {
-        "aliases": ["test type", "test_type", "study type", "study_type", "acute", "chronic", "subchronic", "repeated dose", "repeated_dose", "developmental", "reproductive", "experiment_type"],
-        "regex": [],
-        "priority": 80,
-        "category": "metadata",
-        "label": "Test Type / Study Design"
+    # ── 7. CONCENTRATION VARIABLES ──────────────────────────────────────────────
+    "concentration": {
+        "aliases": ["concentration", "conc", "exposure concentration", "exposure_concentration"],
+        "regex": [], "priority": 90, "category": "concentration", "label": "Concentration"
     },
-    "route": {
-        "aliases": ["route", "route of administration", "route_of_administration", "administration route", "exposure route", "exposure_route", "admin route", "dosing route", "admin_route", "dosing_route", "oral", "dermal", "inhalation"],
-        "regex": [],
-        "priority": 85,
-        "category": "metadata",
-        "label": "Exposure Route"
+    "dose": {
+        "aliases": ["dose", "dosage", "dose level", "dosing level", "administered dose", "administered_dose"],
+        "regex": [], "priority": 90, "category": "concentration", "label": "Dose Level"
     },
-
-    # ── CLINICAL VARIABLES ──────────────────────────────────────────────────
-    "patient_id": {
-        "aliases": ["patient id", "patient_id", "patient", "subject", "subject id", "subject_id"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Patient ID"
+    "administered_dose": {
+        "aliases": ["administered dose", "administered_dose", "ingested dose", "injected dose"],
+        "regex": [], "priority": 90, "category": "concentration", "label": "Administered Dose"
     },
-    "cohort": {
-        "aliases": ["cohort", "cohort name", "cohort_name", "study group", "study_group"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Cohort"
+    "exposure_concentration": {
+        "aliases": ["exposure concentration", "exposure_concentration", "medium concentration", "media concentration"],
+        "regex": [], "priority": 90, "category": "concentration", "label": "Exposure Concentration"
     },
-    "diagnosis": {
-        "aliases": ["diagnosis", "disease", "indication", "condition", "pathology"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Diagnosis"
-    },
-    "biomarker": {
-        "aliases": ["biomarker", "marker", "biological marker", "expression"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Biomarker"
-    },
-    "treatment_group": {
-        "aliases": ["treatment group", "treatment_group", "treatment", "intervention"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Treatment Group"
-    },
-    "dose_group": {
-        "aliases": ["dose group", "dose_group", "dose level", "dose_level", "dosage"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Dose Group"
+    "test_concentration": {
+        "aliases": ["test concentration", "test_concentration", "treatment concentration", "spike concentration"],
+        "regex": [], "priority": 90, "category": "concentration", "label": "Test Concentration"
     },
 
-    # ── PHARMACOLOGY ────────────────────────────────────────────────────────
-    "target": {
-        "aliases": ["target", "protein target", "target name", "target_name", "receptor", "enzyme", "cyp3a4", "cyp2d6", "herg", "egfr", "vegfr", "ppar", "er_alpha", "ar", "ahr"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Target Protein / Receptor"
+    # ── 8. ENDPOINT VARIABLES ───────────────────────────────────────────────────
+    "endpoint": {
+        "aliases": ["endpoint", "toxicity endpoint", "toxicity_endpoint", "lethal endpoint"],
+        "regex": [ENDPOINT_TYPICAL_REGEX], "priority": 95, "category": "endpoint", "label": "Toxicity Endpoint"
     },
-    "protein": {
-        "aliases": ["protein", "protein name", "protein_name", "polypeptide"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Protein"
+    "effect": {
+        "aliases": ["effect", "observed effect", "observed_effect", "effect measure"],
+        "regex": [], "priority": 85, "category": "endpoint", "label": "Biological Effect"
     },
-    "gene": {
-        "aliases": ["gene", "gene name", "gene_name", "gene symbol", "gene_symbol"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Gene"
-    },
-    "receptor": {
-        "aliases": ["receptor", "receptor name", "receptor_name"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Receptor"
-    },
-    "mechanism": {
-        "aliases": ["mechanism", "mechanism of action", "moa", "action", "effect"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Mechanism of Action"
-    },
-    "pathway": {
-        "aliases": ["pathway", "biological pathway", "pathway name", "pathway_name", "kegg", "reactome"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Pathway"
-    },
-
-    # ── MISC SYSTEM & GENERAL ───────────────────────────────────────────────
-    "value": {
-        "aliases": ["value", "potency", "result", "measurement", "response", "endpoint_value", "endpoint value", "measured_value"],
-        "regex": [],
-        "priority": 85,
-        "category": "bioactivity",
-        "label": "Endpoint Value / Potency"
-    },
-    "unit": {
-        "aliases": ["unit", "measurement unit", "concentration unit", "dose unit"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Measurement Unit"
-    },
-    "ghs_classification": {
-        "aliases": ["ghs", "hazard_class", "signal_word", "danger", "warning", "h_statement", "p_statement", "hazard_category", "ghs_label"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "GHS Hazard Classification"
-    },
-    "assay_type": {
-        "aliases": ["assay_type", "assay type", "assay_format", "test format"],
-        "regex": [],
-        "priority": 80,
-        "category": "metadata",
-        "label": "Assay Type"
-    },
-    "ph": {
-        "aliases": ["ph", "acidity", "hydrogen ion concentration"],
-        "regex": [],
-        "priority": 80,
-        "category": "metadata",
-        "label": "pH"
-    },
-
-    # ── UNIVERSAL ENTITY ROLES ───────────────────────────────────────────────
-    "entity_id": {
-        "aliases": ["entity_id", "entity id", "id", "identifier", "record_id", "record id"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Entity ID"
-    },
-    "entity_name": {
-        "aliases": ["entity_name", "entity name", "name", "label", "record_name"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Entity Name"
-    },
-    "subject_id": {
-        "aliases": ["subject_id", "subject id", "subject", "subjid"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Subject ID"
-    },
-    "participant_id": {
-        "aliases": ["participant_id", "participant id", "participant", "part_id"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Participant ID"
-    },
-    "site_id": {
-        "aliases": ["site_id", "site id", "site", "station", "station_id", "station id"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Site ID"
-    },
-    "location": {
-        "aliases": ["location", "site location", "place", "address"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Location"
-    },
-    "region": {
-        "aliases": ["region", "area", "zone", "province", "state", "country"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Region"
-    },
-    "department": {
-        "aliases": ["department", "dept", "division", "sector"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Department"
-    },
-    "sample_id": {
-        "aliases": ["sample_id", "sample id", "sample", "specimen_id", "specimen id", "sample_number", "sample no"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Sample ID"
-    },
-    "material_id": {
-        "aliases": ["material_id", "material id", "material", "mat_id"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Material ID"
-    },
-    "device_id": {
-        "aliases": ["device_id", "device id", "device", "instrument_id", "instrument id"],
-        "regex": [],
-        "priority": 75,
-        "category": "metadata",
-        "label": "Device ID"
-    },
-    "category": {
-        "aliases": ["category", "class", "type", "grouping"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Category"
-    },
-    "group": {
-        "aliases": ["group", "cohort", "cluster", "batch_group"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Group"
-    },
-    "treatment": {
-        "aliases": ["treatment", "intervention", "therapy", "exposure"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Treatment"
+    "response": {
+        "aliases": ["response", "response variable", "measured response", "assay response"],
+        "regex": [], "priority": 85, "category": "endpoint", "label": "Assay Response"
     },
     "outcome": {
-        "aliases": ["outcome", "result", "response", "effect", "endpoint_outcome"],
-        "regex": [],
-        "priority": 85,
-        "category": "metadata",
-        "label": "Outcome / Result"
+        "aliases": ["outcome", "experimental outcome", "clinical outcome", "study outcome"],
+        "regex": [], "priority": 85, "category": "endpoint", "label": "Study Outcome"
     },
-    "timestamp": {
-        "aliases": ["timestamp", "time_stamp", "time", "date_time", "datetime"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Timestamp"
+    "measurement": {
+        "aliases": ["measurement", "continuous measurement", "observation", "metric value"],
+        "regex": [], "priority": 80, "category": "endpoint", "label": "Continuous Measurement"
     },
-    "date": {
-        "aliases": ["date", "day", "month", "year"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Date"
+    "toxicity_endpoint": {
+        "aliases": ["toxicity endpoint", "toxicity_endpoint", "toxicological endpoint", "toxicological_endpoint"],
+        "regex": [], "priority": 95, "category": "endpoint", "label": "Toxicological Endpoint"
     },
-    "batch": {
-        "aliases": ["batch", "lot", "run", "batch_id", "batch id", "lot_number", "lot no"],
-        "regex": [],
-        "priority": 70,
-        "category": "metadata",
-        "label": "Batch / Lot"
+
+    # ── 9. UNITS VARIABLES ──────────────────────────────────────────────────────
+    "unit": {
+        "aliases": ["unit", "measurement unit", "measurement_unit", "units"],
+        "regex": [], "priority": 75, "category": "units", "label": "Measurement Unit"
+    },
+    "dose_unit": {
+        "aliases": ["dose unit", "dose_unit", "dosage unit", "dosage_unit", "mg_kg"],
+        "regex": [], "priority": 80, "category": "units", "label": "Dosing Unit"
+    },
+    "concentration_unit": {
+        "aliases": ["concentration unit", "concentration_unit", "conc unit", "conc_unit", "mg_l", "ppm", "ppb", "ug_l"],
+        "regex": [], "priority": 80, "category": "units", "label": "Concentration Unit"
+    },
+    "time_unit": {
+        "aliases": ["time unit", "time_unit", "duration unit", "duration_unit", "hours", "days"],
+        "regex": [], "priority": 80, "category": "units", "label": "Time Unit"
+    },
+
+    # ── 10. STUDY DESIGN VARIABLES ──────────────────────────────────────────────
+    "test_type": {
+        "aliases": ["test type", "test_type", "study type", "study_type", "acute", "chronic"],
+        "regex": [], "priority": 80, "category": "study_design", "label": "Test / Study Type"
+    },
+    "study_type": {
+        "aliases": ["study type", "study_type", "experiment type", "experiment_type"],
+        "regex": [], "priority": 80, "category": "study_design", "label": "Study Format"
+    },
+    "study_design": {
+        "aliases": ["study design", "study_design", "experimental design", "experimental_design"],
+        "regex": [], "priority": 80, "category": "study_design", "label": "Study Design"
+    },
+    "protocol": {
+        "aliases": ["protocol", "study protocol", "experimental protocol", "test protocol"],
+        "regex": [], "priority": 80, "category": "study_design", "label": "Study Protocol"
+    },
+    "assay_type": {
+        "aliases": ["assay type", "assay_type", "assay format", "assay_format"],
+        "regex": [], "priority": 80, "category": "study_design", "label": "Assay Format"
+    },
+
+    # ── 11. BIOLOGICAL EFFECT VARIABLES ─────────────────────────────────────────
+    "mortality": {
+        "aliases": ["mortality", "lethality", "death rate", "survival rate", "survival_rate"],
+        "regex": [], "priority": 85, "category": "biological_effect", "label": "Mortality Rate"
+    },
+    "growth": {
+        "aliases": ["growth", "growth rate", "growth_rate", "body weight", "body_weight"],
+        "regex": [], "priority": 80, "category": "biological_effect", "label": "Growth Rate"
+    },
+    "reproduction": {
+        "aliases": ["reproduction", "fecundity", "brood size", "brood_size", "fertility"],
+        "regex": [], "priority": 80, "category": "biological_effect", "label": "Reproduction Output"
+    },
+    "development": {
+        "aliases": ["development", "developmental toxicity", "hatching rate", "malformation"],
+        "regex": [], "priority": 80, "category": "biological_effect", "label": "Developmental Indicator"
+    },
+    "survival": {
+        "aliases": ["survival", "survival percentage", "viability"],
+        "regex": [], "priority": 85, "category": "biological_effect", "label": "Survival viability"
+    },
+    "behavior": {
+        "aliases": ["behavior", "behaviour", "mobility", "locomotion", "avoidance"],
+        "regex": [], "priority": 75, "category": "biological_effect", "label": "Locomotion / Behavior"
+    },
+
+    # ── 12. CLINICAL VARIABLES ──────────────────────────────────────────────────
+    "patient_id": {
+        "aliases": ["patient id", "patient_id", "patient", "participant", "participant_id"],
+        "regex": [], "priority": 70, "category": "clinical", "label": "Patient ID"
+    },
+    "subject_id": {
+        "aliases": ["subject id", "subject_id", "subject", "subjid"],
+        "regex": [], "priority": 70, "category": "clinical", "label": "Subject ID"
+    },
+    "cohort": {
+        "aliases": ["cohort", "study cohort", "patient cohort"],
+        "regex": [], "priority": 70, "category": "clinical", "label": "Cohort Group"
+    },
+    "treatment_arm": {
+        "aliases": ["treatment arm", "treatment_arm", "dosing arm", "study arm"],
+        "regex": [], "priority": 70, "category": "clinical", "label": "Treatment Arm"
+    },
+    "sex": {
+        "aliases": ["sex", "gender", "biological sex", "male", "female"],
+        "regex": [], "priority": 60, "category": "clinical", "label": "Biological Sex"
+    },
+    "age": {
+        "aliases": ["age", "subject age", "patient age", "life stage"],
+        "regex": [], "priority": 60, "category": "clinical", "label": "Subject Age"
+    },
+    "race": {
+        "aliases": ["race", "demographic race"],
+        "regex": [], "priority": 60, "category": "clinical", "label": "Subject Race"
+    },
+    "ethnicity": {
+        "aliases": ["ethnicity", "ethnic origin"],
+        "regex": [], "priority": 60, "category": "clinical", "label": "Subject Ethnicity"
+    },
+
+    # ── 13. OMICS VARIABLES ─────────────────────────────────────────────────────
+    "gene": {
+        "aliases": ["gene", "gene id", "gene_id", "gene symbol", "gene_symbol", "ensembl"],
+        "regex": [], "priority": 70, "category": "omics", "label": "Gene Identifier"
+    },
+    "transcript": {
+        "aliases": ["transcript", "transcript id", "transcript_id", "mrna"],
+        "regex": [], "priority": 70, "category": "omics", "label": "Transcript"
+    },
+    "protein": {
+        "aliases": ["protein", "protein name", "protein_name", "uniprot", "polypeptide"],
+        "regex": [], "priority": 70, "category": "omics", "label": "Protein Name"
+    },
+    "metabolite": {
+        "aliases": ["metabolite", "metabolite name", "metabolite_id"],
+        "regex": [], "priority": 70, "category": "omics", "label": "Metabolite"
+    },
+    "pathway": {
+        "aliases": ["pathway", "pathway name", "pathway_id", "biological pathway"],
+        "regex": [], "priority": 70, "category": "omics", "label": "Pathway"
+    },
+
+    # ── 14. ENVIRONMENTAL VARIABLES ─────────────────────────────────────────────
+    "water_type": {
+        "aliases": ["water type", "water_type", "freshwater", "saltwater", "marine water"],
+        "regex": [], "priority": 80, "category": "environmental", "label": "Water Type"
+    },
+    "soil_type": {
+        "aliases": ["soil type", "soil_type", "soil category", "loam", "silt", "clay"],
+        "regex": [], "priority": 80, "category": "environmental", "label": "Soil Composition"
+    },
+    "sediment_type": {
+        "aliases": ["sediment type", "sediment_type", "sediment content"],
+        "regex": [], "priority": 80, "category": "environmental", "label": "Sediment Profile"
+    },
+    "habitat": {
+        "aliases": ["habitat", "ecological habitat", "ecosystem type"],
+        "regex": [], "priority": 80, "category": "environmental", "label": "Ecological Habitat"
+    },
+    "location": {
+        "aliases": ["location", "media location", "matrix source"],
+        "regex": [], "priority": 75, "category": "environmental", "label": "Sampling Location"
+    },
+
+    # ── 15. GEOGRAPHIC VARIABLES ────────────────────────────────────────────────
+    "country": {
+        "aliases": ["country", "nation"],
+        "regex": [], "priority": 70, "category": "geographic", "label": "Country"
+    },
+    "region": {
+        "aliases": ["region", "state", "province", "territory"],
+        "regex": [], "priority": 70, "category": "geographic", "label": "Region"
+    },
+    "site": {
+        "aliases": ["site", "sampling site", "sampling_site", "collection site", "collection_site"],
+        "regex": [], "priority": 70, "category": "geographic", "label": "Sampling Site"
+    },
+    "station": {
+        "aliases": ["station", "monitoring station", "collection station"],
+        "regex": [], "priority": 70, "category": "geographic", "label": "Monitoring Station"
+    },
+    "latitude": {
+        "aliases": ["latitude", "lat", "gps latitude", "coordinates latitude"],
+        "regex": [], "priority": 75, "category": "geographic", "label": "Latitude"
+    },
+    "longitude": {
+        "aliases": ["longitude", "lon", "lng", "gps longitude"],
+        "regex": [], "priority": 75, "category": "geographic", "label": "Longitude"
+    },
+
+    # ── 16. REGULATORY VARIABLES ────────────────────────────────────────────────
+    "guideline": {
+        "aliases": ["guideline", "test guideline", "test_guideline", "oecd guideline", "oecd"],
+        "regex": [], "priority": 80, "category": "regulatory", "label": "Test Guideline"
+    },
+    "authority": {
+        "aliases": ["authority", "regulatory authority", "epa", "reach", "fda", "ich"],
+        "regex": [], "priority": 80, "category": "regulatory", "label": "Regulatory Authority"
+    },
+    "regulation": {
+        "aliases": ["regulation", "governing law", "regulatory classification"],
+        "regex": [], "priority": 80, "category": "regulatory", "label": "Governing Regulation"
+    },
+    "classification": {
+        "aliases": ["classification", "hazard class", "ghs category", "hazard category"],
+        "regex": [], "priority": 80, "category": "regulatory", "label": "Hazard Classification"
+    },
+
+    # ── 17. DESCRIPTOR VARIABLES ────────────────────────────────────────────────
+    "descriptor": {
+        "aliases": ["descriptor", "qsar descriptor", "molecular descriptor", "mw", "logp", "tpsa"],
+        "regex": [], "priority": 70, "category": "descriptors", "label": "QSAR Descriptor"
+    },
+    "fingerprint": {
+        "aliases": ["fingerprint", "molecular fingerprint", "ecfp4", "maccs"],
+        "regex": [], "priority": 70, "category": "descriptors", "label": "Molecular Fingerprint"
+    },
+    "feature": {
+        "aliases": ["feature", "qsar feature", "machine learning feature"],
+        "regex": [], "priority": 70, "category": "descriptors", "label": "QSAR Feature"
+    },
+    "molecular_property": {
+        "aliases": ["molecular property", "molecular_property", "physicochemical property"],
+        "regex": [], "priority": 70, "category": "descriptors", "label": "Molecular Property"
+    },
+
+    # ── 18. ACTIVITY VARIABLES ──────────────────────────────────────────────────
+    "activity": {
+        "aliases": ["activity", "biological activity", "activity score", "binding activity"],
+        "regex": [], "priority": 85, "category": "activity", "label": "Bioactivity State"
+    },
+    "potency": {
+        "aliases": ["potency", "absolute potency", "pic50", "pec50", "potency value"],
+        "regex": [], "priority": 85, "category": "activity", "label": "Biological Potency"
+    },
+    "binding": {
+        "aliases": ["binding", "receptor binding", "binding affinity", "binding ratio"],
+        "regex": [], "priority": 85, "category": "activity", "label": "Receptor Binding"
+    },
+    "affinity": {
+        "aliases": ["affinity", "binding affinity", "ki", "kd", "dissociation constant"],
+        "regex": [], "priority": 85, "category": "activity", "label": "Binding Affinity"
+    },
+
+    # ── UNKNOWN BUT USABLE VARIABLE ─────────────────────────────────────────────
+    "generic_variable": {
+        "aliases": ["generic", "metadata", "other", "unknown", "usable", "none"],
+        "regex": [], "priority": 50, "category": "metadata", "label": "Generic Metadata Variable"
     }
 }
 

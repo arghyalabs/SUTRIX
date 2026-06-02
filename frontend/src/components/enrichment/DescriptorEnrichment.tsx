@@ -81,6 +81,7 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
   const [mordredAvailable, setMordredAvailable] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [preGenSummary, setPreGenSummary] = useState<any>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -97,7 +98,21 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
         if (mounted) setLoading(false);
       }
     };
+    const fetchPreGenSummary = async () => {
+      try {
+        const { workspaceId } = useWorkspaceStore.getState();
+        if (!workspaceId) return;
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/descriptors/${workspaceId}/pre-generation-summary`);
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted) setPreGenSummary(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch pre-gen summary', err);
+      }
+    };
     fetchDescriptors();
+    fetchPreGenSummary();
     return () => { mounted = false; };
   }, []);
 
@@ -194,6 +209,34 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
     <div className="flex h-full overflow-hidden">
       {/* LEFT: Configuration panel */}
       <div className="w-[450px] shrink-0 border-r border-white/[0.06] bg-[#080f1f] flex flex-col overflow-hidden">
+        
+        {/* Smart Recommendation Module */}
+        {preGenSummary && (
+          <div className="px-6 py-5 border-b border-white/[0.06] shrink-0 bg-gradient-to-r from-blue-500/10 to-transparent">
+            <h2 className="text-white font-bold text-sm flex items-center gap-2 mb-2">
+              <Star className="w-4 h-4 text-blue-400" />
+              Smart Recommendation
+            </h2>
+            <div className="space-y-2 mb-3">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/50">Dataset Size</span>
+                <span className="text-white font-medium">{preGenSummary.dataset_size} compounds</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-white/50">Classification</span>
+                <span className="text-blue-400 font-bold">{preGenSummary.size_tier}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-white/50">Rec. Engine</span>
+                <span className="text-white font-medium">{preGenSummary.recommended_engine}</span>
+              </div>
+            </div>
+            <p className="text-white/50 text-[10px] leading-relaxed">
+              {preGenSummary.reason}
+            </p>
+          </div>
+        )}
+        
         <div className="px-6 py-5 border-b border-white/[0.06] shrink-0">
           <h2 className="text-white font-bold text-base flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-400" />

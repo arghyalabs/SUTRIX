@@ -3,15 +3,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, Grid, BarChart2, Zap, Activity, Download,
   LogOut, HelpCircle, FileDigit, Scale, Network, CheckSquare, Settings,
-  Brain, Search, RefreshCw, GitBranch
+  Brain, Search, RefreshCw, GitBranch, Filter, Sliders, ChevronRight, ChevronLeft, Lock
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { SUTRIXLogo, LogoLoader } from '../ui/SUTRIXLogo';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { DatasetModeBadge } from '../ui/DatasetModeBadge';
+import ActiveSubgroupBanner from '../ui/ActiveSubgroupBanner';
 
-// Tabs that need true fullscreen (no scroll wrapper, no padding)
-const FULLSCREEN_TABS = new Set(['hierarchy', 'advanced-tree', 'analysis', 'enrichment', 'readiness', 'verification', 'sci-intelligence', 'sci-explorer']);
+// Tabs that need true fullscreen (no scroll wrapper, no padding, no page-level scroll)
+const TRUE_FULLSCREEN_TABS = new Set([
+  'hierarchy', 'advanced-tree', 'analysis'
+]);
+
+// Full-width tabs that are scrollable (no horizontal padding limit, but scroll naturally)
+const SCROLLABLE_FULL_WIDTH_TABS = new Set([
+  'enrichment', 'readiness', 'verification', 'sci-intelligence', 'sci-explorer', 
+  'subgroup-selection', 'compound-explorer', 'feature-selection', 'structure', 'recovery', 'reports'
+]);
 
 interface SidebarItem {
   id: string;
@@ -51,32 +60,64 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [showHelp, setShowHelp] = useState(false);
 
   // Retrieve dataset mode and passport info from store
-  const { datasetMode, detectedDomain } = useWorkspaceStore();
+  const { datasetMode, detectedDomain, structureState } = useWorkspaceStore();
 
-  const MOLECULAR_TABS: SidebarItem[] = [
-    { id: 'ingest',       name: 'Upload Dataset',        icon: <Upload className="w-5 h-5" />,      stepNum: 1 },
-    { id: 'mapping',      name: 'Variable Mapping',       icon: <Grid className="w-5 h-5" />,        stepNum: 2 },
-    { id: 'hierarchy',    name: 'Hierarchy Builder',      icon: <Network className="w-5 h-5" />,     stepNum: 3 },
-    { id: 'analysis',     name: 'Data Analysis',          icon: <BarChart2 className="w-5 h-5" />,   stepNum: 4 },
-    { id: 'enrichment',   name: 'Enrichment',             icon: <Zap className="w-5 h-5" />,         stepNum: 5 },
-    { id: 'readiness',    name: 'Readiness',              icon: <FileDigit className="w-5 h-5" />,   stepNum: 6 },
-    { id: 'verification', name: 'Compound Explorer',      icon: <CheckSquare className="w-5 h-5" />, stepNum: 7 },
-    { id: 'reports',      name: 'Export',                 icon: <Download className="w-5 h-5" />,    stepNum: 8 },
+  const SUTRIX_TABS: SidebarItem[] = [
+    { id: 'ingest',             name: 'Upload Dataset',                  icon: <Upload className="w-5 h-5" />,       stepNum: 1 },
+    { id: 'mapping',            name: 'Variable Mapping',                icon: <Grid className="w-5 h-5" />,         stepNum: 2 },
+    { id: 'hierarchy',          name: 'Hierarchy Generation',            icon: <Network className="w-5 h-5" />,      stepNum: 3 },
+    { id: 'analysis',           name: 'Variance & Segregation',          icon: <BarChart2 className="w-5 h-5" />,    stepNum: 4 },
+    { id: 'subgroup-selection', name: 'Subgroup Selection Hub',          icon: <Filter className="w-5 h-5" />,       stepNum: 5 },
+    { id: 'structure-assessment', name: 'Structure Assessment',            icon: <FileDigit className="w-5 h-5" />,    stepNum: 6 },
+    { id: 'structure-recovery',   name: 'Structure Recovery',              icon: <Search className="w-5 h-5" />,       stepNum: 7 },
+    { id: 'enrichment',         name: 'Descriptor Enrichment',           icon: <Zap className="w-5 h-5" />,          stepNum: 8 },
+    { id: 'compound-explorer',  name: 'Compound Explorer',               icon: <Search className="w-5 h-5" />,       stepNum: 9 },
+    { id: 'readiness',          name: 'AI & QSAR Readiness',             icon: <CheckSquare className="w-5 h-5" />,  stepNum: 10 },
+    { id: 'feature-selection',  name: 'Feature Selection',               icon: <Sliders className="w-5 h-5" />,      stepNum: 11 },
+    { id: 'sci-intelligence',   name: 'Scientific Intelligence',         icon: <Brain className="w-5 h-5" />,        stepNum: 12 },
+    { id: 'reports',            name: 'Export & Packaging',              icon: <Download className="w-5 h-5" />,     stepNum: 13 },
   ];
 
-  const SCIENTIFIC_TABS: SidebarItem[] = [
-    { id: 'ingest',          name: 'Upload Dataset',        icon: <Upload className="w-5 h-5" />,       stepNum: 1 },
-    { id: 'mapping',         name: 'Variable Mapping',       icon: <Grid className="w-5 h-5" />,         stepNum: 2 },
-    { id: 'hierarchy',       name: 'Hierarchy Builder',      icon: <Network className="w-5 h-5" />,      stepNum: 3 },
-    { id: 'analysis',        name: 'Data Analysis',          icon: <BarChart2 className="w-5 h-5" />,    stepNum: 4 },
-    { id: 'sci-intelligence', name: 'Scientific Intelligence',icon: <Brain className="w-5 h-5" />,        stepNum: 5 },
-    { id: 'readiness',       name: 'Dataset Readiness',      icon: <FileDigit className="w-5 h-5" />,    stepNum: 6 },
-    { id: 'sci-explorer',    name: 'Data Explorer',          icon: <Search className="w-5 h-5" />,       stepNum: 7 },
-    { id: 'reports',         name: 'Export',                 icon: <Download className="w-5 h-5" />,     stepNum: 8 },
-  ];
+  const store = useWorkspaceStore();
+  const isTabLocked = (tabId: string): boolean => {
+    switch (tabId) {
+      case 'ingest': return false;
+      case 'mapping': return store.rowCount === 0;
+      case 'hierarchy': return store.rowCount === 0 || Object.keys(store.mappings).length === 0;
+      case 'analysis': return store.rowCount === 0 || Object.keys(store.mappings).length === 0;
+      case 'subgroup-selection': return !store.segregationExecuted;
+      case 'structure-assessment': return !store.subgroupSelected;
+      case 'structure-recovery': return !store.subgroupSelected || store.structureState !== 'MOLECULAR';
+      case 'enrichment': return !store.subgroupSelected;
+      case 'compound-explorer': 
+      case 'readiness':
+      case 'feature-selection':
+      case 'sci-intelligence':
+      case 'reports':
+        return !store.descriptorDatasetReady;
+      default: return false;
+    }
+  };
 
-  const sidebarItems = datasetMode === 'SCIENTIFIC' ? SCIENTIFIC_TABS : MOLECULAR_TABS;
-  const currentStep = sidebarItems.find(i => i.id === activeTab);
+  // Dynamically filter out Step 7 (Structure Recovery) if dataset has 100% SMILES coverage
+  const sidebarItems = SUTRIX_TABS.filter(item => {
+    if (item.id === 'structure-recovery') {
+      return structureState !== 'MOLECULAR';
+    }
+    return true;
+  }).map((item, idx) => ({
+    ...item,
+    stepNum: idx + 1
+  }));
+
+  const currentStep = sidebarItems.find(i => i.id === activeTab) || {
+    stepNum: 1,
+    name: activeTab
+  };
+
+  const currentIndex = sidebarItems.findIndex(i => i.id === activeTab);
+  const nextItem = currentIndex !== -1 && currentIndex < sidebarItems.length - 1 ? sidebarItems[currentIndex + 1] : null;
+  const prevItem = currentIndex > 0 ? sidebarItems[currentIndex - 1] : null;
 
   return (
     <Tooltip.Provider delayDuration={200}>
@@ -133,14 +174,18 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
             {sidebarItems.map((item) => {
               const isActive = activeTab === item.id;
+              const locked = isTabLocked(item.id);
               
               const ButtonContent = (
                 <button
                   id={`sidebar-tab-${item.id}`}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    if (!locked) setActiveTab(item.id);
+                  }}
+                  disabled={locked}
                   className={`w-full flex items-center h-12 rounded-xl transition-all duration-200 group relative
                     ${collapsed ? 'justify-center' : 'justify-start'}
-                    ${isActive ? 'bg-white/[0.08] text-white' : 'text-secondary hover:bg-white/[0.04] hover:text-white'}
+                    ${isActive ? 'bg-white/[0.08] text-white' : locked ? 'opacity-50 cursor-not-allowed text-secondary/50 hover:bg-transparent' : 'text-secondary hover:bg-white/[0.04] hover:text-white'}
                   `}
                 >
                   {isActive && (
@@ -163,7 +208,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         className="flex-1 flex items-center justify-between pr-3 overflow-hidden"
                       >
                         <span className="font-medium text-sm truncate">{item.name}</span>
-                        {isActive && <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-2 py-0.5 rounded-full font-mono">S{item.stepNum}</span>}
+                        {locked ? (
+                          <Lock className="w-3.5 h-3.5 text-white/20" />
+                        ) : isActive && (
+                          <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-2 py-0.5 rounded-full font-mono">S{item.stepNum}</span>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -314,8 +363,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           {/* Topbar */}
           <header className="h-16 shrink-0 flex items-center justify-between px-6 z-10 border-b border-white/[0.04]">
             <div className="flex items-center gap-4">
+              {prevItem && (
+                <button
+                  onClick={() => setActiveTab(prevItem.id)}
+                  className="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-100 transition-all text-xs font-bold flex items-center gap-1.5 shadow-[0_2px_8px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                </button>
+              )}
               <div className="text-secondary text-sm font-medium flex items-center gap-2">
-                <span className="text-white/30 text-xs">Step {currentStep?.stepNum || 1} / 8</span>
+                <span className="text-white/30 text-xs">Step {currentStep?.stepNum || 1} / {sidebarItems.length}</span>
                 <span className="text-white/[0.15]">&bull;</span> 
                 <span className="text-white font-semibold">{currentStep?.name || activeTab}</span>
                 <span className="text-white/[0.15]">&bull;</span> 
@@ -324,6 +381,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
+              {nextItem && (
+                <button
+                  onClick={() => setActiveTab(nextItem.id)}
+                  className="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-100 transition-all text-xs font-bold flex items-center gap-1.5 shadow-[0_2px_8px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
               {telemetryData.active_jobs_count > 0 && (
                 <div className="px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium flex items-center gap-2">
                   <span className="relative flex h-2 w-2">
@@ -333,40 +398,56 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   Processing
                 </div>
               )}
-              
-              <div className="px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-xs font-mono text-secondary flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${telemetryData.ram_usage_pct > 80 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                RAM {telemetryData.ram_usage_pct}%
-              </div>
-
-              <button 
-                onClick={() => setShowHelp(!showHelp)}
-                className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-secondary hover:text-white hover:bg-white/[0.06] transition-all"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
             </div>
           </header>
 
-          {/* Content Area — fullscreen for hierarchy/analysis tabs, padded scroll for others */}
-          {FULLSCREEN_TABS.has(activeTab) ? (
-            <div className="flex-1 overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="h-full"
-                >
-                  {children}
-                </motion.div>
-              </AnimatePresence>
+          {/* Content Area — truly fullscreen for hierarchy/analysis canvases, scrollable full-width for other scientific tabs, padded for general pages */}
+          {TRUE_FULLSCREEN_TABS.has(activeTab) ? (
+            <div className="flex-1 overflow-hidden flex flex-col justify-between">
+              <div className="flex-1 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="h-full"
+                  >
+                    {children}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+          ) : SCROLLABLE_FULL_WIDTH_TABS.has(activeTab) ? (
+            <div className="flex-1 overflow-y-auto flex flex-col justify-between">
+              <div className="flex-1 flex flex-col">
+                {['structure', 'recovery', 'enrichment', 'readiness', 'sci-intelligence', 'compound-explorer', 'feature-selection', 'reports'].includes(activeTab) && (
+                  <div className="px-6 pt-4 shrink-0">
+                    <ActiveSubgroupBanner onChangeSubgroup={() => setActiveTab('subgroup-selection')} />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeTab}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      {children}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto">
-              <div className="px-8 py-8 pb-16 max-w-6xl mx-auto">
+            <div className="flex-1 overflow-y-auto flex flex-col justify-between">
+              <div className="px-8 py-8 pb-16 max-w-6xl mx-auto flex-1 w-full">
+                {['structure', 'recovery', 'enrichment', 'readiness', 'sci-intelligence', 'compound-explorer', 'feature-selection', 'reports'].includes(activeTab) && (
+                  <ActiveSubgroupBanner onChangeSubgroup={() => setActiveTab('subgroup-selection')} />
+                )}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}

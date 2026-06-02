@@ -52,7 +52,7 @@ interface WorkspaceState {
   primaryEntityType: string;
 
   // Simple / Advanced Dual Analysis Mode
-  analysisMode: 'simple' | 'advanced';
+  analysisMode: 'simple' | 'advanced' | 'compare';
   simpleFunnelData: any | null;
 
   // Zero-Mapping & Recoverable Modes
@@ -64,6 +64,29 @@ interface WorkspaceState {
   // Variance Filtering
   varianceFilterEnabled: boolean;
   varianceSummary: any | null;
+
+  // ── V5: Subgroup Gate (Step 5) ─────────────────────────────────
+  subgroupSelected: boolean;
+  activeSubgroupName: string;
+  activeSubgroupRows: number;
+  activeSubgroupCompounds: number;
+
+  // ── V5: Structure State (Step 6) ──────────────────────────────
+  structureState: 'UNKNOWN' | 'MOLECULAR' | 'HYBRID' | 'NAME_ONLY';
+  smilesCoveragePct: number;
+  structuresAvailable: number;
+  structuresMissing: number;
+  structureRecommendation: 'proceed' | 'optional_recovery' | 'recommended_recovery' | 'recovery_required' | '';
+
+  // ── V5: Recovery State (Step 7) ───────────────────────────────
+  recoveryAttempted: boolean;
+  recoveryCompleted: boolean;
+  postRecoveryCoveragePct: number;
+
+  // ── V5: Descriptor State (Step 8) ─────────────────────────────
+  descriptorDatasetReady: boolean;
+  descriptorCount: number;
+  descriptorSizeTier: 'SMALL' | 'MEDIUM' | 'LARGE' | '';
 
   // Setters
   setWorkspaceId: (id: string) => void;
@@ -94,13 +117,26 @@ interface WorkspaceState {
   setDetectedDomain: (domain: string) => void;
   setPrimaryEntityType: (entity: string) => void;
 
-  setAnalysisMode: (mode: 'simple' | 'advanced') => void;
+  setAnalysisMode: (mode: 'simple' | 'advanced' | 'compare') => void;
   setSimpleFunnelData: (data: any | null) => void;
   setGenericMode: (enabled: boolean, reason?: string) => void;
   setRecoverableMode: (enabled: boolean) => void;
   setGenericBannerDismissed: (dismissed: boolean) => void;
   setVarianceFilterEnabled: (enabled: boolean) => void;
   setVarianceSummary: (summary: any | null) => void;
+
+  // ── V5 Actions ────────────────────────────────────────────────
+  setActiveSubgroup: (name: string, rows: number, compounds: number) => void;
+  setStructureState: (
+    state: 'UNKNOWN' | 'MOLECULAR' | 'HYBRID' | 'NAME_ONLY',
+    coveragePct: number,
+    available: number,
+    missing: number,
+    recommendation: string
+  ) => void;
+  setRecoveryCompleted: (newCoveragePct: number) => void;
+  setDescriptorReady: (count: number, tier: string) => void;
+  clearActiveSubgroup: () => void;
 
   resetWorkspace: () => void;
 }
@@ -159,6 +195,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       varianceFilterEnabled: true,
       varianceSummary: null,
 
+      subgroupSelected: false,
+      activeSubgroupName: '',
+      activeSubgroupRows: 0,
+      activeSubgroupCompounds: 0,
+      structureState: 'UNKNOWN',
+      smilesCoveragePct: 0,
+      structuresAvailable: 0,
+      structuresMissing: 0,
+      structureRecommendation: '',
+      recoveryAttempted: false,
+      recoveryCompleted: false,
+      postRecoveryCoveragePct: 0,
+      descriptorDatasetReady: false,
+      descriptorCount: 0,
+      descriptorSizeTier: '',
+
       setWorkspaceId: (id) => set({ workspaceId: id }),
       setInWorkspace: (inWS) => set({ inWorkspace: inWS }),
       setActiveTab: (tab) => {
@@ -204,6 +256,58 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setVarianceFilterEnabled: (enabled) => set({ varianceFilterEnabled: enabled }),
       setVarianceSummary: (summary) => set({ varianceSummary: summary }),
 
+      setActiveSubgroup: (name, rows, compounds) => set({
+        subgroupSelected: true,
+        activeSubgroupName: name,
+        activeSubgroupRows: rows,
+        activeSubgroupCompounds: compounds,
+        structureState: 'UNKNOWN',
+        smilesCoveragePct: 0,
+        structuresAvailable: 0,
+        structuresMissing: 0,
+        structureRecommendation: '',
+        recoveryAttempted: false,
+        recoveryCompleted: false,
+        postRecoveryCoveragePct: 0,
+        descriptorDatasetReady: false,
+        descriptorCount: 0,
+        descriptorSizeTier: '',
+      }),
+      setStructureState: (state, coveragePct, available, missing, recommendation) => set({
+        structureState: state,
+        smilesCoveragePct: coveragePct,
+        structuresAvailable: available,
+        structuresMissing: missing,
+        structureRecommendation: recommendation as any,
+      }),
+      setRecoveryCompleted: (newCoveragePct) => set({
+        recoveryAttempted: true,
+        recoveryCompleted: true,
+        postRecoveryCoveragePct: newCoveragePct,
+      }),
+      setDescriptorReady: (count, tier) => set({
+        descriptorDatasetReady: true,
+        descriptorCount: count,
+        descriptorSizeTier: tier as any,
+      }),
+      clearActiveSubgroup: () => set({
+        subgroupSelected: false,
+        activeSubgroupName: '',
+        activeSubgroupRows: 0,
+        activeSubgroupCompounds: 0,
+        structureState: 'UNKNOWN',
+        smilesCoveragePct: 0,
+        structuresAvailable: 0,
+        structuresMissing: 0,
+        structureRecommendation: '',
+        recoveryAttempted: false,
+        recoveryCompleted: false,
+        postRecoveryCoveragePct: 0,
+        descriptorDatasetReady: false,
+        descriptorCount: 0,
+        descriptorSizeTier: '',
+      }),
+
       resetWorkspace: () =>
         set({
           workspaceId: '', filename: '', parquetPath: '', rowCount: 0,
@@ -219,24 +323,77 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           analysisMode: 'simple', simpleFunnelData: null,
           genericMode: false, recoverableMode: false, genericBannerDismissed: false,
           varianceFilterEnabled: true, varianceSummary: null,
+          subgroupSelected: false, activeSubgroupName: '', activeSubgroupRows: 0, activeSubgroupCompounds: 0,
+          structureState: 'UNKNOWN', smilesCoveragePct: 0, structuresAvailable: 0, structuresMissing: 0,
+          structureRecommendation: '', recoveryAttempted: false, recoveryCompleted: false,
+          postRecoveryCoveragePct: 0, descriptorDatasetReady: false, descriptorCount: 0, descriptorSizeTier: '',
         }),
     }),
     { 
-      name: 'sdo-workspace-storage-v3',
-      version: 3,
-      migrate: (persistedState: any, version: number) => {
-        return {
-          ...persistedState,
+      name: 'sdo-workspace-storage-v4',
+      version: 4,
+      migrate: (_persistedState: any, _version: number) => {
+        // Hard wipe on any version upgrade — forces fresh defaults
+        if (_version < 4) {
+          return {
+            inWorkspace: false,
+            activeTab: 'ingest',
+            workspaceId: '',
+            filename: '',
+          parquetPath: '',
+          rowCount: 0,
+          columns: [],
+          preview: [],
+          mappings: {},
+          mappingIntelligence: {},
+          segStats: {},
+          segregationExecuted: false,
+          activeSegregationResult: null,
+          activeLineage: null,
+          activeNodeId: '',
+          activeNodeDetail: null,
+          filterNodes: [],
+          enrichmentMode: 'fast',
+          includeMordred: false,
+          selectedDescriptors: [],
           activeJobId: '',
           activeJobType: null,
+          readiness: null,
+          readinessLoading: false,
+          modelingAnalysis: null,
+          modelingLoading: false,
+          modelingActivePanel: 'overview',
+          datasetMode: 'MOLECULAR',
+          datasetClassification: null,
+          datasetPassport: null,
+          detectedDomain: 'General Scientific',
+          primaryEntityType: 'Compound',
           analysisMode: 'simple',
           simpleFunnelData: null,
           genericMode: false,
+          genericModeReason: 'No scientific column mapping was detected or confirmed.',
           recoverableMode: false,
           genericBannerDismissed: false,
           varianceFilterEnabled: true,
           varianceSummary: null,
-        };
+          subgroupSelected: false,
+          activeSubgroupName: '',
+          activeSubgroupRows: 0,
+          activeSubgroupCompounds: 0,
+          structureState: 'UNKNOWN',
+          smilesCoveragePct: 0,
+          structuresAvailable: 0,
+          structuresMissing: 0,
+          structureRecommendation: '',
+          recoveryAttempted: false,
+          recoveryCompleted: false,
+          postRecoveryCoveragePct: 0,
+          descriptorDatasetReady: false,
+          descriptorCount: 0,
+            descriptorSizeTier: '',
+          };
+        }
+        return _persistedState;
       },
     }
   )
