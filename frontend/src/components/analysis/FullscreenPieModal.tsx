@@ -128,9 +128,11 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
-      {isOpen && metrics && typeof document !== 'undefined' && createPortal(
+      {isOpen && metrics && (
         <div className="fixed inset-0 z-[100] flex bg-void/90 backdrop-blur-xl p-6">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -471,9 +473,9 @@ export const FullscreenPieModal: React.FC<FullscreenPieModalProps> = ({
               </div>
             </div>
           </motion.div>
-        </div>,
-        document.body
+        </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

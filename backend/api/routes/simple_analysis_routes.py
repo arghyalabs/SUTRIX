@@ -349,8 +349,17 @@ async def get_available_subgroups(client_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to read dataset: {e}")
         
     for node_id, detail in engine.node_details.items():
-        # Get filters for this node
         metadata = detail.get("metadata", {})
+        
+        # Only process terminal subgroups (leaf nodes) to improve performance
+        if not metadata.get("is_leaf", False) and node_id != "root":
+            # Wait, if there is no tree at all, root is the only node. 
+            # We should include root if it's a leaf, but metadata might not have is_leaf set for root.
+            # Let's just check is_leaf or if it's the only node in the tree.
+            if len(engine.node_details) > 1:
+                continue
+
+        # Get filters for this node
         filters = {**metadata.get("inherited_filters", {}), **metadata.get("applied_filter", {})}
         
         # Apply filters to mapped df

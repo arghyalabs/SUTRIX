@@ -80,23 +80,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const store = useWorkspaceStore();
   const isTabLocked = (tabId: string): boolean => {
-    switch (tabId) {
-      case 'ingest': return false;
-      case 'mapping': return store.rowCount === 0;
-      case 'hierarchy': return store.rowCount === 0 || Object.keys(store.mappings).length === 0;
-      case 'analysis': return store.rowCount === 0 || Object.keys(store.mappings).length === 0;
-      case 'subgroup-selection': return !store.segregationExecuted;
-      case 'structure-assessment': return !store.subgroupSelected;
-      case 'structure-recovery': return !store.subgroupSelected || store.structureState !== 'MOLECULAR';
-      case 'enrichment': return !store.subgroupSelected;
-      case 'compound-explorer': 
-      case 'readiness':
-      case 'feature-selection':
-      case 'sci-intelligence':
-      case 'reports':
-        return !store.descriptorDatasetReady;
-      default: return false;
-    }
+    return false;
   };
 
   // Dynamically filter out Step 7 (Structure Recovery) if dataset has 100% SMILES coverage
