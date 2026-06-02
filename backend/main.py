@@ -304,10 +304,22 @@ async def api_job_status(client_id: str):
     status = TaskManager.query_status(context.active_job_id)
     return status
 
-@app.post("/api/jobs/{client_id}/cancel")
-async def api_job_cancel(client_id: str):
-    context = registry.get_context(client_id)
-    if not context.active_job_id:
+@app.post("/api/jobs/{job_or_client_id}/cancel")
+async def api_job_cancel(job_or_client_id: str):
+    # Check if it's a UUID (V5 job_id)
+    if "-" in job_or_client_id and len(job_or_client_id) == 36:
+        from backend.core.pipeline_task_manager import pipeline_manager
+        cancelled = pipeline_manager.cancel_job(job_or_client_id)
+        if cancelled:
+            job = pipeline_manager.get_job(job_or_client_id)
+            if job:
+                await pipeline_manager.broadcast_partial_save(job)
+            return {"status": "CANCELLED", "job_id": job_or_client_id}
+        raise HTTPException(status_code=404, detail="Job not found or not running")
+        
+    # Otherwise it's a client_id (V4 legacy)
+    context = registry.get_context(job_or_client_id)
+    if not context or not context.active_job_id:
         raise HTTPException(status_code=404, detail="No active job")
     success = TaskManager.cancel_job(context.active_job_id)
     return {"success": success}

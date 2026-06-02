@@ -2,8 +2,12 @@ import { apiClient } from './apiClient';
 import type { ModelingAnalysis, FeatureSelectionRequest, FeatureSelectionResponse } from '../types';
 
 export const modelingApi = {
-  runAnalysis: async (clientId: string): Promise<ModelingAnalysis> => {
-    const { data } = await apiClient.post('/api/modeling/analyze', { client_id: clientId });
+  runAnalysis: async (clientId: string, subgroupNodeIds?: string[]): Promise<ModelingAnalysis> => {
+    const payload: any = { client_id: clientId };
+    if (subgroupNodeIds && subgroupNodeIds.length > 0) {
+      payload.subgroup_ids = subgroupNodeIds;
+    }
+    const { data } = await apiClient.post('/api/modeling/analyze', payload);
     return data;
   },
 

@@ -23,6 +23,7 @@ import { DataAnalysisWorkspace } from './components/analysis/DataAnalysisWorkspa
 import { DescriptorEnrichment } from './components/enrichment/DescriptorEnrichment';
 import { SubgroupSelectionHub } from './components/analysis/SubgroupSelectionHub';
 import { FeatureSelection } from './components/modeling/FeatureSelection';
+import { GlobalEnrichmentWorkspace } from './components/export/GlobalEnrichmentWorkspace';
 import { ReadinessDashboard } from './components/readiness/ReadinessDashboard';
 import ModelingReadinessWorkspace from './components/modeling/ModelingReadinessWorkspace';
 import { modelingApi } from './services/modelingApi';
@@ -277,7 +278,7 @@ const App: React.FC = () => {
   React.useEffect(() => {
     const handlePopState = () => {
     const hash = window.location.hash.replace('#', '');
-      const validTabs = ['ingest', 'mapping', 'hierarchy', 'analysis', 'subgroup-selection', 'structure-assessment', 'structure-recovery', 'enrichment', 'compound-explorer', 'feature-selection', 'readiness', 'verification', 'reports', 'sci-intelligence', 'sci-explorer'];
+      const validTabs = ['ingest', 'mapping', 'hierarchy', 'analysis', 'subgroup-selection', 'structure-assessment', 'structure-recovery', 'enrichment', 'compound-explorer', 'feature-selection', 'readiness', 'verification', 'reports', 'sci-intelligence', 'sci-explorer', 'global-enrichment'];
       if (validTabs.includes(hash)) {
         setActiveTab(hash);
       }
@@ -562,9 +563,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCancelJob = useCallback(async (jobId?: string) => {
+  const handleCancelJob = useCallback(async (jobId?: string | React.MouseEvent) => {
     try {
-      const targetId = jobId || useWorkspaceStore.getState().activeJobId;
+      const targetId = typeof jobId === 'string' ? jobId : useWorkspaceStore.getState().activeJobId;
       if (!targetId) return;
       // Cancel upload job
       if (targetId === uploadJobId) {
@@ -704,10 +705,10 @@ const App: React.FC = () => {
             clientId={clientId}
             modelingAnalysis={modelingAnalysis}
             modelingLoading={modelingLoading}
-            onRunAnalysis={async () => {
+            onRunAnalysis={async (subgroupNodeIds?: string[]) => {
               setModelingLoading(true);
               try {
-                const result = await modelingApi.runAnalysis(clientId);
+                const result = await modelingApi.runAnalysis(clientId, subgroupNodeIds);
                 setModelingAnalysis(result);
                 toast.success('AI Analysis complete!');
               } catch (e: any) {
@@ -734,6 +735,8 @@ const App: React.FC = () => {
             handleResetWorkspace={handleExit}
           />
         );
+      case 'global-enrichment':
+        return <GlobalEnrichmentWorkspace clientId={clientId} />;
       default:
         return <UploadWorkspace filename={filename} rowCount={rowCount} columns={columns} preview={preview} handleIngestFile={handleIngestFile} handleLoadDemo={handleLoadDemo} handleCurateColumns={handleCurateColumns} />;
     }

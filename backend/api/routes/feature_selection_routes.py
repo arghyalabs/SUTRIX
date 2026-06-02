@@ -131,6 +131,7 @@ async def endpoint_diagnostics(client_id: str):
 
 class FeatureSelectionPayload(BaseModel):
     client_id: str
+    subgroup_ids: Optional[List[str]] = None
     variance_threshold: float = 0.01
     correlation_threshold: float = 0.90
     mutual_info_k: int = 200
@@ -166,6 +167,24 @@ async def run_feature_selection_pipeline(payload: FeatureSelectionPayload):
         df = pd.read_parquet(descriptor_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load descriptor matrix: {e}")
+
+    if getattr(payload, "subgroup_ids", None):
+        from backend.api.state import registry
+        engine = registry.get_hierarchy_engine(client_id)
+        if engine:
+            slices = []
+            for node_id in payload.subgroup_ids:
+                if node_id in engine.node_details:
+                    detail = engine.node_details[node_id]
+                    filters = {**detail.get("metadata", {}).get("inherited_filters", {}), **detail.get("metadata", {}).get("applied_filter", {})}
+                    df_slice = df
+                    for col, val in filters.items():
+                        if col in df_slice.columns:
+                            df_slice = df_slice[df_slice[col].astype(str) == str(val)]
+                    slices.append(df_slice)
+            if slices:
+                df = pd.concat(slices).drop_duplicates()
+                logger.info(f"[{client_id}] Sliced dataset for subgroups {payload.subgroup_ids}. New size: {len(df)}")
     
     mappings = getattr(context, 'mappings', {}) or {}
     role_to_col = {v: k for k, v in mappings.items()}

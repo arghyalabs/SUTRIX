@@ -13,6 +13,8 @@ import toast from 'react-hot-toast';
 import type { ModelingAnalysis } from '../../types';
 import { ChemicalSpace3D } from './ChemicalSpace3D';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { simpleAnalysisApi } from '../../services/simpleAnalysisApi';
+import { API_BASE_URL } from '../../config';
 // ── Tab components ───────────────────────────────────────────────────────────
 import { PCATab } from './tabs/PCATab';
 import { CorrelationTab } from './tabs/CorrelationTab';
@@ -356,7 +358,17 @@ const LoadingState: React.FC = () => {
 };
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
-const EmptyState: React.FC<{ onRun: () => void }> = ({ onRun }) => (
+const EmptyState: React.FC<{ 
+  onRun: (subgroups: string[]) => void;
+  availableSubgroups: any[];
+  selectedSubgroupNodeIds: string[];
+  setSelectedSubgroupNodeIds: (ids: string[]) => void;
+  isDropdownOpen: boolean;
+  setIsDropdownOpen: (open: boolean) => void;
+}> = ({ 
+  onRun, availableSubgroups, selectedSubgroupNodeIds, 
+  setSelectedSubgroupNodeIds, isDropdownOpen, setIsDropdownOpen 
+}) => (
   <div className="max-w-[1700px] mx-auto px-6 xl:px-10 py-24 flex flex-col items-center gap-8 text-center">
     <div className="relative">
       <div className="w-20 h-20 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
@@ -370,13 +382,61 @@ const EmptyState: React.FC<{ onRun: () => void }> = ({ onRun }) => (
     </div>
     <div className="max-w-md">
       <h2 className="text-xl font-semibold text-white/70 mb-2">AI Readiness Analysis</h2>
-      <p className="text-sm text-white/35 leading-relaxed">
+      <p className="text-sm text-white/35 leading-relaxed mb-6">
         Run a comprehensive evaluation across 15 scientific dimensions — 
         QSAR compliance, predictive feasibility, descriptor quality, and modeling risk.
       </p>
+      
+      {availableSubgroups.length > 0 && (
+        <div className="relative z-20 mb-6 flex justify-center">
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="px-4 py-2 bg-slate-900 border border-white/[0.06] rounded-xl flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg min-w-[250px] justify-between"
+          >
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <Layers className="w-4 h-4 text-cyan-400" />
+              <span className="font-medium truncate max-w-[200px]">
+                {selectedSubgroupNodeIds.length === 0 ? "No Subgroups Selected" : 
+                 selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.metadata?.node_name || "1 Selected" :
+                 `${selectedSubgroupNodeIds.length} Subgroups Selected`}
+              </span>
+            </div>
+            <ChevronDown className="w-4 h-4 text-slate-500" />
+          </button>
+          {isDropdownOpen && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-slate-900 border border-white/[0.06] rounded-xl shadow-xl overflow-hidden py-2 max-h-64 overflow-y-auto">
+              {availableSubgroups.map(subgroup => {
+                const isSelected = selectedSubgroupNodeIds.includes(subgroup.node_id);
+                return (
+                  <div
+                    key={subgroup.node_id}
+                    className="px-4 py-2 flex items-center gap-3 hover:bg-white/[0.04] cursor-pointer text-left"
+                    onClick={() => {
+                      let newSelection;
+                      if (isSelected) {
+                        newSelection = selectedSubgroupNodeIds.filter(id => id !== subgroup.node_id);
+                      } else {
+                        newSelection = [...selectedSubgroupNodeIds, subgroup.node_id];
+                      }
+                      setSelectedSubgroupNodeIds(newSelection);
+                    }}
+                  >
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-cyan-500 border-cyan-500 text-slate-950' : 'border-white/[0.2] bg-transparent'}`}>
+                      {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                    </div>
+                    <span className="text-sm font-medium text-slate-300 truncate">
+                      {subgroup.metadata?.node_name || subgroup.subgroup_name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
     <motion.button
-      onClick={onRun}
+      onClick={() => onRun(selectedSubgroupNodeIds)}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       className="flex items-center gap-2.5 px-7 py-3 rounded-xl bg-white text-black text-sm font-semibold shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] transition-all hover:-translate-y-0.5 active:translate-y-0"
@@ -391,7 +451,7 @@ interface Props {
   clientId: string;
   modelingAnalysis: ModelingAnalysis | null;
   modelingLoading: boolean;
-  onRunAnalysis: () => Promise<void>;
+  onRunAnalysis: (subgroupNodeIds?: string[]) => Promise<void>;
   activePanel: string;
   setActivePanel: (p: string) => void;
 }
@@ -402,6 +462,37 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
   const { datasetMode, datasetPassport } = useWorkspaceStore();
 
   // ── ALL HOOKS MUST COME FIRST (Rules of Hooks) ────────────────────────────
+  // Subgroup selection state
+  const [availableSubgroups, setAvailableSubgroups] = useState<any[]>([]);
+  const [selectedSubgroupNodeIds, setSelectedSubgroupNodeIds] = useState<string[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (!clientId) return;
+    
+    const fetchSubgroups = async () => {
+      try {
+        const data = await simpleAnalysisApi.getSubgroups(clientId);
+        const activeRes = await fetch(`${API_BASE_URL}/api/simple-analysis/subgroups/${clientId}/active`);
+        if (activeRes.ok) {
+          const activeData = await activeRes.json();
+          if (activeData.selected_node_ids && activeData.selected_node_ids.length > 0) {
+            setSelectedSubgroupNodeIds(activeData.selected_node_ids);
+            setAvailableSubgroups(data.filter((s: any) => activeData.selected_node_ids.includes(s.node_id)));
+          } else {
+            setAvailableSubgroups(data);
+          }
+        } else {
+          setAvailableSubgroups(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subgroups:", err);
+      }
+    };
+    
+    fetchSubgroups();
+  }, [clientId]);
+
   const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [openRisk, setOpenRisk] = useState<string | null>(null);
   const [embeddingData, setEmbeddingData] = useState<any[]>([]);
@@ -437,7 +528,14 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
 
   // ── Early returns AFTER all hooks ─────────────────────────────────────────
   if (modelingLoading) return <LoadingState />;
-  if (!modelingAnalysis) return <EmptyState onRun={onRunAnalysis} />;
+  if (!modelingAnalysis) return <EmptyState 
+    onRun={onRunAnalysis} 
+    availableSubgroups={availableSubgroups}
+    selectedSubgroupNodeIds={selectedSubgroupNodeIds}
+    setSelectedSubgroupNodeIds={setSelectedSubgroupNodeIds}
+    isDropdownOpen={isDropdownOpen}
+    setIsDropdownOpen={setIsDropdownOpen}
+  />;
 
   // ── Data derivations (safe — modelingAnalysis is guaranteed non-null here) ─
   const d = modelingAnalysis;
