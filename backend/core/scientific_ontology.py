@@ -79,7 +79,7 @@ SCIENTIFIC_VARIABLES: Dict[str, Dict[str, Any]] = {
     },
 
     # ── 3. CHEMICAL IDENTIFIER VARIABLES ───────────────────────────────────────
-    "cas": {
+    "cas_number": {
         "aliases": ["cas", "cas number", "cas_number", "cas_no", "cas_rn", "casrn", "registry_number"],
         "regex": [CAS_REGEX], "priority": 95, "category": "chemical_identifier", "label": "CAS Number"
     },

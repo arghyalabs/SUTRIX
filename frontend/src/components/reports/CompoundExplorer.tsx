@@ -124,6 +124,9 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
   // Fullscreen Details Mode State
   const [isDetailFullscreen, setIsDetailFullscreen] = useState(false);
   const [isStructureFullscreen, setIsStructureFullscreen] = useState(false);
+  const [isRadarFullscreen, setIsRadarFullscreen] = useState(false);
+  const [isHistogramFullscreen, setIsHistogramFullscreen] = useState(false);
+  const [isNetworkFullscreen, setIsNetworkFullscreen] = useState(false);
   const [fullscreenScrollTop, setFullscreenScrollTop] = useState(0);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
   const fullscreenContainerHeight = 550;
@@ -977,11 +980,20 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                   
                   {/* Radar Plot of 6 descriptor dimensions */}
                   <div className="rounded-xl border border-white/[0.05] bg-black/40 p-4 flex flex-col h-[280px]">
-                    <div>
-                      <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-1.5">
-                        <Compass className="w-3.5 h-3.5 text-violet-400" /> Molecular Radar Fingerprint
-                      </h4>
-                      <p className="text-[9px] text-white/20 mt-0.5">Normalized chemical space projection across six key structural categories</p>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-wider flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5 text-violet-400" /> Molecular Radar Fingerprint
+                        </h4>
+                        <p className="text-[9px] text-white/20 mt-0.5">Normalized chemical space projection across six key structural categories</p>
+                      </div>
+                      <button
+                        onClick={() => setIsRadarFullscreen(true)}
+                        title="Maximize Radar"
+                        className="p-1.5 rounded-lg bg-white/[0.03] text-white/30 hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     
                     <div className="flex-1 min-h-0 flex items-center justify-center mt-2">
@@ -1012,12 +1024,21 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                         </p>
                       </div>
                       
-                      {distributionData && (
-                        <div className="text-right font-mono text-[9px]">
-                          <p className="text-white/60">Val: <span className="text-cyan-400 font-bold">{distributionData.current_value.toFixed(2)}</span></p>
-                          <p className="text-emerald-400 font-extrabold mt-0.5">{distributionData.percentile}th Pctl</p>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {distributionData && (
+                          <div className="text-right font-mono text-[9px]">
+                            <p className="text-white/60">Val: <span className="text-cyan-400 font-bold">{distributionData.current_value.toFixed(2)}</span></p>
+                            <p className="text-emerald-400 font-extrabold mt-0.5">{distributionData.percentile}th Pctl</p>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setIsHistogramFullscreen(true)}
+                          title="Maximize Histogram"
+                          className="p-1.5 rounded-lg bg-white/[0.03] text-white/30 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="flex-1 min-h-0 relative flex items-center justify-center mt-2">
@@ -1098,24 +1119,43 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                          </p>
                        </div>
                        
-                       {activeNetworkTab === 'scatter' && (
+                       {activeNetworkTab === 'scatter' ? (
                          <div className="flex flex-col items-end gap-2">
-                           <div className="flex gap-1 bg-black/40 border border-white/[0.05] p-0.5 rounded text-[8px] font-mono">
-                             {(['pca', 'umap', 'tsne'] as const).map(proj => (
-                               <button
-                                 key={proj}
-                                 onClick={() => setProjectionType(proj)}
-                                 className={`px-2 py-0.5 rounded uppercase ${projectionType === proj ? 'bg-cyan-500/20 text-cyan-400 font-bold' : 'text-white/40 hover:text-white/80'}`}
-                               >
-                                 {proj}
-                               </button>
-                             ))}
+                           <div className="flex items-center gap-2">
+                             <div className="flex gap-1 bg-black/40 border border-white/[0.05] p-0.5 rounded text-[8px] font-mono">
+                               {(['pca', 'umap', 'tsne'] as const).map(proj => (
+                                 <button
+                                   key={proj}
+                                   onClick={() => setProjectionType(proj)}
+                                   className={`px-2 py-0.5 rounded uppercase ${projectionType === proj ? 'bg-cyan-500/20 text-cyan-400 font-bold' : 'text-white/40 hover:text-white/80'}`}
+                                 >
+                                   {proj}
+                                 </button>
+                               ))}
+                             </div>
+                             <button
+                               onClick={() => setIsNetworkFullscreen(true)}
+                               title="Maximize Network"
+                               className="p-1.5 rounded-lg bg-white/[0.03] text-white/30 hover:text-pink-400 hover:bg-pink-500/10 transition-colors"
+                             >
+                               <Maximize2 className="w-3.5 h-3.5" />
+                             </button>
                            </div>
                            {similarityNetwork && similarityNetwork.explained_variance && projectionType === 'pca' && (
                              <div className="text-right text-[9px] text-white/40 font-mono">
                                Expl. Var: <span className="text-pink-400 font-bold">{(similarityNetwork.explained_variance[0]*100).toFixed(1)}%</span>, <span className="text-cyan-400 font-bold">{(similarityNetwork.explained_variance[1]*100).toFixed(1)}%</span>
                              </div>
                            )}
+                         </div>
+                       ) : (
+                         <div className="flex items-center">
+                           <button
+                             onClick={() => setIsNetworkFullscreen(true)}
+                             title="Maximize Network Heatmap"
+                             className="p-1.5 rounded-lg bg-white/[0.03] text-white/30 hover:text-pink-400 hover:bg-pink-500/10 transition-colors"
+                           >
+                             <Maximize2 className="w-3.5 h-3.5" />
+                           </button>
                          </div>
                        )}
                      </div>
@@ -1925,6 +1965,272 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* Radar Fullscreen Modal */}
+        <AnimatePresence>
+          {isRadarFullscreen && detail && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-[#050914]/95 backdrop-blur-3xl flex flex-col p-6"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Compass className="text-violet-400" /> Molecular Radar Fingerprint: {detail.name || 'Unnamed'}
+                </h2>
+                <button
+                  onClick={() => setIsRadarFullscreen(false)}
+                  className="p-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white/50 hover:text-white transition-all"
+                >
+                  <Minimize2 className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 bg-black/40 border border-white/[0.05] rounded-2xl p-6 flex flex-col items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                    <PolarGrid stroke="rgba(255,255,255,0.05)" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 700 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }} axisLine={false} />
+                    <Radar name={detail.name || 'Compound'} dataKey="value" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.25} strokeWidth={2} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0d1627', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '14px' }}
+                      itemStyle={{ color: '#22d3ee' }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Histogram Fullscreen Modal */}
+        <AnimatePresence>
+          {isHistogramFullscreen && distributionData && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-[#050914]/95 backdrop-blur-3xl flex flex-col p-6"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <BarChart4 className="text-cyan-400" /> Descriptor Placement Profile: {selectedDescriptor}
+                  </h2>
+                  <p className="text-white/40 mt-1">
+                    Value: <span className="text-cyan-400 font-mono font-bold">{distributionData.current_value.toFixed(2)}</span> ({distributionData.percentile}th Percentile)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsHistogramFullscreen(false)}
+                  className="p-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white/50 hover:text-white transition-all"
+                >
+                  <Minimize2 className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 bg-black/40 border border-white/[0.05] rounded-2xl p-6 relative flex items-center justify-center">
+                {distributionLoading ? (
+                  <div className="flex flex-col items-center gap-3 text-cyan-400 font-mono">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                    COMPUTING PERCENTILE...
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={distributionData.histogram} margin={{ top: 20, right: 30, left: -10, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="binLabel" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0d1627', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '14px' }}
+                        labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}
+                        itemStyle={{ color: '#22d3ee' }}
+                      />
+                      <Bar dataKey="count" fill="url(#histGradModal)" radius={[4, 4, 0, 0]}>
+                        {distributionData.histogram.map((entry, index) => {
+                          const val = entry.value;
+                          const isCurrent = Math.abs(val - distributionData.current_value) < (distributionData.max - distributionData.min) / 10;
+                          return (
+                            <Cell key={`cell-modal-${index}`} fill={isCurrent ? '#22d3ee' : 'rgba(139,92,246,0.35)'} />
+                          );
+                        })}
+                      </Bar>
+                      <defs>
+                        <linearGradient id="histGradModal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                        </linearGradient>
+                      </defs>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Network Fullscreen Modal */}
+        <AnimatePresence>
+          {isNetworkFullscreen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-[#050914]/95 backdrop-blur-3xl flex flex-col p-6"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Layers className="text-pink-400" /> Chemical Space Similarity Network
+                  </h2>
+                  <div className="flex gap-2 mt-2">
+                    {(['scatter', 'fp_heatmap', 'desc_heatmap'] as const).map(tab => (
+                      <button 
+                        key={tab}
+                        onClick={() => setActiveNetworkTab(tab)}
+                        className={`text-xs font-bold uppercase px-3 py-1.5 rounded border ${activeNetworkTab === tab ? (tab === 'desc_heatmap' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-pink-500/20 text-pink-400 border-pink-500/30') : 'bg-transparent text-white/40 border-white/[0.05] hover:bg-white/[0.05]'}`}
+                      >
+                        {tab.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-3">
+                  <button
+                    onClick={() => setIsNetworkFullscreen(false)}
+                    className="p-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white/50 hover:text-white transition-all"
+                  >
+                    <Minimize2 className="w-5 h-5" />
+                  </button>
+                  {activeNetworkTab === 'scatter' && (
+                    <div className="flex gap-1 bg-black/40 border border-white/[0.05] p-1 rounded font-mono text-[10px]">
+                      {(['pca', 'umap', 'tsne'] as const).map(proj => (
+                        <button
+                          key={proj}
+                          onClick={() => setProjectionType(proj)}
+                          className={`px-3 py-1 rounded uppercase transition-all ${projectionType === proj ? 'bg-cyan-500/20 text-cyan-400 font-bold' : 'text-white/40 hover:text-white/80'}`}
+                        >
+                          {proj}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 bg-[#0a0f1d]/80 border border-white/[0.05] rounded-2xl p-6 relative flex items-center justify-center overflow-hidden">
+                {activeNetworkTab === 'scatter' ? (
+                  similarityLoading ? (
+                    <div className="flex flex-col items-center gap-3 text-pink-400 font-mono">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      COMPUTING {projectionType.toUpperCase()} & FINGERPRINTS...
+                    </div>
+                  ) : similarityNetwork && similarityNetwork.nodes ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: -10 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                        <XAxis type="number" dataKey="x" name="Dim 1" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis type="number" dataKey="y" name="Dim 2" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <ZAxis type="number" range={[100, 100]} />
+                        <Tooltip 
+                          cursor={{ strokeDasharray: '3 3' }}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-[#0d1627] border border-white/10 rounded-lg p-4 shadow-xl">
+                                  <p className="font-bold text-white text-base mb-2">{data.name}</p>
+                                  {data.cas && <p className="text-white/60 font-mono text-sm mb-1">CAS: <span className="text-cyan-400">{data.cas}</span></p>}
+                                  <p className="text-white/60 font-mono text-sm">Endpoint: <span className="text-pink-400">{data.endpoint || '—'}</span></p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Scatter 
+                          data={similarityNetwork.nodes} 
+                          fill="#f472b6" 
+                          onClick={(node: any) => {
+                            if (node && node.smiles) {
+                              setSelectedCompoundSmiles(node.smiles);
+                              setIsNetworkFullscreen(false);
+                            }
+                          }}
+                        >
+                          {similarityNetwork.nodes.map((entry: any, index: number) => {
+                            const isSelected = selectedCompoundSmiles === entry.smiles;
+                            return (
+                              <Cell 
+                                key={`cell-modal-${index}`} 
+                                fill={isSelected ? '#22d3ee' : 'rgba(244, 114, 182, 0.5)'} 
+                                stroke={isSelected ? '#fff' : 'transparent'}
+                                strokeWidth={isSelected ? 3 : 0}
+                              />
+                            );
+                          })}
+                        </Scatter>
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="text-white/40 font-mono">Failed to load similarity network.</div>
+                  )
+                ) : activeNetworkTab === 'fp_heatmap' ? (
+                  fpHeatmapLoading ? (
+                    <div className="flex flex-col items-center gap-3 text-pink-400 font-mono">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      GENERATING FP HEATMAP...
+                    </div>
+                  ) : fpHeatmapData && fpHeatmapData.matrix ? (
+                    <div className="w-full h-full p-6 overflow-auto custom-scrollbar flex flex-col gap-2 items-center justify-center">
+                      <div className="text-sm font-mono text-pink-400 mb-4 border border-pink-500/20 bg-pink-500/5 px-4 py-2 rounded">
+                        Tanimoto Matrix ({fpHeatmapData.labels?.length || 0}x{fpHeatmapData.labels?.length || 0})
+                      </div>
+                      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${fpHeatmapData.labels?.length || 10}, minmax(0, 1fr))` }}>
+                        {fpHeatmapData.matrix.map((row: number[], i: number) => (
+                          row.map((val: number, j: number) => (
+                            <div 
+                              key={`fp-modal-${i}-${j}`} 
+                              className="w-4 h-4 md:w-8 md:h-8 lg:w-12 lg:h-12 rounded-sm" 
+                              style={{ backgroundColor: `rgba(244, 114, 182, ${Math.max(0.05, val)})` }} 
+                              title={`${fpHeatmapData.labels[i]} vs ${fpHeatmapData.labels[j]}\nSim: ${val.toFixed(3)}`} 
+                            />
+                          ))
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-white/40 font-mono">Heatmap data unavailable.</div>
+                  )
+                ) : (
+                  descHeatmapLoading ? (
+                    <div className="flex flex-col items-center gap-3 text-cyan-400 font-mono">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      GENERATING DESCRIPTOR HEATMAP...
+                    </div>
+                  ) : descCorrelationMatrix ? (
+                    <div className="w-full h-full p-6 overflow-auto custom-scrollbar flex flex-col gap-2 items-center justify-center">
+                      <div className="text-sm font-mono text-cyan-400 mb-4 border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 rounded">
+                        Pearson Correlation Matrix ({descCorrelationMatrix.names.length}x{descCorrelationMatrix.names.length})
+                      </div>
+                      <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${descCorrelationMatrix.names.length}, minmax(0, 1fr))` }}>
+                        {descCorrelationMatrix.matrix.map((row: number[], i: number) => (
+                          row.map((val: number, j: number) => {
+                            const isPositive = val >= 0;
+                            const alpha = Math.min(1, Math.abs(val));
+                            return (
+                              <div 
+                                key={`desc-modal-${i}-${j}`} 
+                                className="w-5 h-5 md:w-10 md:h-10 lg:w-16 lg:h-16 rounded-sm" 
+                                style={{ backgroundColor: isPositive ? `rgba(34, 211, 238, ${Math.max(0.05, alpha)})` : `rgba(139, 92, 246, ${Math.max(0.05, alpha)})` }} 
+                                title={`${descCorrelationMatrix.names[i]} vs ${descCorrelationMatrix.names[j]}\nCorr: ${val.toFixed(3)}`} 
+                              />
+                            );
+                          })
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-white/40 font-mono">Heatmap data unavailable.</div>
+                  )
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
     </div>
   );
 };
