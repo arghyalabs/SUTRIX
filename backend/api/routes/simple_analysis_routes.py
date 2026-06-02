@@ -522,6 +522,7 @@ async def select_subgroups(client_id: str, payload: SubgroupSelectPayload):
         "unique_compounds": int(df_combined[chem_col].nunique()) if chem_col and chem_col in df_combined.columns else 0,
         "created_at": time.time()
     }
+    context.selected_node_ids = payload.node_ids
     
     # Reset downstream V5 state
     context.structure_state = "UNKNOWN"
@@ -556,5 +557,6 @@ async def get_active_subgroup(client_id: str):
         "structure_state": getattr(context, 'structure_state', 'UNKNOWN'),
         "smiles_coverage_pct": getattr(context, 'smiles_coverage_pct', 0.0),
         "active_subgroup_path": getattr(context, 'active_subgroup_path', None),
+        "selected_node_ids": getattr(context, 'selected_node_ids', []),
     }
 

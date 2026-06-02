@@ -7,7 +7,7 @@ import logging
 import io
 import json
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -282,6 +282,24 @@ async def run_modeling_analysis(payload: BaseClientPayload):
         df = pd.read_parquet(parquet_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read dataset: {e}")
+
+    if getattr(payload, "subgroup_ids", None):
+
+        engine = registry.get_hierarchy_engine(client_id)
+        if engine:
+            slices = []
+            for node_id in payload.subgroup_ids:
+                if node_id in engine.node_details:
+                    detail = engine.node_details[node_id]
+                    filters = {**detail.get("metadata", {}).get("inherited_filters", {}), **detail.get("metadata", {}).get("applied_filter", {})}
+                    df_slice = df
+                    for col, val in filters.items():
+                        if col in df_slice.columns:
+                            df_slice = df_slice[df_slice[col].astype(str) == str(val)]
+                    slices.append(df_slice)
+            if slices:
+                df = pd.concat(slices).drop_duplicates()
+                logger.info(f"[{client_id}] Sliced dataset for subgroups {payload.subgroup_ids}. New size: {len(df)}")
 
     mappings = ctx.mappings or {}
     smiles_col, val_col, unit_col, ep_col, descriptor_cols = _resolve_columns(df, mappings)
@@ -1210,6 +1228,7 @@ from backend.core.feature_selection_engine import FeatureSelectionEngine
 
 class FeatureSelectionPayload(BaseModel):
     client_id: str
+    subgroup_ids: Optional[List[str]] = None
     variance_threshold: float = 0.01
     correlation_threshold: float = 0.85
     mi_fraction: float = 0.5
@@ -1232,6 +1251,24 @@ async def run_feature_selection(payload: FeatureSelectionPayload):
         df = pd.read_parquet(parquet_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read dataset: {e}")
+
+    if getattr(payload, "subgroup_ids", None):
+
+        engine = registry.get_hierarchy_engine(client_id)
+        if engine:
+            slices = []
+            for node_id in payload.subgroup_ids:
+                if node_id in engine.node_details:
+                    detail = engine.node_details[node_id]
+                    filters = {**detail.get("metadata", {}).get("inherited_filters", {}), **detail.get("metadata", {}).get("applied_filter", {})}
+                    df_slice = df
+                    for col, val in filters.items():
+                        if col in df_slice.columns:
+                            df_slice = df_slice[df_slice[col].astype(str) == str(val)]
+                    slices.append(df_slice)
+            if slices:
+                df = pd.concat(slices).drop_duplicates()
+                logger.info(f"[{client_id}] Sliced dataset for subgroups {payload.subgroup_ids}. New size: {len(df)}")
         
     res = FeatureSelectionEngine.run_pipeline(
         df=df,

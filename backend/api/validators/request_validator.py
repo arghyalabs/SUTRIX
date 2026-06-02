@@ -1,12 +1,13 @@
 import os
 import re
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pydantic import BaseModel, field_validator, model_validator
 from fastapi import HTTPException
 from backend.core.scientific_ontology import SCIENTIFIC_VARIABLES
 
 class BaseClientPayload(BaseModel):
     client_id: str
+    subgroup_ids: Optional[List[str]] = None
 
     @field_validator("client_id")
     @classmethod

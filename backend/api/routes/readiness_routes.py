@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
+import pandas as pd
+from backend.api.validators.request_validator import BaseClientPayload
 
 from backend.core.workspace_registry import registry
 from backend.core.predictability_engine import AIPredictabilityEngine
@@ -30,12 +32,13 @@ def get_predictability_score(client_id: str) -> Dict[str, Any]:
     result = AIPredictabilityEngine.analyze_subgroup(df, context.mappings)
     return result
 
-@router.get("/{client_id}/assessment")
-def get_ai_readiness_assessment(client_id: str) -> Dict[str, Any]:
+@router.post("/assessment")
+def get_ai_readiness_assessment(payload: BaseClientPayload) -> Dict[str, Any]:
     """
     Returns the full AI and QSAR Readiness Assessment for the subgroup.
     Requires the subgroup to be enriched with descriptors.
     """
+    client_id = payload.client_id
     context = registry.get_context(client_id)
     if not context:
         raise HTTPException(status_code=404, detail="Context not found")
@@ -49,6 +52,23 @@ def get_ai_readiness_assessment(client_id: str) -> Dict[str, Any]:
     df = context.load_active_dataset()
     if df is None:
         raise HTTPException(status_code=400, detail="Enriched subgroup dataset not found or empty")
+
+    if getattr(payload, "subgroup_ids", None):
+        from backend.api.state import registry
+        engine = registry.get_hierarchy_engine(client_id)
+        if engine:
+            slices = []
+            for node_id in payload.subgroup_ids:
+                if node_id in engine.node_details:
+                    detail = engine.node_details[node_id]
+                    filters = {**detail.get("metadata", {}).get("inherited_filters", {}), **detail.get("metadata", {}).get("applied_filter", {})}
+                    df_slice = df
+                    for col, val in filters.items():
+                        if col in df_slice.columns:
+                            df_slice = df_slice[df_slice[col].astype(str) == str(val)]
+                    slices.append(df_slice)
+            if slices:
+                df = pd.concat(slices).drop_duplicates()
         
     result = ReadinessEngine.evaluate_readiness(df, context.mappings)
     if not result.get("success"):
@@ -60,7 +80,7 @@ from fastapi import BackgroundTasks
 from backend.core.pipeline_task_manager import pipeline_manager
 import asyncio
 
-def run_benchmark_background(job_id: str, client_id: str):
+def run_benchmark_background(job_id: str, client_id: str, subgroup_ids: Optional[List[str]] = None):
     job = pipeline_manager.get_job(job_id)
     if not job:
         return
@@ -78,6 +98,23 @@ def run_benchmark_background(job_id: str, client_id: str):
         import pandas as pd
         df = pd.read_parquet(descriptor_path)
         
+        if subgroup_ids:
+            from backend.api.state import registry
+            engine = registry.get_hierarchy_engine(client_id)
+            if engine:
+                slices = []
+                for node_id in subgroup_ids:
+                    if node_id in engine.node_details:
+                        detail = engine.node_details[node_id]
+                        filters = {**detail.get("metadata", {}).get("inherited_filters", {}), **detail.get("metadata", {}).get("applied_filter", {})}
+                        df_slice = df
+                        for col, val in filters.items():
+                            if col in df_slice.columns:
+                                df_slice = df_slice[df_slice[col].astype(str) == str(val)]
+                        slices.append(df_slice)
+                if slices:
+                    df = pd.concat(slices).drop_duplicates()
+        
         from backend.core.ml_benchmark_engine import MLBenchmarkEngine
         engine = MLBenchmarkEngine()
         result = engine.benchmark(df, context.mappings)
@@ -87,12 +124,13 @@ def run_benchmark_background(job_id: str, client_id: str):
         asyncio.run(pipeline_manager.broadcast_failed(job, f"Benchmark failed: {str(e)}"))
 
 
-@router.post("/{client_id}/benchmark")
-def start_ml_benchmark(client_id: str, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+@router.post("/benchmark")
+def start_ml_benchmark(payload: BaseClientPayload, background_tasks: BackgroundTasks) -> Dict[str, Any]:
     """
     Starts the rapid ML benchmark engine in the background.
     Requires the subgroup to be enriched with descriptors.
     """
+    client_id = payload.client_id
     context = registry.get_context(client_id)
     if not context:
         raise HTTPException(status_code=404, detail="Context not found")
@@ -111,7 +149,7 @@ def start_ml_benchmark(client_id: str, background_tasks: BackgroundTasks) -> Dic
         )
         
     job = pipeline_manager.create_job(client_id, "ml_benchmark", 1)
-    background_tasks.add_task(run_benchmark_background, job.job_id, client_id)
+    background_tasks.add_task(run_benchmark_background, job.job_id, client_id, payload.subgroup_ids)
     
     return {"job_id": job.job_id, "status": "PROCESSING"}
 

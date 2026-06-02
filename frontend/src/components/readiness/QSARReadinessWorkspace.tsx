@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 import { toast } from 'react-hot-toast';
+import { simpleAnalysisApi } from '../../services/simpleAnalysisApi';
 
 interface ModelScore {
   model: string;
@@ -43,7 +44,7 @@ interface ReadinessAssessment {
 }
 
 export const QSARReadinessWorkspace: React.FC = () => {
-  const { workspaceId, setActiveTab } = useWorkspaceStore();
+  const { clientId, setActiveTab } = useWorkspaceStore();
   
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [assessment, setAssessment] = useState<ReadinessAssessment | null>(null);
@@ -52,17 +53,52 @@ export const QSARReadinessWorkspace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!workspaceId) return;
-    runInitialAnalysis();
-  }, [workspaceId]);
+  // Subgroup selection state
+  const [availableSubgroups, setAvailableSubgroups] = useState<any[]>([]);
+  const [selectedSubgroupNodeIds, setSelectedSubgroupNodeIds] = useState<string[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const runInitialAnalysis = async () => {
+  useEffect(() => {
+    if (!clientId) return;
+    
+    const fetchSubgroups = async () => {
+      try {
+        const data = await simpleAnalysisApi.getSubgroups(clientId);
+        // Fetch initially selected nodes from Step 5
+        const activeRes = await fetch(`${API_BASE_URL}/api/simple-analysis/subgroups/${clientId}/active`);
+        if (activeRes.ok) {
+          const activeData = await activeRes.json();
+          if (activeData.selected_node_ids && activeData.selected_node_ids.length > 0) {
+            setSelectedSubgroupNodeIds(activeData.selected_node_ids);
+            setAvailableSubgroups(data.filter((s: any) => activeData.selected_node_ids.includes(s.node_id)));
+          } else {
+            setAvailableSubgroups(data);
+          }
+        } else {
+          setAvailableSubgroups(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subgroups:", err);
+      }
+    };
+    
+    fetchSubgroups().then(() => runInitialAnalysis());
+  }, [clientId]);
+
+  const runInitialAnalysis = async (customSubgroupNodeIds?: string[]) => {
     try {
       setLoading(true);
       setError(null);
       
-      const assessRes = await fetch(`${API_BASE_URL}/api/readiness/${workspaceId}/assessment`);
+      const currentIds = customSubgroupNodeIds || selectedSubgroupNodeIds;
+      const assessRes = await fetch(`${API_BASE_URL}/api/readiness/assessment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            client_id: clientId,
+            subgroup_ids: currentIds
+        })
+      });
       if (!assessRes.ok) {
         throw new Error('Please run Descriptor Enrichment in Step 8 before conducting AI & QSAR Readiness.');
       }
@@ -70,7 +106,14 @@ export const QSARReadinessWorkspace: React.FC = () => {
       setAssessment(assessData);
 
       // Try to fetch existing benchmark, but don't fail if we need to trigger it
-      const benchRes = await fetch(`${API_BASE_URL}/api/readiness/${workspaceId}/benchmark`);
+      const benchRes = await fetch(`${API_BASE_URL}/api/readiness/benchmark`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            client_id: clientId,
+            subgroup_ids: currentIds
+        })
+      });
       if (benchRes.ok) {
         const benchData = await benchRes.json();
         setBenchmark(benchData);
@@ -86,8 +129,13 @@ export const QSARReadinessWorkspace: React.FC = () => {
     try {
       setBenchmarkingActive(true);
       const toastId = toast.loading('Starting 5-fold cross-validated scikit-learn models...');
-      const res = await fetch(`${API_BASE_URL}/api/readiness/${workspaceId}/benchmark`, {
-        method: 'POST'
+      const res = await fetch(`${API_BASE_URL}/api/readiness/benchmark`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            client_id: clientId,
+            subgroup_ids: selectedSubgroupNodeIds
+        })
       });
       if (!res.ok) {
         throw new Error('Failed to start ML benchmark models.');
@@ -100,7 +148,7 @@ export const QSARReadinessWorkspace: React.FC = () => {
       // Polling loop
       const poll = setInterval(async () => {
         try {
-          const statusRes = await fetch(`${API_BASE_URL}/api/readiness/${workspaceId}/benchmark/status?job_id=${jobId}`);
+          const statusRes = await fetch(`${API_BASE_URL}/api/readiness/${clientId}/benchmark/status?job_id=${jobId}`);
           if (statusRes.ok) {
             const statusData = await statusRes.json();
             if (statusData.status === 'COMPLETED') {
@@ -185,9 +233,61 @@ export const QSARReadinessWorkspace: React.FC = () => {
           <Target className="w-8 h-8 text-cyan-400" />
           AI & QSAR Readiness Assessment
         </h1>
-        <p className="text-slate-400 mt-2 max-w-3xl text-sm leading-relaxed">
-          Evaluate modeling feasibility and regulatory validation readiness before feature selection. Downstream modeling packages are dynamically audited against scikit-learn models and OECD regulatory frameworks.
-        </p>
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mt-2">
+            <p className="text-slate-400 max-w-3xl text-sm leading-relaxed">
+              Evaluate modeling feasibility and regulatory validation readiness before feature selection. Downstream modeling packages are dynamically audited against scikit-learn models and OECD regulatory frameworks.
+            </p>
+            {/* Subgroup Dropdown */}
+            {availableSubgroups.length > 0 && (
+              <div className="relative z-20">
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="px-4 py-2 bg-slate-900 border border-white/[0.06] rounded-xl flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg min-w-[200px] justify-between"
+                >
+                  <div className="flex items-center gap-2 text-sm text-slate-300">
+                    <Layers className="w-4 h-4 text-cyan-400" />
+                    <span className="font-medium truncate max-w-[150px]">
+                      {selectedSubgroupNodeIds.length === 0 ? "No Subgroups Selected" : 
+                       selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.metadata?.node_name || "1 Selected" :
+                       `${selectedSubgroupNodeIds.length} Subgroups Selected`}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-500">▼</span>
+                </button>
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-white/[0.06] rounded-xl shadow-xl overflow-hidden py-2 max-h-64 overflow-y-auto">
+                    {availableSubgroups.map(subgroup => {
+                      const isSelected = selectedSubgroupNodeIds.includes(subgroup.node_id);
+                      return (
+                        <div
+                          key={subgroup.node_id}
+                          className="px-4 py-2 flex items-center gap-3 hover:bg-white/[0.04] cursor-pointer"
+                          onClick={() => {
+                            let newSelection;
+                            if (isSelected) {
+                              newSelection = selectedSubgroupNodeIds.filter(id => id !== subgroup.node_id);
+                            } else {
+                              newSelection = [...selectedSubgroupNodeIds, subgroup.node_id];
+                            }
+                            setSelectedSubgroupNodeIds(newSelection);
+                            runInitialAnalysis(newSelection);
+                          }}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-cyan-500 border-cyan-500 text-slate-950' : 'border-white/[0.2] bg-transparent'}`}>
+                            {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm text-slate-200 truncate">{subgroup.metadata?.node_name || subgroup.node_id}</span>
+                            <span className="text-[10px] text-slate-500">{subgroup.compound_count} compounds</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+        </div>
       </div>
 
       {/* 5-Panel Grid */}

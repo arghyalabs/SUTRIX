@@ -10,6 +10,8 @@ import {
 } from 'recharts';
 import { API_BASE_URL } from '../../config';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { simpleAnalysisApi } from '../../services/simpleAnalysisApi';
+import { Layers } from 'lucide-react';
 
 interface FeatureSelectionProps {
   clientId: string;
@@ -78,9 +80,34 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
 
   const { setDescriptorReady } = useWorkspaceStore();
 
+  // Subgroup selection state
+  const [availableSubgroups, setAvailableSubgroups] = useState<any[]>([]);
+  const [selectedSubgroupNodeIds, setSelectedSubgroupNodeIds] = useState<string[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   useEffect(() => {
     if (clientId) {
-      fetchDiagnostics();
+      const fetchSubgroups = async () => {
+        try {
+          const data = await simpleAnalysisApi.getSubgroups(clientId);
+          const activeRes = await fetch(`${API_BASE_URL}/api/simple-analysis/subgroups/${clientId}/active`);
+          if (activeRes.ok) {
+            const activeData = await activeRes.json();
+            if (activeData.selected_node_ids && activeData.selected_node_ids.length > 0) {
+              setSelectedSubgroupNodeIds(activeData.selected_node_ids);
+              setAvailableSubgroups(data.filter((s: any) => activeData.selected_node_ids.includes(s.node_id)));
+            } else {
+              setAvailableSubgroups(data);
+            }
+          } else {
+            setAvailableSubgroups(data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch subgroups:", err);
+        }
+      };
+      
+      fetchSubgroups().then(() => fetchDiagnostics());
     }
   }, [clientId]);
 
@@ -111,6 +138,7 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: clientId,
+          subgroup_ids: selectedSubgroupNodeIds,
           variance_threshold: variance,
           correlation_threshold: correlation,
           mutual_info_k: mutualInfoK,
@@ -183,7 +211,7 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
   return (
     <div className="h-full flex flex-col p-8 max-w-7xl mx-auto text-white overflow-y-auto space-y-8">
       {/* Title */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
             <Sliders className="w-8 h-8 text-cyan-400" />
@@ -193,6 +221,55 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
             Filter out noisy, constant, or highly correlated descriptors before training. A streamlined feature space drastically improves OECD Mechanistic Interpretability and guards against overfitting.
           </p>
         </div>
+        {/* Subgroup Dropdown */}
+        {availableSubgroups.length > 0 && (
+          <div className="relative z-20">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="px-4 py-2 bg-slate-900 border border-white/[0.06] rounded-xl flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-lg min-w-[200px] justify-between"
+            >
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <span className="font-medium truncate max-w-[150px]">
+                  {selectedSubgroupNodeIds.length === 0 ? "No Subgroups Selected" : 
+                   selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.metadata?.node_name || "1 Selected" :
+                   `${selectedSubgroupNodeIds.length} Subgroups Selected`}
+                </span>
+              </div>
+              <span className="text-xs text-slate-500">▼</span>
+            </button>
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-white/[0.06] rounded-xl shadow-xl overflow-hidden py-2 max-h-64 overflow-y-auto">
+                {availableSubgroups.map(subgroup => {
+                  const isSelected = selectedSubgroupNodeIds.includes(subgroup.node_id);
+                  return (
+                    <div
+                      key={subgroup.node_id}
+                      className="px-4 py-2 flex items-center gap-3 hover:bg-white/[0.04] cursor-pointer"
+                      onClick={() => {
+                        let newSelection;
+                        if (isSelected) {
+                          newSelection = selectedSubgroupNodeIds.filter(id => id !== subgroup.node_id);
+                        } else {
+                          newSelection = [...selectedSubgroupNodeIds, subgroup.node_id];
+                        }
+                        setSelectedSubgroupNodeIds(newSelection);
+                      }}
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-cyan-500 border-cyan-500 text-slate-950' : 'border-white/[0.2] bg-transparent'}`}>
+                        {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm text-slate-200 truncate">{subgroup.metadata?.node_name || subgroup.node_id}</span>
+                        <span className="text-[10px] text-slate-500">{subgroup.compound_count} compounds</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Section 0 — Endpoint Diagnostics */}
@@ -376,37 +453,52 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
             </div>
           </div>
 
-          {/* Section 3: Export Controls */}
+          {/* Section 3: Dataset Library & Export */}
           <div className="lg:col-span-1 glass-panel rounded-2xl border border-white/[0.06] p-6 flex flex-col justify-between bg-slate-900/30">
             <div className="space-y-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/[0.06] pb-3">
                 <Download className="w-5 h-5 text-cyan-400" />
-                Section 3: Export Packages
+                Section 3: Dataset Library & Export
               </h2>
               
               <p className="text-slate-400 text-xs leading-relaxed">
-                Compile your finalized subgroup and selected descriptor matrices into a publication-ready modeling package.
+                Export specific QSAR-ready datasets or run a massive batch enrichment on the entire library hierarchy.
               </p>
 
-              <div className="p-4 bg-slate-950/50 border border-white/[0.04] rounded-xl text-xs space-y-2">
-                <div className="font-bold text-slate-500 uppercase tracking-wider mb-1">Package Contents</div>
-                <div className="text-slate-300">✓ dataset.csv (Subgroup + Features)</div>
-                <div className="text-slate-300">✓ dataset.parquet (Columnar)</div>
-                <div className="text-slate-300">✓ metadata.json (SUTRIX V5 Trace)</div>
-                <div className="text-slate-300">✓ feature_selection_report.xlsx</div>
-                {result.initial_descriptors !== result.final_descriptors && (
-                  <div className="text-slate-300">✓ recovery_report.xlsx</div>
-                )}
+              <div className="p-4 bg-slate-950/50 border border-white/[0.04] rounded-xl text-xs space-y-3">
+                <button 
+                  onClick={handleDownloadPackage}
+                  disabled={isDownloading}
+                  className="w-full py-2.5 rounded-lg bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                >
+                  {isDownloading ? <Activity className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  Export Current Subgroup
+                </button>
+                
+                <button 
+                  onClick={() => {/* TODO: Implement selected export */}}
+                  className="w-full py-2.5 rounded-lg bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export Selected QSAR Ready Datasets
+                </button>
+
+                <button 
+                  onClick={() => {/* TODO: Implement all export */}}
+                  className="w-full py-2.5 rounded-lg bg-white/5 border border-white/10 text-white font-medium hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export All QSAR Ready Datasets
+                </button>
               </div>
             </div>
 
             <button 
-              onClick={handleDownloadPackage}
-              disabled={isDownloading}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black hover:from-emerald-400 hover:to-teal-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(16,185,129,0.15)] mt-6"
+              onClick={() => { window.location.href = `/workspace/${clientId}/global-enrichment` }}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black hover:from-emerald-400 hover:to-teal-500 transition-all flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(16,185,129,0.15)] mt-6"
             >
-              {isDownloading ? <Activity className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5 fill-current" />}
-              Export Modeling-Ready Package
+              <Layers className="w-5 h-5 fill-current" />
+              Launch Global Enrichment Workspace
             </button>
           </div>
         </div>
