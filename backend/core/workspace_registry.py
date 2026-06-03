@@ -51,6 +51,7 @@ class PipelineContext:
     active_subgroup_path: Optional[str] = None
     subgroup_metadata: Dict[str, Any] = field(default_factory=dict)
     subgroup_selected: bool = False
+    selected_node_ids: List[str] = field(default_factory=list)
 
     # ── V5: Structure State (Step 6) ─────────────────────────────────────────────
     structure_state: str = "UNKNOWN"         # MOLECULAR | HYBRID | NAME_ONLY | UNKNOWN

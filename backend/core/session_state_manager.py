@@ -57,6 +57,7 @@ class SessionStateManager:
                 "active_subgroup_path": getattr(context, "active_subgroup_path", None),
                 "subgroup_metadata": getattr(context, "subgroup_metadata", {}),
                 "subgroup_selected": getattr(context, "subgroup_selected", False),
+                "selected_node_ids": getattr(context, "selected_node_ids", []),
                 "structure_state": getattr(context, "structure_state", "UNKNOWN"),
                 "smiles_coverage_pct": getattr(context, "smiles_coverage_pct", 0.0),
                 "total_unique_compounds": getattr(context, "total_unique_compounds", 0),
@@ -142,6 +143,7 @@ class SessionStateManager:
             context.active_subgroup_path = state_data.get("active_subgroup_path", None)
             context.subgroup_metadata = state_data.get("subgroup_metadata", {})
             context.subgroup_selected = state_data.get("subgroup_selected", False)
+            context.selected_node_ids = state_data.get("selected_node_ids", [])
             context.structure_state = state_data.get("structure_state", "UNKNOWN")
             context.smiles_coverage_pct = state_data.get("smiles_coverage_pct", 0.0)
             context.total_unique_compounds = state_data.get("total_unique_compounds", 0)

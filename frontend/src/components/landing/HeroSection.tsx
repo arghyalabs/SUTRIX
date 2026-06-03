@@ -71,9 +71,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onLaunch }) => {
           className="flex items-center gap-8"
         >
           <a href="#workflow" className="text-xs font-semibold uppercase tracking-wider text-white/50 hover:text-white transition-colors">Documentation</a>
-          <button className="text-xs font-semibold uppercase tracking-wider text-white/50 hover:text-white transition-colors flex items-center gap-1.5">
-            Sign In <ArrowRight className="w-3 h-3" />
-          </button>
         </motion.div>
       </header>
 

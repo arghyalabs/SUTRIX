@@ -397,7 +397,7 @@ const EmptyState: React.FC<{
               <Layers className="w-4 h-4 text-cyan-400" />
               <span className="font-medium truncate max-w-[200px]">
                 {selectedSubgroupNodeIds.length === 0 ? "No Subgroups Selected" : 
-                 selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.metadata?.node_name || "1 Selected" :
+                 selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.subgroup_name || "1 Selected" :
                  `${selectedSubgroupNodeIds.length} Subgroups Selected`}
               </span>
             </div>
@@ -424,9 +424,12 @@ const EmptyState: React.FC<{
                     <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-cyan-500 border-cyan-500 text-slate-950' : 'border-white/[0.2] bg-transparent'}`}>
                       {isSelected && <CheckCircle2 className="w-3 h-3" />}
                     </div>
-                    <span className="text-sm font-medium text-slate-300 truncate">
-                      {subgroup.metadata?.node_name || subgroup.subgroup_name}
-                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium text-slate-300 truncate">
+                        {subgroup.subgroup_name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">{subgroup.compounds} compounds</span>
+                    </div>
                   </div>
                 );
               })}
@@ -473,7 +476,7 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
     const fetchSubgroups = async () => {
       try {
         const data = await simpleAnalysisApi.getSubgroups(clientId);
-        const activeRes = await fetch(`${API_BASE_URL}/api/simple-analysis/subgroups/${clientId}/active`);
+        const activeRes = await fetch(`${API_BASE_URL}/api/analysis/subgroups/${clientId}/active`);
         if (activeRes.ok) {
           const activeData = await activeRes.json();
           if (activeData.selected_node_ids && activeData.selected_node_ids.length > 0) {
@@ -583,13 +586,66 @@ const ModelingReadinessWorkspace: React.FC<Props> = ({
               {r.n_samples.toLocaleString()} compounds · {r.n_features.toLocaleString()} descriptors · analyzed in {d.meta.elapsed_seconds}s
             </p>
           </div>
-          <button
-            onClick={onRunAnalysis}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.06] 
-              text-white/50 hover:text-white/70 hover:border-white/[0.10] transition-all text-sm"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Re-analyze
-          </button>
+          <div className="flex items-center gap-4">
+            {availableSubgroups.length > 0 && (
+              <div className="relative z-20">
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="px-4 py-2 bg-white/[0.02] border border-white/[0.06] rounded-xl flex items-center gap-2 hover:bg-white/[0.04] transition-colors min-w-[200px] justify-between"
+                >
+                  <div className="flex items-center gap-2 text-sm text-slate-300">
+                    <Layers className="w-4 h-4 text-cyan-400" />
+                    <span className="font-medium truncate max-w-[150px]">
+                      {selectedSubgroupNodeIds.length === 0 ? "No Subgroups Selected" : 
+                       selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.subgroup_name || "1 Selected" :
+                       `${selectedSubgroupNodeIds.length} Subgroups Selected`}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                </button>
+                {isDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-white/[0.06] rounded-xl shadow-xl overflow-hidden py-2 max-h-64 overflow-y-auto z-50">
+                    {availableSubgroups.map(subgroup => {
+                      const isSelected = selectedSubgroupNodeIds.includes(subgroup.node_id);
+                      return (
+                        <div
+                          key={subgroup.node_id}
+                          className="px-4 py-2 flex items-center gap-3 hover:bg-white/[0.04] cursor-pointer text-left"
+                          onClick={() => {
+                            let newSelection;
+                            if (isSelected) {
+                              newSelection = selectedSubgroupNodeIds.filter(id => id !== subgroup.node_id);
+                            } else {
+                              newSelection = [...selectedSubgroupNodeIds, subgroup.node_id];
+                            }
+                            setSelectedSubgroupNodeIds(newSelection);
+                          }}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-cyan-500 border-cyan-500 text-slate-950' : 'border-white/[0.2] bg-transparent'}`}>
+                            {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium text-slate-300 truncate">
+                              {subgroup.subgroup_name}
+                            </span>
+                            <span className="text-[10px] text-slate-500">{subgroup.compounds} compounds</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={() => onRunAnalysis(selectedSubgroupNodeIds)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.06] 
+                text-white/50 hover:text-white/70 hover:border-white/[0.10] transition-all text-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Re-analyze
+            </button>
+          </div>
         </div>
 
         {/* ── KPI Row ─────────────────────────────────────────────────── */}
