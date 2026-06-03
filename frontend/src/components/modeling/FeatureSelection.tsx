@@ -90,7 +90,7 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
       const fetchSubgroups = async () => {
         try {
           const data = await simpleAnalysisApi.getSubgroups(clientId);
-          const activeRes = await fetch(`${API_BASE_URL}/api/simple-analysis/subgroups/${clientId}/active`);
+          const activeRes = await fetch(`${API_BASE_URL}/api/analysis/subgroups/${clientId}/active`);
           if (activeRes.ok) {
             const activeData = await activeRes.json();
             if (activeData.selected_node_ids && activeData.selected_node_ids.length > 0) {
@@ -260,8 +260,8 @@ export const FeatureSelection: React.FC<FeatureSelectionProps> = ({ clientId, on
                         {isSelected && <CheckCircle2 className="w-3 h-3" />}
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-sm text-slate-200 truncate">{subgroup.metadata?.node_name || subgroup.node_id}</span>
-                        <span className="text-[10px] text-slate-500">{subgroup.compound_count} compounds</span>
+                        <span className="text-sm text-slate-200 truncate">{subgroup.subgroup_name || subgroup.node_id}</span>
+                        <span className="text-[10px] text-slate-500">{subgroup.compounds} compounds</span>
                       </div>
                     </div>
                   );

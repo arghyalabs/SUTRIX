@@ -169,8 +169,7 @@ async def run_feature_selection_pipeline(payload: FeatureSelectionPayload):
         raise HTTPException(status_code=500, detail=f"Failed to load descriptor matrix: {e}")
 
     if getattr(payload, "subgroup_ids", None):
-        from backend.api.state import registry
-        engine = registry.get_hierarchy_engine(client_id)
+        engine = registry.get_hierarchy_engine(payload.client_id)
         if engine:
             slices = []
             for node_id in payload.subgroup_ids:
@@ -184,7 +183,7 @@ async def run_feature_selection_pipeline(payload: FeatureSelectionPayload):
                     slices.append(df_slice)
             if slices:
                 df = pd.concat(slices).drop_duplicates()
-                logger.info(f"[{client_id}] Sliced dataset for subgroups {payload.subgroup_ids}. New size: {len(df)}")
+                logger.info(f"[{payload.client_id}] Sliced dataset for subgroups {payload.subgroup_ids}. New size: {len(df)}")
     
     mappings = getattr(context, 'mappings', {}) or {}
     role_to_col = {v: k for k, v in mappings.items()}

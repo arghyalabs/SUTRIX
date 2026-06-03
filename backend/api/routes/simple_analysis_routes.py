@@ -426,10 +426,13 @@ async def get_available_subgroups(client_id: str):
             "duplicate_score": round(dup_score)
         }
         
+        path_str = metadata.get("path", "Root")
+        display_name = path_str[7:] if path_str.startswith("Root > ") else path_str
+        
         subgroups.append({
             "node_id": node_id,
-            "subgroup_name": node_name,
-            "path": metadata.get("path", "Root"),
+            "subgroup_name": display_name if node_id != "root" else "Root Dataset",
+            "path": path_str,
             "rows": len(df_slice),
             "compounds": unique_compounds,
             "missing_pct": missing_pct,

@@ -65,7 +65,7 @@ export const QSARReadinessWorkspace: React.FC = () => {
       try {
         const data = await simpleAnalysisApi.getSubgroups(clientId);
         // Fetch initially selected nodes from Step 5
-        const activeRes = await fetch(`${API_BASE_URL}/api/simple-analysis/subgroups/${clientId}/active`);
+        const activeRes = await fetch(`${API_BASE_URL}/api/analysis/subgroups/${clientId}/active`);
         if (activeRes.ok) {
           const activeData = await activeRes.json();
           if (activeData.selected_node_ids && activeData.selected_node_ids.length > 0) {
@@ -248,7 +248,7 @@ export const QSARReadinessWorkspace: React.FC = () => {
                     <Layers className="w-4 h-4 text-cyan-400" />
                     <span className="font-medium truncate max-w-[150px]">
                       {selectedSubgroupNodeIds.length === 0 ? "No Subgroups Selected" : 
-                       selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.metadata?.node_name || "1 Selected" :
+                       selectedSubgroupNodeIds.length === 1 ? availableSubgroups.find(s => s.node_id === selectedSubgroupNodeIds[0])?.subgroup_name || "1 Selected" :
                        `${selectedSubgroupNodeIds.length} Subgroups Selected`}
                     </span>
                   </div>
@@ -277,8 +277,8 @@ export const QSARReadinessWorkspace: React.FC = () => {
                             {isSelected && <CheckCircle2 className="w-3 h-3" />}
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className="text-sm text-slate-200 truncate">{subgroup.metadata?.node_name || subgroup.node_id}</span>
-                            <span className="text-[10px] text-slate-500">{subgroup.compound_count} compounds</span>
+                            <span className="text-sm text-slate-200 truncate">{subgroup.subgroup_name || subgroup.node_id}</span>
+                            <span className="text-[10px] text-slate-500">{subgroup.compounds} compounds</span>
                           </div>
                         </div>
                       );

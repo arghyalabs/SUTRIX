@@ -163,6 +163,9 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
                         )
 
     # Fill empty smiles values in the dataframe using the resolved mapping
+    if smiles_col in df.columns:
+        df[smiles_col] = df[smiles_col].astype('object')
+        
     for idx, row in df.iterrows():
         sm_val = str(row[smiles_col]).strip() if pd.notna(row[smiles_col]) else ""
         if not sm_val and name_col and name_col in df.columns:
@@ -329,10 +332,12 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
     sample_desc = next((v["data"] for v in all_descriptor_results.values() if v.get("success") and v.get("data")), {})
     descriptor_keys = list(sample_desc.keys())
     
-    # Add new descriptor columns
+    # Add new descriptor columns and ensure they can hold strings
     for dk in descriptor_keys:
         if dk not in enriched_df.columns:
-            enriched_df[dk] = None
+            enriched_df[dk] = pd.Series(dtype='object')
+        else:
+            enriched_df[dk] = enriched_df[dk].astype('object')
             
     # Add PubChem_Error column if it doesn't exist
     if 'PubChem_Error' not in enriched_df.columns:
@@ -351,12 +356,14 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
         else:
             enriched_df.at[idx, 'PubChem_Error'] = "SMILES_NOT_RESOLVED"
 
-    # Cast new descriptor columns to true numerical values where possible
+    # Cast new descriptor columns to true numerical values where possible (excluding string identifiers)
+    string_cols = {"CanonicalSMILES", "IsomericSMILES", "InChIKey", "MolecularFormula", "PubChem_Error"}
     for dk in descriptor_keys:
-        try:
-            enriched_df[dk] = pd.to_numeric(enriched_df[dk], errors='coerce')
-        except Exception:
-            pass
+        if dk not in string_cols:
+            try:
+                enriched_df[dk] = pd.to_numeric(enriched_df[dk], errors='ignore')
+            except Exception:
+                pass
 
     # Automatic floating/integer compression optimization
     tracker.log("⚡ Compacting RAM sizing: Downcasting float64/int64 columns to float32/int32...")
