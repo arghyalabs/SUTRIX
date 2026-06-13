@@ -57,3 +57,4 @@ workspaces/
 frontend/pw_log.txt
 frontend/pw_run_log.txt
 out_profile.json
+thesis_compiler/
