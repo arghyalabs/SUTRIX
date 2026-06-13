@@ -429,11 +429,16 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
         enable_dedup = payload.get("enable_dedup", False)
         prune_high_variance = payload.get("prune_high_variance", False)
         
+        # Store the raw ingestion count before any reduction
+        # This is the ground truth for the harmonization audit banner
+        from backend.core.workspace_registry import registry as _reg
+        _ctx = _reg.get_context(context_id)
+        if _ctx and not getattr(_ctx, "raw_ingestion_count", 0):
+            _ctx.raw_ingestion_count = len(df)
+        
         dedup_res = None
         vs = None
 
-        from backend.core.workspace_registry import registry as _reg
-        _ctx = _reg.get_context(context_id)
         if _ctx and _ctx.mappings:
             if enable_dedup:
                 from backend.validation.duplicate_detector import SmartDeduplicator

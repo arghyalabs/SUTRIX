@@ -51,3 +51,9 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# SUTRIX Temp Workspaces & Test Logs
+workspaces/
+frontend/pw_log.txt
+frontend/pw_run_log.txt
+out_profile.json

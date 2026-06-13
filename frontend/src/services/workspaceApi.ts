@@ -42,5 +42,13 @@ export const workspaceApi = {
     });
     return response.data;
   },
+
+  /**
+   * Resets and deletes the active workspace session files on the backend.
+   */
+  resetWorkspace: async (clientId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.delete<{ success: boolean; message: string }>(`/api/workspace/${clientId}/reset`);
+    return response.data;
+  },
 };
 

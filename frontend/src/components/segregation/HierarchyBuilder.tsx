@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { API_BASE_URL } from '../../config';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -77,7 +78,7 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
 
-  const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiBase = API_BASE_URL;
 
   // Fetch column recommendations from backend entropy engine
   useEffect(() => {

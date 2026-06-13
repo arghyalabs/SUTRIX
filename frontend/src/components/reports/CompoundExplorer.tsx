@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../../config';
 import {
   Search, Loader2, AlertCircle, Database, BarChart3,
   CheckCircle2, FlaskConical, ArrowRight, Table2, Eye,
@@ -75,7 +76,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
   activeJobId,
   onContinue,
 }) => {
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const API_BASE = API_BASE_URL;
   
   // Search & Pagination State
   const [query, setQuery] = useState('');

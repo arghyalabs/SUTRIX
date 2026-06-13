@@ -121,6 +121,10 @@ class MappingEngineV2:
                 # Exact synapse match check
                 if col_normalized == alias_norm:
                     best_name_score = max(best_name_score, 1.0)
+                elif f"_{alias_norm}_" in f"_{col_normalized}_":
+                    best_name_score = max(best_name_score, 0.90)
+                elif col_normalized.startswith(alias_norm + "_") or col_normalized.endswith("_" + alias_norm):
+                    best_name_score = max(best_name_score, 0.85)
                     
             # Signal B: Value Pattern Score
             pattern_score = 0.0
@@ -137,16 +141,24 @@ class MappingEngineV2:
             stat_score = 0.5 # Default if no data context loaded
             if col_series is not None:
                 category = meta.get("category", "")
-                if category in ("physicochemical", "concentration", "units") or std_key in ("latitude", "longitude"):
+                is_typically_numeric = (
+                    category in ("concentration", "exposure", "physicochemical") or 
+                    std_key in ("latitude", "longitude", "value")
+                )
+                if is_typically_numeric:
                     # Typically numeric
                     stat_score = 1.0 if is_numeric else 0.2
                 else:
-                    # Typically categorical
+                    # Typically categorical (includes units, chemical identifiers, species, endpoints, etc.)
                     stat_score = 1.0 if not is_numeric else 0.2
                     
             # Compute V3 Final Weighted Score
-            # Final Score = 0.4 * Column Name Score + 0.3 * Value Pattern Score + 0.3 * Statistical Context Score
-            final_score = (0.4 * best_name_score) + (0.3 * pattern_score) + (0.3 * stat_score)
+            # If no data series is loaded, base score purely on name matching
+            if col_series is None:
+                final_score = best_name_score
+            else:
+                # Final Score = 0.4 * Column Name Score + 0.3 * Value Pattern Score + 0.3 * Statistical Context Score
+                final_score = (0.4 * best_name_score) + (0.3 * pattern_score) + (0.3 * stat_score)
             
             candidates.append({
                 "std_key": std_key,

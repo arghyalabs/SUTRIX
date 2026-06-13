@@ -489,7 +489,12 @@ async def _stream_parquet_as_format(
     """Read parquet from disk and convert to the requested format in-memory."""
     import pandas as pd
 
-    df = pd.read_parquet(parquet_path)
+    if not os.path.exists(parquet_path):
+        raise HTTPException(status_code=404, detail="Dataset file not found.")
+    try:
+        df = pd.read_parquet(parquet_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read dataset: {e}")
     buf = io.BytesIO()
     mime = _MIME_MAP.get(fmt, "application/octet-stream")
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { API_BASE_URL } from '../../config';
 import { Play, Ban, ChevronRight, Cpu, Zap, Beaker, Activity, Terminal, Search, CheckSquare, Square, ListFilter, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Progress from '@radix-ui/react-progress';
@@ -102,7 +103,7 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
       try {
         const { workspaceId } = useWorkspaceStore.getState();
         if (!workspaceId) return;
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/descriptors/${workspaceId}/pre-generation-summary`);
+        const res = await fetch(`${API_BASE_URL}/api/descriptors/${workspaceId}/pre-generation-summary`);
         if (res.ok) {
           const data = await res.json();
           if (mounted) setPreGenSummary(data);

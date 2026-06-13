@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { useWorkspaceStore } from '../store/useWorkspaceStore';
 
 export interface SchemaInference {
   column: string;
@@ -31,8 +32,10 @@ export const mappingApi = {
    * Dispatches column list to AI inference engine.
    */
   inferSchema: async (columns: string[], abortSignal?: AbortSignal): Promise<SchemaInferResponse> => {
+    const clientId = useWorkspaceStore.getState().workspaceId;
     const response = await apiClient.post<SchemaInferResponse>('/api/schema/infer', {
       columns,
+      client_id: clientId,
     }, { signal: abortSignal });
     return response.data;
   },

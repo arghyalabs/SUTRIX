@@ -36,7 +36,8 @@ const mapOptions = [
   { value: 'study_material',   label: 'Study Material',           group: 'chemical_identity' },
 
   // ── Structure ──────────────────────────────────────────────────────────────
-  { value: 'smiles',    label: 'SMILES / Canonical SMILES',       group: 'structure' },
+  { value: 'canonical_smiles', label: 'SMILES / Canonical SMILES',       group: 'structure' },
+  { value: 'smiles',           label: 'SMILES (Alternative)',            group: 'structure' },
   { value: 'inchi',     label: 'InChI',                           group: 'structure' },
   { value: 'inchikey',  label: 'InChIKey',                        group: 'structure' },
   { value: 'molfile',   label: 'Molfile / SDF Block',             group: 'structure' },
@@ -63,13 +64,15 @@ const mapOptions = [
   { value: 'taxonomic_kingdom', label: 'Kingdom (Animalia etc.)', group: 'taxonomy' },
 
   // ── Exposure ───────────────────────────────────────────────────────────────
-  { value: 'exposure_time',          label: 'Exposure Duration',              group: 'exposure' },
+  { value: 'duration',               label: 'Exposure Duration',              group: 'exposure' },
+  { value: 'exposure_time',          label: 'Exposure Time',                  group: 'exposure' },
   { value: 'treatment_duration',     label: 'Treatment Duration',             group: 'exposure' },
   { value: 'contact_time',           label: 'Contact Time',                   group: 'exposure' },
   { value: 'observation_period',     label: 'Observation Period',             group: 'exposure' },
   { value: 'duration_days',          label: 'Duration (Days)',                group: 'exposure' },
   { value: 'exposure_concentration', label: 'Exposure Concentration',         group: 'exposure' },
-  { value: 'exposure_route',         label: 'Exposure Route (Oral, Inhalation)', group: 'exposure' },
+  { value: 'route',                  label: 'Exposure Route (Oral, Inhalation)', group: 'exposure' },
+  { value: 'exposure_route',         label: 'Exposure Route (Alternative)',      group: 'exposure' },
   { value: 'test_medium',            label: 'Test Medium (Soil / Water)',     group: 'exposure' },
   { value: 'temperature',            label: 'Temperature',                    group: 'exposure' },
   { value: 'ph',                     label: 'pH',                             group: 'exposure' },
@@ -230,7 +233,7 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
       if (colLower.includes('fish') || colLower.includes('zebrafish')) hasFish = true;
       if (colLower.includes('lc50')) hasLC50 = true;
       if (colLower.includes('noec')) hasNOEC = true;
-      if (role === 'exposure_time' || colLower.includes('96h')) hasDuration = true;
+      if (role === 'exposure_time' || role === 'duration' || role === 'exposure_duration' || colLower.includes('96h')) hasDuration = true;
       if (colLower.includes('oral') || colLower.includes('diet')) hasOral = true;
     });
 
@@ -263,12 +266,12 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
 
     const CHEMICAL_IDENTITY_VALS = ['chemical_name','compound_name','substance_name','drug_name',
       'molecule_name','analyte','ingredient','active_ingredient','test_substance','test_material','study_material'];
-    const STRUCTURE_VALS = ['smiles','inchi','inchikey','molfile'];
+    const STRUCTURE_VALS = ['canonical_smiles','smiles','inchi','inchikey','molfile'];
     const IDENTIFIER_VALS = ['cas_number','chemical_id','cid','chembl_id','dsstox_id','ec_number','unii','drugbank_id','chebi_id'];
     const PHYSCHEM_VALS = ['molecular_weight','logp','pka','tpsa','h_bond_donors','h_bond_acceptors','rotatable_bonds','solubility','boiling_point','melting_point','vapor_pressure'];
     const ENDPOINT_VALS = ['endpoint','toxicity','toxicity_endpoint','behavior','value','dose','concentration','unit','qualifier','dose_unit','concentration_unit','pXC50','assay_type','target_gene','cell_line','effect_type','observation_type','bioactivity','mechanism','pathway'];
     const TAXONOMY_VALS = ['organism','species','taxon','common_name','strain','life_stage','trophic_level','taxonomic_kingdom'];
-    const EXPOSURE_VALS = ['exposure_time','duration_days','exposure_concentration','exposure_route','test_medium','temperature','ph','dissolved_oxygen','salinity','hardness'];
+    const EXPOSURE_VALS = ['duration','exposure_time','treatment_duration','contact_time','observation_period','duration_days','exposure_concentration','route','exposure_route','test_medium','temperature','ph','dissolved_oxygen','salinity','hardness'];
     const ENVFATE_VALS = ['biodegradation','half_life','bcf','koc','henry_constant','photolysis'];
     const CLINICAL_VALS = ['patient_id','age','sex','clinical_phase','adverse_event','disease','dosage_regimen'];
     const ADME_VALS = ['clearance','bioavailability','cmax','tmax','vd','auc','protein_binding'];
@@ -301,7 +304,14 @@ export const DatasetMapping: React.FC<DatasetMappingProps> = ({
   }, [columns, mappings]);
 
   const renderColumnItem = (col: string) => {
-    const mappedValue = (mappings[col] || 'none') as any;
+    let mappedValue = (mappings[col] || 'none') as any;
+    
+    // Ensure mappedValue exists in mapOptions, otherwise default to 'none' to prevent blank dropdown
+    const isValidOption = mapOptions.some(opt => opt.value === mappedValue);
+    if (!isValidOption) {
+      mappedValue = 'none';
+    }
+
     const isMapped = mappedValue !== 'none' && mappedValue !== undefined;
     const intel = (intelligence[col] || {}) as any;
     

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader2, AlertCircle, Database, LayoutDashboard } from 'lucide-react';
 import { 
@@ -27,7 +28,7 @@ interface PreviewResult {
 }
 
 export const CompoundPreview: React.FC<CompoundPreviewProps> = ({ clientId, activeJobId }) => {
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const API_BASE = API_BASE_URL;
   
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);

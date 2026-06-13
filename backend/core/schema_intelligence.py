@@ -10,18 +10,52 @@ class SchemaIntelligenceEngine:
     """
     
     @staticmethod
-    def infer_schema(columns: List[str]) -> List[Dict[str, Any]]:
+    def infer_schema(columns: List[str], client_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        from typing import Optional
         inferred_mappings = []
         engine = MappingEngineV2()
         
+        # Translation map to normalize internal keys to canonical backend keys
+        translation_map = {
+            "smiles": "canonical_smiles",
+            "inchi": "canonical_smiles",
+            "inchikey": "canonical_smiles",
+            "molfile": "canonical_smiles",
+            "sdf": "canonical_smiles",
+            "organism": "species",
+            "taxon": "species",
+            "test_species": "species",
+            "host_species": "species",
+            "exposed_species": "species",
+            "target_species": "species",
+            "exposure_duration": "duration",
+            "exposure_time": "duration",
+            "contact_time": "duration",
+            "observation_period": "duration",
+            "treatment_duration": "duration",
+            "exposure_route": "route",
+            "concentration": "value",
+            "dose": "value",
+            "administered_dose": "value",
+            "exposure_concentration": "value",
+            "test_concentration": "value",
+            "pxc50": "value",
+            "regression_target": "value",
+            "pic50": "value",
+            "potency": "value",
+            "ic50": "value",
+            "ec50": "value",
+            "ki": "value",
+        }
+        
         for col in columns:
             # 1. Base mapping confidence from V2 engine
-            res = engine.evaluate_column(col)
+            res = engine.evaluate_column(col, client_id)
             
             # Form dict with backward-compatible shape + new fields
             mapping_result = {
                 "column": col,
-                "mapped_to": res.mapped_to,
+                "mapped_to": translation_map.get(res.mapped_to, res.mapped_to),
                 "confidence": res.confidence,
                 "confidence_score": int(res.confidence * 100),
                 "exact_match": res.layer_reached == 1 or res.layer_reached == 2,
@@ -29,7 +63,10 @@ class SchemaIntelligenceEngine:
                 "semantic_match": res.layer_reached == 4,
                 "layer_reached": res.layer_reached,
                 "needs_user_confirmation": res.needs_user_confirmation,
-                "alternatives": res.alternatives,
+                "alternatives": [
+                    {**alt, "mapped_to": translation_map.get(alt["mapped_to"], alt["mapped_to"])}
+                    for alt in res.alternatives
+                ],
                 "reasons": res.reasons
             }
             
