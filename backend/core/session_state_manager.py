@@ -70,6 +70,15 @@ class SessionStateManager:
                 "descriptor_dataframe_path": getattr(context, "descriptor_dataframe_path", None),
                 "descriptor_engine_used": getattr(context, "descriptor_engine_used", None),
                 "descriptor_count": getattr(context, "descriptor_count", 0),
+                # Harmonization Control fields
+                "harmonization_settings": getattr(context, "harmonization_settings", {
+                    "variance_conflict_strategy": "KEEP_ALL",
+                    "duplicate_segregation_strategy": "KEEP_ALL",
+                    "settings_confirmed": False,
+                    "applied_at": None,
+                }),
+                "harmonization_audit": getattr(context, "harmonization_audit", None),
+                "raw_ingestion_count": getattr(context, "raw_ingestion_count", 0),
             }
             
             temp_path = self.get_state_file_path(context.workspace_id) + ".tmp"
@@ -156,6 +165,16 @@ class SessionStateManager:
             context.descriptor_dataframe_path = state_data.get("descriptor_dataframe_path", None)
             context.descriptor_engine_used = state_data.get("descriptor_engine_used", None)
             context.descriptor_count = state_data.get("descriptor_count", 0)
+
+            # Restore Harmonization Control fields
+            context.harmonization_settings = state_data.get("harmonization_settings", {
+                "variance_conflict_strategy": "KEEP_ALL",
+                "duplicate_segregation_strategy": "KEEP_ALL",
+                "settings_confirmed": False,
+                "applied_at": None,
+            })
+            context.harmonization_audit = state_data.get("harmonization_audit", None)
+            context.raw_ingestion_count = state_data.get("raw_ingestion_count", 0)
 
             node_details = state_data.get("node_details")
             if node_details:

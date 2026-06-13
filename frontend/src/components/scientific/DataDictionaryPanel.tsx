@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config';
 import { motion } from 'framer-motion';
 import { 
   FileText, Download, Check, AlertCircle, Copy, FileSpreadsheet, Loader2, Info
@@ -16,7 +17,7 @@ export const DataDictionaryPanel: React.FC<DataDictionaryPanelProps> = ({
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiBase = API_BASE_URL;
 
   useEffect(() => {
     fetchDictionary();

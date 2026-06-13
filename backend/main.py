@@ -41,6 +41,12 @@ from backend.api.routes.structure_assessment_routes import router as assessment_
 from backend.api.routes.subgroup_routes import router as subgroup_router
 from backend.api.routes.feature_selection_routes import router as feature_selection_router
 from backend.api.routes.export_routes import router as export_router
+from backend.api.routes.normalization_routes import router as normalization_router
+from backend.api.routes.analytics_routes import router as analytics_router
+from backend.api.routes.qsar_studio_routes import router as qsar_studio_router
+from backend.api.routes.oecd_routes import router as oecd_router
+from backend.api.routes.intelligence_routes import router as intelligence_router
+from backend.api.routes.harmonization_routes import router as harmonization_router
 from backend.core.config import settings
 
 app = FastAPI(title="Scientific Data Orchestrator", version="5.0")
@@ -65,6 +71,12 @@ app.include_router(assessment_router)
 app.include_router(subgroup_router)
 app.include_router(feature_selection_router)
 app.include_router(export_router)
+app.include_router(normalization_router)
+app.include_router(analytics_router)
+app.include_router(qsar_studio_router)
+app.include_router(oecd_router)
+app.include_router(intelligence_router)
+app.include_router(harmonization_router)
 
 memory_guard = MemoryGuard()
 
@@ -260,7 +272,7 @@ from backend.core.schema_intelligence import SchemaIntelligenceEngine
 @app.post("/api/schema/infer")
 async def api_schema_infer(payload: SchemaInferPayload):
     try:
-        inferred = SchemaIntelligenceEngine.infer_schema(payload.columns)
+        inferred = SchemaIntelligenceEngine.infer_schema(payload.columns, payload.client_id)
         return {"mappings": inferred}
     except Exception as e:
         logger.error(f"Schema Inference failed: {e}")
@@ -402,6 +414,41 @@ async def api_workspace_mode(client_id: str):
     except Exception as e:
         logger.error(f"Failed to query workspace mode: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/workspace/{client_id}/reset")
+async def reset_workspace(client_id: str):
+    """
+    Completely deletes all workspace session files, directories,
+    and in-memory registries for the specified client.
+    """
+    try:
+        from backend.core.session_state_manager import session_manager
+        import shutil
+
+        # 1. Delete session JSON state file
+        session_manager.delete_session(client_id)
+
+        # 2. Delete workspace directories (uploads, exports, lineage, etc.)
+        workspace_dir = os.path.join("workspaces", client_id)
+        if os.path.exists(workspace_dir):
+            try:
+                shutil.rmtree(workspace_dir)
+                logger.info(f"Workspace {client_id} directory deleted successfully.")
+            except Exception as e:
+                logger.error(f"Failed to delete directory {workspace_dir}: {e}")
+
+        # 3. Evict context from in-memory registry
+        ctx = registry.workspaces.pop(client_id, None)
+        if ctx:
+            ctx.flush_memory()
+
+        logger.info(f"Workspace {client_id} completely reset.")
+        return {"success": True, "message": f"Workspace {client_id} completely reset."}
+    except Exception as e:
+        logger.error(f"Failed to reset workspace {client_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/workspace/{client_id}/data-dictionary")
 async def api_data_dictionary(client_id: str):

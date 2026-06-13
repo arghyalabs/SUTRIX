@@ -47,20 +47,7 @@ async def reset_subgroup(client_id: str):
     """
     context = registry.get_context(client_id)
     
-    context.active_subgroup_path = None
-    context.subgroup_selected = False
-    context.subgroup_metadata = {}
-    context.structure_state = "UNKNOWN"
-    context.smiles_coverage_pct = 0.0
-    context.total_unique_compounds = 0
-    context.structures_available = 0
-    context.structures_missing = 0
-    context.recovery_attempted = False
-    context.recovery_completed = False
-    context.post_recovery_coverage_pct = 0.0
-    context.recovered_subgroup_path = None
-    context.descriptor_dataframe_path = None
-    context.dataframe_cache = None
+    context.reset_subgroup_state()
     context.touch(save_to_disk=True)
     
     logger.info(f"Workspace {client_id}: Subgroup reset. All downstream state cleared.")

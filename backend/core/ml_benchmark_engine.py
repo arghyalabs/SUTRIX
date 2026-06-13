@@ -75,12 +75,21 @@ class MLBenchmarkEngine:
     @staticmethod
     def detect_task_type(y_series) -> str:
         """Auto-detect regression vs classification."""
+        import pandas as pd
         unique_vals = y_series.dropna().unique()
         n_unique = len(unique_vals)
+        is_numeric = pd.api.types.is_numeric_dtype(y_series)
+        
         if n_unique <= 2:
             return "binary_classification"
         elif n_unique <= 10:
             return "multiclass_classification"
+        elif not is_numeric:
+            try:
+                pd.to_numeric(y_series.dropna())
+                return "regression"
+            except Exception:
+                return "multiclass_classification"
         else:
             return "regression"
 

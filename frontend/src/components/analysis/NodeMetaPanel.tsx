@@ -187,11 +187,16 @@ export const NodeMetaPanel: React.FC<NodeMetaPanelProps> = ({ nodeDetail, client
                       <span className="text-[10px] text-white/30 font-mono">#{idx+1}</span>
                       {node.label}
                     </div>
-                    <div className="flex items-center gap-3 font-semibold">
-                      <span className="text-emerald-400">{node.unique_compounds} compounds</span>
+                    <div className="flex items-center gap-2 font-semibold">
+                      <span className="text-emerald-400 text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-lg shrink-0">
+                        {node.rows?.toLocaleString() ?? 0} rows
+                      </span>
+                      <span className="text-violet-400 text-[10px] bg-violet-500/10 px-2 py-0.5 rounded-lg shrink-0">
+                        {node.unique_compounds} compounds
+                      </span>
                       {idx > 0 && (
-                        <span className="text-rose-400 text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-lg">
-                          -{node.reduction_pct}%
+                        <span className="text-rose-400 text-[10px] bg-rose-500/15 px-1.5 py-0.5 rounded-lg shrink-0">
+                          -{node.row_reduction_pct}%
                         </span>
                       )}
                     </div>

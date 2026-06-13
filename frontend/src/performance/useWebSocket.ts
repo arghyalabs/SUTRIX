@@ -156,10 +156,12 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
             // Store the new lineage (field: 'lineage')
             if (msg.data && msg.data.lineage) {
               useWorkspaceStore.getState().setActiveLineage(msg.data.lineage);
+              useWorkspaceStore.getState().setSegregation(msg.data.lineage, true);
             }
             // Keep backward compat: also handle old 'graph' field
             if (msg.data && msg.data.graph) {
               useWorkspaceStore.getState().setActiveSegregationResult(msg.data);
+              useWorkspaceStore.getState().setSegregation(msg.data.graph, true);
             }
             
             activeJobIdRef.current = null; // Prevent exponential reconnect loop

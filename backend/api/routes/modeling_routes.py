@@ -285,7 +285,8 @@ async def run_modeling_analysis(payload: BaseClientPayload):
 
     if getattr(payload, "subgroup_ids", None):
 
-        engine = registry.get_hierarchy_engine(client_id)
+        context = registry.get_context(client_id)
+        engine = context.hierarchy_engine if context else None
         if engine:
             slices = []
             for node_id in payload.subgroup_ids:
@@ -1254,7 +1255,8 @@ async def run_feature_selection(payload: FeatureSelectionPayload):
 
     if getattr(payload, "subgroup_ids", None):
 
-        engine = registry.get_hierarchy_engine(client_id)
+        context = registry.get_context(client_id)
+        engine = context.hierarchy_engine if context else None
         if engine:
             slices = []
             for node_id in payload.subgroup_ids:

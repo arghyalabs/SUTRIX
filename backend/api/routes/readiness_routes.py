@@ -55,7 +55,8 @@ def get_ai_readiness_assessment(payload: BaseClientPayload) -> Dict[str, Any]:
 
     if getattr(payload, "subgroup_ids", None):
         from backend.api.state import registry
-        engine = registry.get_hierarchy_engine(client_id)
+        context = registry.get_context(client_id)
+        engine = context.hierarchy_engine if context else None
         if engine:
             slices = []
             for node_id in payload.subgroup_ids:
@@ -96,11 +97,17 @@ def run_benchmark_background(job_id: str, client_id: str, subgroup_ids: Optional
         
         descriptor_path = getattr(context, 'descriptor_dataframe_path', None) or getattr(context, 'parquet_path', None)
         import pandas as pd
-        df = pd.read_parquet(descriptor_path)
+        if not descriptor_path or not os.path.exists(descriptor_path):
+            raise HTTPException(status_code=400, detail="Descriptor dataset not found.")
+        try:
+            df = pd.read_parquet(descriptor_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load dataset: {e}")
         
         if subgroup_ids:
             from backend.api.state import registry
-            engine = registry.get_hierarchy_engine(client_id)
+            context = registry.get_context(client_id)
+            engine = context.hierarchy_engine if context else None
             if engine:
                 slices = []
                 for node_id in subgroup_ids:

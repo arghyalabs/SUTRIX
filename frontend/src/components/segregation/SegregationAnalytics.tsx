@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { API_BASE_URL } from '../../config';
 import { 
   ChevronRight, BarChart2, TrendingUp, CheckCircle, 
   Database, Sliders, CheckCircle2, AlertTriangle, Download, ArrowUp, ArrowDown 
@@ -655,7 +656,7 @@ export const SegregationAnalytics: React.FC<SegregationAnalyticsProps> = ({
                   </div>
                   
                   <a 
-                    href={`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/api/segregate/${clientId}/download`}
+                    href={`${API_BASE_URL}/api/segregate/${clientId}/download`}
                     download
                     className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white text-void font-bold text-xs hover:bg-gray-100 transition-colors shadow-lg"
                   >

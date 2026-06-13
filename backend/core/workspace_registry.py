@@ -11,6 +11,14 @@ import pandas as pd
 
 logger = logging.getLogger("sdo.core.registry")
 
+# Default harmonization settings — KEEP_ALL means no silent data removal
+_DEFAULT_HARMONIZATION_SETTINGS = {
+    "variance_conflict_strategy": "KEEP_ALL",
+    "duplicate_segregation_strategy": "KEEP_ALL",
+    "settings_confirmed": False,
+    "applied_at": None,
+}
+
 @dataclass
 class PipelineSnapshot:
     stage: str
@@ -89,6 +97,14 @@ class PipelineContext:
     # Fast search index for Google-style compound exploration
     search_index: Optional[List[Dict[str, Any]]] = None
 
+    # ── Harmonization Control (Cross-Studio Data Reduction) ───────────────────
+    # Stores user-chosen variance and dedup strategies (serialisable dict)
+    harmonization_settings: Dict[str, Any] = field(default_factory=lambda: dict(_DEFAULT_HARMONIZATION_SETTINGS))
+    # Full audit trail produced when harmonization is applied
+    harmonization_audit: Optional[Dict[str, Any]] = None
+    # Original ingestion count before any harmonization (set at mapping time)
+    raw_ingestion_count: int = 0
+
     # Platform status telemetry and job tracking
     job_state: Dict[str, Any] = field(default_factory=dict)
     websocket_connections: List[str] = field(default_factory=list)
@@ -143,7 +159,25 @@ class PipelineContext:
                     self.hierarchy_engine._node_df_slices.clear()
             except Exception:
                 pass
-        
+
+    def reset_subgroup_state(self):
+        """Resets all subgroup-related flags, paths, and states back to defaults."""
+        self.active_subgroup_path = None
+        self.subgroup_selected = False
+        self.subgroup_metadata = {}
+        self.selected_node_ids = []
+        self.structure_state = "UNKNOWN"
+        self.smiles_coverage_pct = 0.0
+        self.total_unique_compounds = 0
+        self.structures_available = 0
+        self.structures_missing = 0
+        self.recovery_attempted = False
+        self.recovery_completed = False
+        self.post_recovery_coverage_pct = 0.0
+        self.recovered_subgroup_path = None
+        self.descriptor_dataframe_path = None
+        self.dataframe_cache = None
+
     def load_slice(self) -> pd.DataFrame:
         """Loads dataframe from parquet source of truth."""
         self.touch()
@@ -159,19 +193,20 @@ class PipelineContext:
         Priority: recovered_subgroup_path > active_subgroup_path > parquet_path (pre-step-5 only).
         Raises ValueError if subgroup_selected is True but no subgroup path exists.
         """
-        if self.recovered_subgroup_path and os.path.exists(self.recovered_subgroup_path):
-            self.touch()
-            return pd.read_parquet(self.recovered_subgroup_path)
-        if self.active_subgroup_path and os.path.exists(self.active_subgroup_path):
-            self.touch()
-            return pd.read_parquet(self.active_subgroup_path)
-        if not self.subgroup_selected:
+        if self.subgroup_selected:
+            if self.recovered_subgroup_path and os.path.exists(self.recovered_subgroup_path):
+                self.touch()
+                return pd.read_parquet(self.recovered_subgroup_path)
+            if self.active_subgroup_path and os.path.exists(self.active_subgroup_path):
+                self.touch()
+                return pd.read_parquet(self.active_subgroup_path)
+            raise ValueError(
+                "Active subgroup dataset not found. "
+                "Please complete Step 5 (Subgroup Selection) before proceeding."
+            )
+        else:
             # Pre-step-5 pages are allowed to fall through to the root parquet
             return self.load_slice()
-        raise ValueError(
-            "Active subgroup dataset not found. "
-            "Please complete Step 5 (Subgroup Selection) before proceeding."
-        )
 
 class WorkspaceRegistry:
     def __init__(self, ttl_seconds: int = 3600):

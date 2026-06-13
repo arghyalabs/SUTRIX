@@ -1,194 +1,287 @@
-import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
-import { Layers, Cpu, Shield, Database, Network, FlaskConical, Download, Activity, Zap, Compass, Info, BarChart3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { GitBranch, FlaskConical, BarChart3, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-interface Feature {
-  icon: React.ReactNode;
+interface StudioCardProps {
   title: string;
   desc: string;
-  tag: string;
   color: string;
-  bgColor: string;
-  borderColor: string;
-  textColor: string;
-  detail: string;
+  icon: React.ReactNode;
+  features: string[];
+  animationComponent: React.ReactNode;
+  onClick: () => void;
 }
 
-const molecularFeatures: Feature[] = [
-  {
-    icon: <Shield className="w-5 h-5" />,
-    title: 'QSAR Readiness Engine',
-    tag: 'Validation',
-    desc: 'Evaluates dataset suitability before model development.',
-    detail: 'Flags structural duplicates, missing SMILES, and severe data gaps before machine learning pipelines are run.',
-    color: 'rgba(244,114,182,0.4)', textColor: 'text-pink-400',
-    bgColor: 'bg-pink-500/[0.05]', borderColor: 'border-pink-500/[0.12]',
-  },
-  {
-    icon: <Layers className="w-5 h-5" />,
-    title: 'OECD Compliance Evaluation',
-    tag: 'Regulatory',
-    desc: 'Checks readiness against QSAR best practices.',
-    detail: 'Generates detailed audit checklists against the 5 OECD principles, including defined endpoints and applicability domains.',
-    color: 'rgba(167,139,250,0.4)', textColor: 'text-violet-400',
-    bgColor: 'bg-violet-500/[0.05]', borderColor: 'border-violet-500/[0.12]',
-  },
-  {
-    icon: <Database className="w-5 h-5" />,
-    title: 'Compound Explorer',
-    tag: 'Interactive',
-    desc: 'Search and inspect every compound interactively.',
-    detail: 'Google-style live search and on-demand 2D chemical structure rendering using RDKit backend engines.',
-    color: 'rgba(96,165,250,0.4)', textColor: 'text-blue-400',
-    bgColor: 'bg-blue-500/[0.05]', borderColor: 'border-blue-500/[0.12]',
-  },
-  {
-    icon: <Zap className="w-5 h-5" />,
-    title: 'Descriptor Intelligence',
-    tag: 'Calculation',
-    desc: 'Identify generated and missing descriptor families.',
-    detail: 'Groups 2,000+ molecular features into Constitutional, Physicochemical, Topological, and Fingerprint descriptors.',
-    color: 'rgba(251,191,36,0.4)', textColor: 'text-amber-400',
-    bgColor: 'bg-amber-500/[0.05]', borderColor: 'border-amber-500/[0.12]',
-  },
-];
+const StudioCard: React.FC<StudioCardProps> = ({ title, desc, color, icon, features, animationComponent, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
 
-const scientificFeatures: Feature[] = [
-  {
-    icon: <Cpu className="w-5 h-5" />,
-    title: 'Scientific Ontologies',
-    tag: 'Ontology Engine',
-    desc: 'Fuzzy binding binds column variants dynamically.',
-    detail: 'Automatically matches columns to standardized variables across general pharmacological, biological, and clinical contexts.',
-    color: 'rgba(34,211,238,0.4)', textColor: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/[0.05]', borderColor: 'border-cyan-500/[0.12]',
-  },
-  {
-    icon: <Network className="w-5 h-5" />,
-    title: 'Variable Correlation Networks',
-    tag: 'Topological Visualizer',
-    desc: 'Interactive spring-force networks of correlations.',
-    detail: 'Visualizes variables as nodes and correlation paths as color-coded links, with filters to isolate key network hubs.',
-    color: 'rgba(45,212,191,0.4)', textColor: 'text-teal-400',
-    bgColor: 'bg-teal-500/[0.05]', borderColor: 'border-teal-500/[0.12]',
-  },
-  {
-    icon: <Compass className="w-5 h-5" />,
-    title: 'Scientific Data Explorer',
-    tag: 'Big Data Explorer',
-    desc: 'Fluid server-side pagination with type profiling.',
-    detail: 'Enables real-time data browsing, custom sorting, filtering, and deep column profiling sidebars without client-side lag.',
-    color: 'rgba(96,165,250,0.4)', textColor: 'text-blue-400',
-    bgColor: 'bg-blue-500/[0.05]', borderColor: 'border-blue-500/[0.12]',
-  },
-  {
-    icon: <Activity className="w-5 h-5" />,
-    title: 'Multi-modal ML Readiness',
-    tag: 'Signal Predictor',
-    desc: 'Scans class imbalance, PCA, and baseline signaling.',
-    detail: 'Performs non-chemical high-dimensional audits, recommending optimal model algorithms and warning of overfitting.',
-    color: 'rgba(251,146,60,0.4)', textColor: 'text-orange-400',
-    bgColor: 'bg-orange-500/[0.05]', borderColor: 'border-orange-500/[0.12]',
-  },
-];
+  const colorMap: Record<string, { text: string, border: string, bg: string, glow: string }> = {
+    cyan: { text: 'text-cyan-400', border: 'border-cyan-500/20', bg: 'bg-cyan-500/5', glow: 'shadow-[0_0_30px_rgba(6,182,212,0.15)]' },
+    violet: { text: 'text-violet-400', border: 'border-violet-500/20', bg: 'bg-violet-500/5', glow: 'shadow-[0_0_30px_rgba(139,92,246,0.15)]' },
+    emerald: { text: 'text-emerald-400', border: 'border-emerald-500/20', bg: 'bg-emerald-500/5', glow: 'shadow-[0_0_30px_rgba(16,185,129,0.15)]' },
+  };
 
-const FeatureCard: React.FC<{ f: Feature; i: number; inView: boolean }> = ({ f, i, inView }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={inView ? { opacity: 1, y: 0 } : {}}
-    transition={{ delay: i * 0.06, duration: 0.5 }}
-    whileHover={{ y: -3 }}
-    className={`group relative p-6 rounded-2xl border ${f.borderColor} ${f.bgColor} hover:border-opacity-50 transition-all cursor-default overflow-hidden`}
-  >
-    {/* Glow on hover */}
-    <div
-      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl"
-      style={{ background: `radial-gradient(circle at 20% 20%, ${f.color.replace('0.4', '0.08')}, transparent 70%)` }}
-    />
-    <div className="relative z-10">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-10 h-10 rounded-xl ${f.bgColor} border ${f.borderColor} flex items-center justify-center ${f.textColor}`}>
-          {f.icon}
-        </div>
-        <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${f.bgColor} ${f.textColor} border ${f.borderColor}`}>
-          {f.tag}
-        </span>
-      </div>
-      <h3 className="text-sm font-bold text-white mb-2">{f.title}</h3>
-      <p className="text-xs text-white/40 leading-relaxed mb-3">{f.desc}</p>
-      <div className="pt-3 border-t border-white/[0.04]">
-        <p className="text-[10px] text-white/25 leading-relaxed italic">{f.detail}</p>
-      </div>
-    </div>
-  </motion.div>
-);
-
-export const FeatureExplorer: React.FC = () => {
-  const [activeMode, setActiveMode] = useState<'MOLECULAR' | 'SCIENTIFIC'>('MOLECULAR');
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
-
-  const currentFeatures = activeMode === 'MOLECULAR' ? molecularFeatures : scientificFeatures;
+  const style = colorMap[color] || colorMap.cyan;
 
   return (
-    <section id="features" ref={ref} className="py-28 px-6 bg-[#03070f] border-t border-white/[0.04]">
-      <div className="max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          className="text-center mb-10"
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/20 text-xs font-semibold text-emerald-400 mb-5">
-            <Cpu className="w-3 h-3" />
-            Platform Capabilities
-          </div>
-          <h2 className="text-4xl font-extrabold text-white mb-4">Dual Environment Intelligence</h2>
-          <p className="text-white/40 text-lg max-w-2xl mx-auto">
-            Choose an environment capability mode below to view our highly optimized platform integrations.
-          </p>
-        </motion.div>
+    <motion.div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={onClick}
+      whileHover={{ y: -6 }}
+      className={`relative flex flex-col p-6 rounded-2xl border ${style.border} ${style.bg} hover:border-${color}-500/40 hover:bg-${color}-500/[0.08] transition-all cursor-pointer group select-none ${isHovered ? style.glow : ''}`}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-white/[0.03] border border-white/10 ${style.text}`}>
+          {icon}
+        </div>
+        <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-white/80 group-hover:translate-x-0.5 transition-all" />
+      </div>
 
-        {/* Mode Selector */}
-        <div className="flex justify-center mb-10">
-          <div className="inline-flex p-1 rounded-xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md">
-            <button
-              onClick={() => setActiveMode('MOLECULAR')}
-              className={`px-5 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-                activeMode === 'MOLECULAR'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
-                  : 'text-white/45 hover:text-white/80'
-              }`}
-            >
-              Molecular / Cheminformatics
-            </button>
-            <button
-              onClick={() => setActiveMode('SCIENTIFIC')}
-              className={`px-5 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-                activeMode === 'SCIENTIFIC'
-                  ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.15)]'
-                  : 'text-white/45 hover:text-white/80'
-              }`}
-            >
-              Scientific Data Science
-            </button>
+      <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+      <p className="text-sm text-white/50 leading-relaxed mb-6">{desc}</p>
+
+      {/* Interactive Animation Placeholder Area */}
+      <div className="h-40 w-full rounded-xl bg-slate-950/60 border border-white/[0.05] mb-6 overflow-hidden flex items-center justify-center relative">
+        {animationComponent}
+      </div>
+
+      <div className="mt-auto space-y-2">
+        <div className="text-[10px] font-black uppercase tracking-wider text-white/30">Key Features</div>
+        <ul className="grid grid-cols-2 gap-2">
+          {features.map(f => (
+            <li key={f} className="flex items-center gap-1.5 text-xs text-white/70">
+              <span className={`w-1 h-1 rounded-full bg-${color}-400 flex-shrink-0`} />
+              <span className="truncate">{f}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
+  );
+};
+
+// Animation component 1: Hierarchy Tree splitting
+const HierarchyTreeAnimation: React.FC = () => {
+  return (
+    <svg className="w-full h-32" viewBox="0 0 200 120">
+      {/* Root Node */}
+      <motion.circle cx="100" cy="20" r="6" fill="#22d3ee" />
+      
+      {/* Branch Lines */}
+      <motion.path 
+        d="M 100 20 L 50 60 M 100 20 L 150 60" 
+        stroke="rgba(34, 211, 238, 0.4)" 
+        strokeWidth="1.5" 
+        fill="none"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse" }}
+      />
+      
+      {/* Subgroups Level 1 */}
+      <motion.circle cx="50" cy="60" r="5" fill="#22d3ee" />
+      <motion.circle cx="150" cy="60" r="5" fill="#22d3ee" />
+
+      {/* Branch Lines Level 2 */}
+      <motion.path 
+        d="M 50 60 L 25 100 M 50 60 L 75 100 M 150 60 L 125 100 M 150 60 L 175 100" 
+        stroke="rgba(34, 211, 238, 0.4)" 
+        strokeWidth="1" 
+        fill="none"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 1.8, delay: 0.2, repeat: Infinity, repeatType: "reverse" }}
+      />
+
+      {/* Subgroups Level 2 */}
+      <motion.circle cx="25" cy="100" r="4" fill="#0891b2" />
+      <motion.circle cx="75" cy="100" r="4" fill="#0891b2" />
+      <motion.circle cx="125" cy="100" r="4" fill="#0891b2" />
+      <motion.circle cx="175" cy="100" r="4" fill="#0891b2" />
+
+      {/* Moving Data Packets */}
+      <motion.circle 
+        cx="100" 
+        cy="20" 
+        r="3" 
+        fill="#ffffff"
+        animate={{ 
+          cx: [100, 50, 25], 
+          cy: [20, 60, 100] 
+        }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.circle 
+        cx="100" 
+        cy="20" 
+        r="3" 
+        fill="#ffffff"
+        animate={{ 
+          cx: [100, 150, 175], 
+          cy: [20, 60, 100] 
+        }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+      />
+    </svg>
+  );
+};
+
+// Animation component 2: Molecular Ring / Calculations
+const QSARMolecularAnimation: React.FC = () => {
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* Rotating Benzene Ring */}
+      <motion.svg 
+        className="w-24 h-24 text-violet-400" 
+        viewBox="0 0 100 100"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+      >
+        {/* Hexagon */}
+        <polygon points="50,15 80,32 80,68 50,85 20,68 20,32" fill="none" stroke="currentColor" strokeWidth="2" />
+        {/* Inside double bonds */}
+        <line x1="48" y1="21" x2="74" y2="36" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="77" y1="65" x2="50" y2="80" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="23" y1="65" x2="23" y2="35" stroke="currentColor" strokeWidth="1.5" />
+      </motion.svg>
+
+      {/* Calculating indicator */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <motion.div 
+          animate={{ opacity: [0.3, 0.9, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="text-[9px] font-mono text-violet-300 uppercase tracking-widest bg-violet-950/70 border border-violet-500/20 px-2 py-0.5 rounded-full"
+        >
+          DESCRIPTORS: 5,420
+        </motion.div>
+      </div>
+
+      {/* Dynamic calculation particles */}
+      <motion.div 
+        className="absolute w-1.5 h-1.5 rounded-full bg-violet-400"
+        animate={{ 
+          x: [0, 40, -30, 0], 
+          y: [-20, 30, 10, -20],
+          scale: [0.5, 1.2, 0.8, 0.5] 
+        }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div 
+        className="absolute w-1 h-1 rounded-full bg-indigo-400"
+        animate={{ 
+          x: [0, -35, 45, 0], 
+          y: [20, -10, -30, 20],
+          scale: [1, 0.6, 1.2, 1] 
+        }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+      />
+    </div>
+  );
+};
+
+// Animation component 3: Analytics Scatter Plot (t-SNE/UMAP) points floating
+const AnalyticsPlotAnimation: React.FC = () => {
+  return (
+    <svg className="w-full h-32" viewBox="0 0 200 120">
+      {/* Grid Lines */}
+      <line x1="20" y1="100" x2="180" y2="100" stroke="rgba(255,255,255,0.05)" />
+      <line x1="20" y1="20" x2="20" y2="100" stroke="rgba(255,255,255,0.05)" />
+      
+      {/* Cluster 1: Green points */}
+      {[[50, 40], [65, 30], [55, 55], [75, 45], [40, 50]].map((p, idx) => (
+        <motion.circle
+          key={`c1-${idx}`}
+          cx={p[0]}
+          cy={p[1]}
+          r="3"
+          fill="#10b981"
+          animate={{
+            cx: [p[0], p[0] + (Math.random() - 0.5) * 8, p[0]],
+            cy: [p[1], p[1] + (Math.random() - 0.5) * 8, p[1]]
+          }}
+          transition={{ duration: 3 + idx, repeat: Infinity, ease: "easeInOut" }}
+        />
+      ))}
+
+      {/* Cluster 2: Blue points */}
+      {[[130, 80], [145, 90], [155, 75], [125, 70], [140, 60]].map((p, idx) => (
+        <motion.circle
+          key={`c2-${idx}`}
+          cx={p[0]}
+          cy={p[1]}
+          r="3"
+          fill="#3b82f6"
+          animate={{
+            cx: [p[0], p[0] + (Math.random() - 0.5) * 8, p[0]],
+            cy: [p[1], p[1] + (Math.random() - 0.5) * 8, p[1]]
+          }}
+          transition={{ duration: 4 + idx, repeat: Infinity, ease: "easeInOut" }}
+        />
+      ))}
+
+      {/* Centroid connecting line */}
+      <motion.line 
+        x1="57" y1="44" x2="139" y2="75" 
+        stroke="rgba(255, 255, 255, 0.1)" 
+        strokeWidth="1.5"
+        strokeDasharray="4,4"
+        animate={{ opacity: [0.2, 0.6, 0.2] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      />
+    </svg>
+  );
+};
+
+export const FeatureExplorer: React.FC = () => {
+  const navigate = useNavigate();
+
+  return (
+    <section className="py-24 px-6 bg-[#020610] border-b border-white/[0.04]">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/[0.08] border border-violet-500/20 text-xs font-semibold text-violet-400 mb-5">
+            What Can SUTRIX Do?
           </div>
+          <h2 className="text-4xl font-extrabold text-white mb-4">
+            Interactive Feature Explorer
+          </h2>
+          <p className="text-white/40 text-lg max-w-2xl mx-auto">
+            Standardize molecular data, group properties, run analytics, and generate OECD checklists in specialized workspaces.
+          </p>
         </div>
 
-        <div className="min-h-[300px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeMode}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-              className="grid md:grid-cols-2 lg:grid-cols-4 gap-4"
-            >
-              {currentFeatures.map((f, i) => (
-                <FeatureCard key={f.title} f={f} i={i} inView={inView} />
-              ))}
-            </motion.div>
-          </AnimatePresence>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StudioCard
+            title="Hierarchy Studio"
+            desc="Build and segregates toxicological subgroup matrices. Map endpoints, biological classes, and exposure variables."
+            color="cyan"
+            icon={<GitBranch className="w-6 h-6" />}
+            features={['automatic subgrouping', 'branch merging', 'segregation analysis', 'hierarchy exports']}
+            animationComponent={<HierarchyTreeAnimation />}
+            onClick={() => navigate('/hierarchy')}
+          />
+
+          <StudioCard
+            title="QSAR Studio"
+            desc="Construct modeling-ready QSAR datasets. Perform structural cleaning, calculate properties, and run AI evaluations."
+            color="violet"
+            icon={<FlaskConical className="w-6 h-6" />}
+            features={['structure recovery', 'descriptor generation', 'feature optimization', 'OECD & AI readiness']}
+            animationComponent={<QSARMolecularAnimation />}
+            onClick={() => navigate('/qsar')}
+          />
+
+          <StudioCard
+            title="Analytics Studio"
+            desc="Inspect chemical clusters and distributions. Explore PCA, correlation matrices, and missing values dynamically."
+            color="emerald"
+            icon={<BarChart3 className="w-6 h-6" />}
+            features={['PCA dimensionality', 't-SNE & UMAP plots', 'value distributions', 'missingness profiles']}
+            animationComponent={<AnalyticsPlotAnimation />}
+            onClick={() => navigate('/analytics')}
+          />
         </div>
       </div>
     </section>

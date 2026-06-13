@@ -40,7 +40,19 @@ class MappingPayload(BaseClientPayload):
             "none", "smiles", "inchi", "organism", "exposure_time", "exposure_route",
             "pxc50", "regression_target", "pic50", "potency", "ic50", "ec50", "ki",
             "classification_target", "assay", "assay_type", "target", "toxicity", "toxicology",
-            "absorption", "distribution", "metabolism", "excretion", "generic_variable"
+            "absorption", "distribution", "metabolism", "excretion", "generic_variable",
+            "canonical_smiles", "duration", "route", "chemical_id", "common_name", "life_stage",
+            "trophic_level", "taxonomic_kingdom", "duration_days", "test_medium", "temperature",
+            "ph", "dissolved_oxygen", "salinity", "hardness", "target_gene", "cell_line",
+            "effect_type", "observation_type", "glp_compliant", "study_year", "source_database",
+            "reference", "author", "journal", "bioactivity", "mechanism", "gene_expression",
+            "protein_level", "clinical_phase", "adverse_event", "disease", "dosage_regimen",
+            "clearance", "bioavailability", "cmax", "tmax", "vd", "auc", "protein_binding",
+            "molecular_weight", "logp", "pka", "tpsa", "h_bond_donors", "h_bond_acceptors",
+            "rotatable_bonds", "solubility", "boiling_point", "melting_point", "vapor_pressure",
+            "biodegradation", "half_life", "bcf", "koc", "henry_constant", "photolysis",
+            "ecoregion", "regulatory_status", "regulatory_limit", "oecd_guideline",
+            "reach_registration", "ghs_classification"
         }
         
         # Translation map to normalize all scientific variables to canonical backend keys
@@ -158,6 +170,7 @@ class MappingPayload(BaseClientPayload):
 
 class SchemaInferPayload(BaseModel):
     columns: List[str]
+    client_id: Optional[str] = None
 
     @field_validator("columns")
     @classmethod

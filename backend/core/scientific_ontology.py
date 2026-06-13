@@ -58,7 +58,7 @@ SCIENTIFIC_VARIABLES: Dict[str, Dict[str, Any]] = {
 
     # ── 2. STRUCTURE VARIABLES ──────────────────────────────────────────────────
     "smiles": {
-        "aliases": ["smiles", "canonical smiles", "canonical_smiles", "smiles string", "isomeric smiles", "structure"],
+        "aliases": ["smiles", "canonical smiles", "canonical_smiles", "smiles string", "isomeric smiles", "structure", "smile", "canonical smile", "smiles_string"],
         "regex": [SMILES_HEURISTIC_REGEX], "priority": 100, "category": "structure", "label": "SMILES Structure"
     },
     "inchi": {
@@ -249,11 +249,19 @@ SCIENTIFIC_VARIABLES: Dict[str, Dict[str, Any]] = {
         "aliases": ["toxicity endpoint", "toxicity_endpoint", "toxicological endpoint", "toxicological_endpoint"],
         "regex": [], "priority": 95, "category": "endpoint", "label": "Toxicological Endpoint"
     },
+    "value": {
+        "aliases": ["value", "endpoint value", "endpoint_value", "potency", "result", "assay value", "val", "original val", "original_value", "response value", "response_value"],
+        "regex": [], "priority": 95, "category": "endpoint", "label": "Endpoint Value"
+    },
 
-    # ── 9. UNITS VARIABLES ──────────────────────────────────────────────────────
+    # ── 9. UNITS & QUALIFIERS ───────────────────────────────────────────────────
     "unit": {
-        "aliases": ["unit", "measurement unit", "measurement_unit", "units"],
+        "aliases": ["unit", "measurement unit", "measurement_unit", "units", "original unit", "original_unit", "response unit", "response_unit"],
         "regex": [], "priority": 75, "category": "units", "label": "Measurement Unit"
+    },
+    "qualifier": {
+        "aliases": ["qualifier", "operator", "relation", "sign"],
+        "regex": [re.compile(r"^[<>\=]$|^<=$|^>=$")], "priority": 85, "category": "units", "label": "Qualifier"
     },
     "dose_unit": {
         "aliases": ["dose unit", "dose_unit", "dosage unit", "dosage_unit", "mg_kg"],

@@ -184,10 +184,12 @@ def _get_branch_payload(node_id: str, client_id: Optional[str] = None) -> dict:
     compound_attrition = []
     for i, node_detail in enumerate(path_nodes):
         compounds = node_detail.get("stats", {}).get("unique_compounds", 0)
+        rows = node_detail.get("stats", {}).get("total_rows", 0)
         label = node_detail.get("metadata", {}).get("node_name", "Root") if node_detail.get("id") != "root" else "Root"
         
         if i == 0:
             reduction_pct = 0.0
+            row_reduction_pct = 0.0
         else:
             prev_compounds = path_nodes[i - 1].get("stats", {}).get("unique_compounds", 0)
             if prev_compounds > 0:
@@ -195,10 +197,18 @@ def _get_branch_payload(node_id: str, client_id: Optional[str] = None) -> dict:
             else:
                 reduction_pct = 0.0
                 
+            prev_rows = path_nodes[i - 1].get("stats", {}).get("total_rows", 0)
+            if prev_rows > 0:
+                row_reduction_pct = round(((prev_rows - rows) / prev_rows) * 100, 2)
+            else:
+                row_reduction_pct = 0.0
+                
         compound_attrition.append({
             "label": label,
             "unique_compounds": compounds,
-            "reduction_pct": reduction_pct
+            "reduction_pct": reduction_pct,
+            "rows": rows,
+            "row_reduction_pct": row_reduction_pct
         })
         
     # 6. Filtration Impact Ranking
@@ -285,7 +295,14 @@ def _get_branch_payload(node_id: str, client_id: Optional[str] = None) -> dict:
         "distribution_shift": {
             "shift_detected": shift_detected,
             "message": shift_message
-        }
+        },
+        # ── Data Reduction Lineage ─────────────────────────────────────────────
+        # Carries raw-ingestion metadata so the UI can display:
+        #   Raw (90) → Dedup → Variance Pruning → Active (55)
+        "segmentation_results": context.segmentation_results if context else {},
+        "harmonization_audit": context.harmonization_audit if context else None,
+        "harmonization_settings": context.harmonization_settings if context else {},
+        "raw_ingestion_count": getattr(context, "raw_ingestion_count", 0) if context else 0,
     }
 
 
@@ -335,9 +352,8 @@ async def get_available_subgroups(client_id: str):
     rows, compounds, missingness %, and the full 9-score AI Predictability Matrix.
     """
     context = _get_context(client_id)
-    engine = _require_engine(context, client_id)
+    engine = context.hierarchy_engine
     
-    subgroups = []
     # Load mapped dataframe to ensure original structure is used
     mapped_path = context.mapped_dataframe_path or context.parquet_path
     if not mapped_path:
@@ -348,6 +364,74 @@ async def get_available_subgroups(client_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read dataset: {e}")
         
+    if not engine:
+        # If hierarchy engine is not initialized (e.g. Compound Studio / flat dataset),
+        # return a single "Root Dataset" subgroup.
+        from backend.core.predictability_engine import AIPredictabilityEngine
+        analysis = AIPredictabilityEngine.analyze_subgroup(df_base, context.mappings, "Root Dataset")
+        
+        # Calculate 9 scores from predictability engine metrics
+        unique_compounds = analysis["unique_compounds"]
+        missing_pct = analysis["missing_pct"]
+        duplicate_percentage = analysis["duplicate_percentage"]
+        feature_variance = analysis["feature_variance"]
+        
+        # 1. Sufficiency Score
+        if unique_compounds < 50:
+            sufficiency_score = 15.0
+        elif unique_compounds < 150:
+            sufficiency_score = 45.0
+        elif unique_compounds < 500:
+            sufficiency_score = 75.0
+        else:
+            sufficiency_score = min(100.0, 75.0 + (unique_compounds - 500) / 1500.0 * 25.0)
+
+        # 2. Completeness Score
+        completeness_score = max(0.0, 100.0 - missing_pct * 2.0)
+
+        # 3. Balance Score
+        imbalance_ratio = analysis["imbalance_ratio"]
+        balance_score = imbalance_ratio * 100.0
+
+        # 4. Duplicate/Redundancy Score
+        dup_score = max(0.0, 100.0 - duplicate_percentage * 2.0)
+
+        # Build 9 scores
+        ai_predictability = analysis["ai_predictability_score"]
+        qsar_potential = round(sufficiency_score * 0.6 + balance_score * 0.4)
+        data_quality = round(completeness_score * 0.5 + dup_score * 0.5)
+        chemical_diversity = round(min(100.0, 30.0 + min(unique_compounds, 2000)/20))
+        coverage = round(min(100.0, 50.0 + unique_compounds / max(len(df_base), 1) * 50.0))
+        missingness = round(100.0 - missing_pct)
+        
+        scores = {
+            "ai_predictability_score": round(ai_predictability),
+            "qsar_potential_score": round(qsar_potential),
+            "data_quality_score": round(data_quality),
+            "chemical_diversity_score": round(chemical_diversity),
+            "completeness_score": round(completeness_score),
+            "balance_score": round(balance_score),
+            "coverage_score": round(coverage),
+            "missingness_score": round(missingness),
+            "duplicate_score": round(dup_score)
+        }
+        
+        return [{
+            "node_id": "root",
+            "subgroup_name": "Root Dataset",
+            "path": "Root",
+            "rows": len(df_base),
+            "compounds": unique_compounds,
+            "missing_pct": missing_pct,
+            "ai_score": ai_predictability,
+            "scores": scores,
+            "recommendation": "Recommended",
+            "reasons": ["Entire dataset is treated as the primary subgroup."],
+            "recommended": True,
+            "is_leaf": True
+        }]
+        
+    subgroups = []
     for node_id, detail in engine.node_details.items():
         metadata = detail.get("metadata", {})
         
@@ -459,7 +543,7 @@ async def select_subgroups(client_id: str, payload: SubgroupSelectPayload):
     saving the result to context.parquet_path for all subsequent steps (Enrichment, etc.).
     """
     context = _get_context(client_id)
-    engine = _require_engine(context, client_id)
+    engine = context.hierarchy_engine
     
     if not payload.node_ids:
         raise HTTPException(status_code=400, detail="Please select at least one subgroup.")
@@ -477,19 +561,25 @@ async def select_subgroups(client_id: str, payload: SubgroupSelectPayload):
         raise HTTPException(status_code=500, detail=f"Failed to read mapped dataset: {e}")
         
     slices = []
-    for node_id in payload.node_ids:
-        if node_id not in engine.node_details:
-            raise HTTPException(status_code=404, detail=f"Subgroup node '{node_id}' not found.")
+    if not engine:
+        for node_id in payload.node_ids:
+            if node_id != "root":
+                raise HTTPException(status_code=404, detail=f"Subgroup node '{node_id}' not found.")
+            slices.append(df_base)
+    else:
+        for node_id in payload.node_ids:
+            if node_id not in engine.node_details:
+                raise HTTPException(status_code=404, detail=f"Subgroup node '{node_id}' not found.")
+                
+            detail = engine.node_details[node_id]
+            metadata = detail.get("metadata", {})
+            filters = {**metadata.get("inherited_filters", {}), **metadata.get("applied_filter", {})}
             
-        detail = engine.node_details[node_id]
-        metadata = detail.get("metadata", {})
-        filters = {**metadata.get("inherited_filters", {}), **metadata.get("applied_filter", {})}
-        
-        df_slice = df_base
-        for col, val in filters.items():
-            if col in df_slice.columns:
-                df_slice = df_slice[df_slice[col].astype(str) == str(val)]
-        slices.append(df_slice)
+            df_slice = df_base
+            for col, val in filters.items():
+                if col in df_slice.columns:
+                    df_slice = df_slice[df_slice[col].astype(str) == str(val)]
+            slices.append(df_slice)
         
     # Combine slices and drop duplicates
     df_combined = pd.concat(slices).drop_duplicates()
@@ -506,7 +596,10 @@ async def select_subgroups(client_id: str, payload: SubgroupSelectPayload):
     # Extract name for metadata
     subgroup_name = "Combined Subgroups"
     if len(payload.node_ids) == 1:
-        subgroup_name = engine.node_details[payload.node_ids[0]].get("metadata", {}).get("node_name", "Subgroup")
+        if engine:
+            subgroup_name = engine.node_details[payload.node_ids[0]].get("metadata", {}).get("node_name", "Subgroup")
+        else:
+            subgroup_name = "Root Dataset"
         
     # Find chemical column for unique count
     chem_col = None

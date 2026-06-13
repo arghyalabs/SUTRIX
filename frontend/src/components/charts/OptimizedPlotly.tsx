@@ -28,8 +28,13 @@ export const OptimizedPlotly: React.FC<PlotProps> = ({ data, layout, useGL = fal
     );
   }
 
-  // Deep clone the layout object to prevent Plotly from mutatively cross-wiring nested objects (xaxis, yaxis) between multiple charts on the same page
-  const parsedLayout = JSON.parse(JSON.stringify(layout));
+  let parsedLayout = layout;
+  try {
+    // Deep clone the layout object to prevent Plotly from mutatively cross-wiring nested objects (xaxis, yaxis) between multiple charts on the same page
+    parsedLayout = JSON.parse(JSON.stringify(layout));
+  } catch (e) {
+    console.warn("OptimizedPlotly: Failed to deep clone layout, falling back to original", e);
+  }
 
   const finalLayout = {
     ...parsedLayout,

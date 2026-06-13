@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from '../../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Server, Cpu, Database, Wifi, WifiOff, RefreshCw, Package } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_BASE = API_BASE_URL;
 
 interface SystemMetrics {
   cpu_pct: number;

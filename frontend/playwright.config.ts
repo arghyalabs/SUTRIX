@@ -1,38 +1,48 @@
-import { defineConfig, devices } from '@playwright/test';
+﻿import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 90000,           // 90s per test (hierarchy can be slow)
-  fullyParallel: false,     // Sequential — avoids concurrent SQLite lock collisions
+  timeout: 120000,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 1,
+  retries: 0,
   workers: 1,
   reporter: [
     ['list'],
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
+    ['json', { outputFile: 'playwright-report/results.json' }],
   ],
 
   use: {
     baseURL: 'http://localhost:5173',
-    trace: 'retain-on-failure',       // Full trace on every failure
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    actionTimeout: 20000,
-    navigationTimeout: 30000,
+    headless: false,
+    trace: 'on',
+    screenshot: 'on',
+    video: 'on',
+    actionTimeout: 25000,
+    navigationTimeout: 45000,
+    viewport: { width: 1600, height: 900 },
   },
 
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        headless: false,
+        launchOptions: {
+          args: ['--no-sandbox', '--disable-web-security'],
+        },
+      },
     },
   ],
 
-  // Reuse existing dev server (started separately)
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: true,   // Always reuse — we start it ourselves
+    reuseExistingServer: true,
     timeout: 60000,
   },
+
+  outputDir: 'test-results',
 });

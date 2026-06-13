@@ -44,7 +44,8 @@ interface ReadinessAssessment {
 }
 
 export const QSARReadinessWorkspace: React.FC = () => {
-  const { clientId, setActiveTab } = useWorkspaceStore();
+  const { workspaceId, setActiveTab } = useWorkspaceStore();
+  const clientId = workspaceId;
   
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [assessment, setAssessment] = useState<ReadinessAssessment | null>(null);

@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, Grid, BarChart2, Zap, Activity, Download,
   LogOut, HelpCircle, FileDigit, Scale, Network, CheckSquare, Settings,
-  Brain, Search, RefreshCw, GitBranch, Filter, Sliders, ChevronRight, ChevronLeft, Lock
+  Brain, Search, RefreshCw, GitBranch, Filter, Sliders, ChevronRight, ChevronLeft, 
+  Lock, AlertTriangle, Check, Database, AlertCircle, Loader2
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { SUTRIXLogo, LogoLoader } from '../ui/SUTRIXLogo';
@@ -11,9 +12,14 @@ import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { DatasetModeBadge } from '../ui/DatasetModeBadge';
 import ActiveSubgroupBanner from '../ui/ActiveSubgroupBanner';
 
+// Navigation Imports
+import { useStudioNavigation } from '../studio/navigation/StudioNavigationProvider';
+import { CommandPalette } from '../studio/navigation/CommandPalette';
+import { HeaderWorkflowNavigator } from '../navigation/HeaderWorkflowNavigator';
+
 // Tabs that need true fullscreen (no scroll wrapper, no padding, no page-level scroll)
 const TRUE_FULLSCREEN_TABS = new Set([
-  'hierarchy', 'advanced-tree', 'analysis'
+  'hierarchy', 'advanced-tree', 'analysis', 'feature-selection', 'reports'
 ]);
 
 // Full-width tabs that are scrollable (no horizontal padding limit, but scroll naturally)
@@ -45,6 +51,22 @@ interface DashboardLayoutProps {
   };
 }
 
+const WarningBanner: React.FC = () => {
+  const nav = useStudioNavigation();
+  if (!nav) return null;
+  const warning = nav.getWarning(nav.activeTab);
+  if (!warning) return null;
+  return (
+    <div className="mx-6 mt-4 p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start gap-3">
+      <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+      <div className="flex flex-col">
+        <span className="text-xs font-bold text-amber-300">Prerequisite Warning</span>
+        <span className="text-[11px] text-amber-400/80 mt-0.5 leading-relaxed">{warning}</span>
+      </div>
+    </div>
+  );
+};
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
   activeTab,
@@ -56,98 +78,132 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   onSwitchWorkspace,
   telemetryData = { ram_usage_pct: 42, fps: 60, active_jobs_count: 0 }
 }) => {
-  const [collapsed, setCollapsed] = useState(true);
-  const [showHelp, setShowHelp] = useState(false);
+  const { 
+    sidebarPinned, 
+    setSidebarPinned, 
+    datasetMode, 
+    detectedDomain, 
+    structureState,
+    filename,
+    rowCount
+  } = useWorkspaceStore();
 
-  // Retrieve dataset mode and passport info from store
-  const { datasetMode, detectedDomain, structureState } = useWorkspaceStore();
+  const [isHovered, setIsHovered] = useState(false);
+  const isExpanded = sidebarPinned || isHovered;
+
+  const nav = useStudioNavigation();
 
   const SUTRIX_TABS: SidebarItem[] = [
-    { id: 'ingest',             name: 'Upload Dataset',                  icon: <Upload className="w-5 h-5" />,       stepNum: 1 },
-    { id: 'mapping',            name: 'Variable Mapping',                icon: <Grid className="w-5 h-5" />,         stepNum: 2 },
-    { id: 'hierarchy',          name: 'Hierarchy Generation',            icon: <Network className="w-5 h-5" />,      stepNum: 3 },
-    { id: 'analysis',           name: 'Variance & Segregation',          icon: <BarChart2 className="w-5 h-5" />,    stepNum: 4 },
-    { id: 'subgroup-selection', name: 'Subgroup Selection Hub',          icon: <Filter className="w-5 h-5" />,       stepNum: 5 },
-    { id: 'structure-assessment', name: 'Structure Assessment',            icon: <FileDigit className="w-5 h-5" />,    stepNum: 6 },
-    { id: 'structure-recovery',   name: 'Structure Recovery',              icon: <Search className="w-5 h-5" />,       stepNum: 7 },
-    { id: 'enrichment',         name: 'Descriptor Enrichment',           icon: <Zap className="w-5 h-5" />,          stepNum: 8 },
-    { id: 'compound-explorer',  name: 'Compound Explorer',               icon: <Search className="w-5 h-5" />,       stepNum: 9 },
-    { id: 'readiness',          name: 'AI & QSAR Readiness',             icon: <CheckSquare className="w-5 h-5" />,  stepNum: 10 },
-    { id: 'feature-selection',  name: 'Feature Selection',               icon: <Sliders className="w-5 h-5" />,      stepNum: 11 },
-    { id: 'sci-intelligence',   name: 'Scientific Intelligence',         icon: <Brain className="w-5 h-5" />,        stepNum: 12 },
-    { id: 'reports',            name: 'Export & Packaging',              icon: <Download className="w-5 h-5" />,     stepNum: 13 },
+    { id: 'ingest',             name: 'Dataset Assessment',              icon: <Upload className="w-5 h-5" />,       stepNum: 1 },
+    { id: 'structure-recovery',   name: 'Structure Recovery',              icon: <Search className="w-5 h-5" />,       stepNum: 2 },
+    { id: 'enrichment',         name: 'Descriptor Engineering',          icon: <Zap className="w-5 h-5" />,          stepNum: 3 },
+    { id: 'readiness',          name: 'Applicability Domain',            icon: <CheckSquare className="w-5 h-5" />,  stepNum: 4 },
+    { id: 'reports',            name: 'OECD Audit',                      icon: <Download className="w-5 h-5" />,     stepNum: 5 },
   ];
 
-  const store = useWorkspaceStore();
   const isTabLocked = (tabId: string): boolean => {
+    if (nav) {
+      return nav.getStepStatus(tabId) === 'blocked';
+    }
     return false;
   };
 
-  // Dynamically filter out Step 7 (Structure Recovery) if dataset has 100% SMILES coverage
-  const sidebarItems = SUTRIX_TABS.filter(item => {
-    if (item.id === 'structure-recovery') {
-      return structureState !== 'MOLECULAR';
-    }
-    return true;
-  }).map((item, idx) => ({
-    ...item,
-    stepNum: idx + 1
-  }));
+  // Dynamically map navigation items from the provider context or fallback
+  const sidebarItems = nav
+    ? nav.steps.map((step, idx) => ({
+        id: step.id,
+        name: step.label,
+        icon: step.icon,
+        stepNum: idx + 1
+      }))
+    : SUTRIX_TABS.filter(item => {
+        if (item.id === 'structure-recovery') {
+          return structureState !== 'MOLECULAR';
+        }
+        return true;
+      }).map((item, idx) => ({
+        ...item,
+        stepNum: idx + 1
+      }));
 
   const currentStep = sidebarItems.find(i => i.id === activeTab) || {
     stepNum: 1,
     name: activeTab
   };
 
-  const currentIndex = sidebarItems.findIndex(i => i.id === activeTab);
-  const nextItem = currentIndex !== -1 && currentIndex < sidebarItems.length - 1 ? sidebarItems[currentIndex + 1] : null;
-  const prevItem = currentIndex > 0 ? sidebarItems[currentIndex - 1] : null;
+  const completedCount = nav && nav.steps
+    ? nav.steps.filter(s => nav.getStepStatus(s.id) === 'completed' || s.id === nav.activeTab).length
+    : 0;
+  const pct = nav && nav.steps && nav.steps.length > 0
+    ? Math.round((completedCount / nav.steps.length) * 100)
+    : 0;
+
+  const renderProgressBar = (percentage: number) => {
+    const totalBars = 10;
+    const filledBars = Math.round((percentage / 100) * totalBars);
+    const emptyBars = totalBars - filledBars;
+    return '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+  };
 
   return (
     <Tooltip.Provider delayDuration={200}>
-      <div className="flex h-screen bg-void text-primary font-sans overflow-hidden selection:bg-cyan-500/30">
+      <div className="flex h-screen bg-[#030b18] text-white overflow-hidden selection:bg-cyan-500/30">
         
         {/* Floating Sidebar */}
         <motion.aside
           initial={false}
-          animate={{ width: collapsed ? 88 : 280 }}
-          className="relative flex flex-col glass-elevated my-4 ml-4 mr-4 rounded-2xl shrink-0 z-20 overflow-hidden"
-          onHoverStart={() => setCollapsed(false)}
-          onHoverEnd={() => setCollapsed(true)}
+          animate={{ width: isExpanded ? 280 : 80 }}
+          className="relative flex flex-col glass-elevated my-4 ml-4 mr-4 rounded-2xl shrink-0 z-20 overflow-hidden bg-[#050d1a]/90 backdrop-blur-xl border border-white/[0.08]"
+          onHoverStart={() => setIsHovered(true)}
+          onHoverEnd={() => setIsHovered(false)}
         >
           {/* Header */}
-          <div className="flex flex-col border-b border-white/[0.06] shrink-0 p-4 gap-2">
-            <div className="flex items-center h-16 gap-4">
-              <div className="shrink-0 cursor-pointer" onClick={onGoHome}>
-                <LogoLoader size="w-12 h-12" compact />
+          <div className={`flex flex-col border-b border-white/[0.06] shrink-0 py-4 ${!isExpanded ? 'items-center' : 'px-4'} gap-2`}>
+            <div className={`flex items-center h-16 ${!isExpanded ? 'justify-center' : 'gap-3'}`}>
+              <div className="shrink-0 flex items-center justify-center w-12 h-12">
+                <SUTRIXLogo className="w-10 h-10" />
               </div>
               <AnimatePresence>
-                {!collapsed && (
+                {isExpanded && (
                   <motion.div 
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                     className="whitespace-nowrap min-w-0"
                   >
-                    <p className="font-extrabold tracking-[0.2em] text-xl text-white leading-none">SUTRIX</p>
-                    <p className="text-[10px] font-semibold tracking-[0.15em] text-white/40 uppercase mt-1">SDO Platform</p>
+                    <div className="text-xl font-extrabold tracking-[0.2em] leading-none text-white">SUTRIX</div>
+                    <div className="text-[10px] text-slate-500 font-medium tracking-wider uppercase mt-1">SDO Platform</div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+            
+            {/* Badges */}
             <AnimatePresence>
-              {!collapsed && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-wrap gap-1.5 mt-1"
-                >
-                  <DatasetModeBadge />
-                  {detectedDomain && (
-                    <span className="px-2 py-0.5 rounded-full text-[9px] bg-white/[0.04] border border-white/[0.08] text-white/60 truncate max-w-[120px]">
-                      {detectedDomain}
+              {!isExpanded && (
+                <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px] font-bold">
+                  5
+                </div>
+              )}
+              {isExpanded && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-2 mt-2">
+                  <div className="inline-flex self-start items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">
+                      Studio 5
                     </span>
+                  </div>
+                  <div className="text-xs font-bold text-white/90 leading-snug">QSAR Studio</div>
+                  
+                  {filename ? (
+                    <div className="mt-1 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <Check className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                      <span className="text-[10px] text-emerald-300 truncate font-medium">{filename}</span>
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                      <AlertCircle className="w-3 h-3 text-slate-600 flex-shrink-0" />
+                      <span className="text-[10px] text-slate-600 font-medium">No Dataset Loaded</span>
+                    </div>
                   )}
                 </motion.div>
               )}
@@ -155,67 +211,100 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
 
           {/* Nav Items */}
-          <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+          <div className={`flex-1 overflow-y-auto py-4 ${isExpanded ? 'px-3' : 'px-2'} space-y-2 scrollbar-none`}>
+            {/* Studio Overview Drawer */}
+            {isExpanded && nav && nav.steps && nav.steps.length > 0 && (
+              <div className="mb-4 flex flex-col gap-1.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                <div className="text-xs font-extrabold text-white/90 leading-tight">QSAR Studio</div>
+                <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 font-bold mt-1">
+                  <span>{renderProgressBar(pct)}</span>
+                  <span className="text-cyan-400">{pct}%</span>
+                </div>
+                {rowCount > 0 && (
+                  <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
+                    {rowCount.toLocaleString()} rows loaded
+                  </div>
+                )}
+              </div>
+            )}
+
             {sidebarItems.map((item) => {
               const isActive = activeTab === item.id;
               const locked = isTabLocked(item.id);
               
+              const status = nav ? nav.getStepStatus(item.id) : (locked ? 'blocked' : (isActive ? 'active' : 'completed'));
+              const isCompleted = status === 'completed';
+              const isBlocked = status === 'blocked';
+              const isActiveStep = status === 'active';
+
+              // Optional structure recovery badge
+              const isOptional = (item.id === 'structure-recovery' && 
+                ((structureState as string) === 'CAS_ONLY' || (structureState as string) === 'FORMULA_ONLY'));
+
               const ButtonContent = (
                 <button
                   id={`sidebar-tab-${item.id}`}
                   onClick={() => {
-                    if (!locked) setActiveTab(item.id);
+                    if (nav) {
+                      nav.handleJump(item.id);
+                    } else if (!locked) {
+                      setActiveTab(item.id);
+                    }
                   }}
-                  disabled={locked}
-                  className={`w-full flex items-center h-12 rounded-xl transition-all duration-200 group relative
-                    ${collapsed ? 'justify-center' : 'justify-start'}
-                    ${isActive ? 'bg-white/[0.08] text-white' : locked ? 'opacity-50 cursor-not-allowed text-secondary/50 hover:bg-transparent' : 'text-secondary hover:bg-white/[0.04] hover:text-white'}
+                  disabled={isBlocked}
+                  className={`w-full flex items-center h-11 rounded-xl transition-all duration-200 group relative text-left
+                    ${isExpanded ? 'px-3 gap-3' : 'justify-center'}
+                    ${isActiveStep 
+                      ? 'bg-cyan-500/10 text-white border border-cyan-500/20' 
+                      : isBlocked 
+                        ? 'opacity-40 cursor-not-allowed text-slate-600 hover:bg-transparent' 
+                        : 'text-slate-400 hover:bg-white/[0.03] hover:text-white border border-transparent'
+                    }
                   `}
                 >
-                  {isActive && (
+                  {isActiveStep && (
                     <motion.div 
-                      layoutId="activeTabIndicator"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-cyan-400 rounded-r-full"
+                      layoutId="activeTabIndicator" 
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-cyan-400 rounded-r-full"
                     />
                   )}
-                  <div className="w-12 h-12 flex items-center justify-center shrink-0">
-                    <span className={isActive ? 'text-cyan-400' : 'group-hover:text-cyan-400/70 transition-colors'}>
-                      {item.icon}
-                    </span>
+                  
+                  {/* Step Icon */}
+                  <div className={`w-8 h-8 flex items-center justify-center shrink-0 rounded-lg bg-white/[0.02] border border-white/[0.04]
+                    ${isActiveStep ? 'text-cyan-400 border-cyan-500/20' : 'text-slate-500 group-hover:text-slate-300'}`}>
+                    {item.icon}
                   </div>
-                  <AnimatePresence>
-                    {!collapsed && (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex-1 flex items-center justify-between pr-3 overflow-hidden"
-                      >
-                        <span className="font-medium text-sm truncate">{item.name}</span>
-                        {locked ? (
-                          <Lock className="w-3.5 h-3.5 text-white/20" />
-                        ) : isActive && (
-                          <span className="text-[10px] bg-cyan-400/20 text-cyan-400 px-2 py-0.5 rounded-full font-mono">S{item.stepNum}</span>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+
+                  {isExpanded && (
+                    <div className="flex-1 flex items-center justify-between min-w-0 pr-1">
+                      <span className="font-semibold text-xs truncate">{item.name}</span>
+                      
+                      {/* Status Indicator */}
+                      {isBlocked ? (
+                        <Lock className="w-3.5 h-3.5 text-rose-500/80 shrink-0" />
+                      ) : isCompleted ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 font-bold" />
+                      ) : isOptional ? (
+                        <span className="text-[8px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">Opt</span>
+                      ) : isActiveStep ? (
+                        <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full shrink-0 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                      ) : (
+                        <span className="w-1.5 h-1.5 border border-slate-600 rounded-full shrink-0" />
+                      )}
+                    </div>
+                  )}
                 </button>
               );
 
-              return collapsed ? (
+              return !isExpanded ? (
                 <Tooltip.Root key={item.id}>
-                  <Tooltip.Trigger asChild>
-                    {ButtonContent}
-                  </Tooltip.Trigger>
+                  <Tooltip.Trigger asChild>{ButtonContent}</Tooltip.Trigger>
                   <Tooltip.Portal>
-                    <Tooltip.Content 
-                      side="right" 
-                      sideOffset={16}
-                      className="glass px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xl animate-in fade-in zoom-in-95 z-50"
-                    >
-                      {item.name}
-                      <Tooltip.Arrow className="fill-[rgba(10,15,30,0.8)]" />
+                    <Tooltip.Content side="right" sideOffset={16} className="bg-[#050d1a] border border-white/[0.08] px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-2xl z-50">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-white">{item.name}</span>
+                      </div>
+                      <Tooltip.Arrow className="fill-[#050d1a]" />
                     </Tooltip.Content>
                   </Tooltip.Portal>
                 </Tooltip.Root>
@@ -225,169 +314,57 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             })}
           </div>
 
-          {/* Footer */}
-          <div className="p-3 border-t border-white/[0.06] space-y-1 shrink-0">
-            {/* Switch Workspace */}
+          {/* Footer Utilities */}
+          <div className={`py-3 border-t border-white/[0.06] space-y-2 shrink-0 ${isExpanded ? 'px-3' : 'px-2'}`}>
             {onSwitchWorkspace && (
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button
-                    onClick={onSwitchWorkspace}
-                    className={`w-full flex items-center h-12 rounded-xl text-cyan-400 hover:bg-cyan-500/10 transition-colors
-                      ${collapsed ? 'justify-center' : 'justify-start'}
-                    `}
-                  >
-                    <div className="w-12 h-12 flex items-center justify-center shrink-0">
-                      <RefreshCw className="w-5 h-5 text-cyan-400" />
-                    </div>
-                    <AnimatePresence>
-                      {!collapsed && (
-                        <motion.span
-                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className="font-semibold text-sm truncate whitespace-nowrap"
-                        >
-                          Switch Workspace
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </button>
-                </Tooltip.Trigger>
-                {collapsed && (
-                  <Tooltip.Portal>
-                    <Tooltip.Content side="right" sideOffset={16}
-                      className="glass px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xl animate-in fade-in zoom-in-95 z-50"
-                    >
-                      Switch Workspace
-                      <Tooltip.Arrow className="fill-[rgba(10,15,30,0.8)]" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                )}
-              </Tooltip.Root>
+              <SidebarUtilButton
+                icon={<RefreshCw className="w-5 h-5 text-cyan-400" />}
+                label="Switch Workspace"
+                onClick={onSwitchWorkspace}
+                isExpanded={isExpanded}
+              />
             )}
-
-            {/* System Monitor — utility shortcut, not a workflow step */}
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <button
-                  onClick={() => onOpenSystem ? onOpenSystem() : setActiveTab('benchmark')}
-                  className={`w-full flex items-center h-12 rounded-xl transition-colors
-                    ${collapsed ? 'justify-center' : 'justify-start'}
-                    ${activeTab === 'benchmark' ? 'bg-white/[0.08] text-white' : 'text-secondary hover:bg-white/[0.04] hover:text-white'}
-                  `}
-                >
-                  <div className="w-12 h-12 flex items-center justify-center shrink-0">
-                    <Activity className={`w-5 h-5 ${activeTab === 'benchmark' ? 'text-cyan-400' : ''}`} />
-                  </div>
-                  <AnimatePresence>
-                    {!collapsed && (
-                      <motion.span
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="font-medium text-sm truncate"
-                      >
-                        System Monitor
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </button>
-              </Tooltip.Trigger>
-              {collapsed && (
-                <Tooltip.Portal>
-                  <Tooltip.Content side="right" sideOffset={16}
-                    className="glass px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xl animate-in fade-in zoom-in-95 z-50"
-                  >
-                    System Monitor
-                    <Tooltip.Arrow className="fill-[rgba(10,15,30,0.8)]" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              )}
-            </Tooltip.Root>
-
-            <button 
+            <SidebarUtilButton
+              icon={<Activity className="w-5 h-5" />}
+              label="System Monitor"
+              onClick={() => onOpenSystem ? onOpenSystem() : setActiveTab('benchmark')}
+              isActive={activeTab === 'benchmark'}
+              isExpanded={isExpanded}
+            />
+            <SidebarUtilButton
+              icon={<Scale className="w-5 h-5 text-cyan-400" />}
+              label="AGPL-3.0 License"
               onClick={onOpenLicense}
-              className={`w-full flex items-center h-12 rounded-xl text-secondary hover:bg-white/[0.04] hover:text-white transition-colors
-                ${collapsed ? 'justify-center' : 'justify-start'}
-              `}
-            >
-              <div className="w-12 h-12 flex items-center justify-center shrink-0"><Scale className="w-5 h-5 text-cyan-400" /></div>
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.span 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="font-bold text-xs truncate tracking-wider text-cyan-400"
-                  >
-                    AGPL-3.0 License
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
-
-            <button 
+              isExpanded={isExpanded}
+            />
+            <SidebarUtilButton
+              icon={<LogOut className="w-5 h-5" />}
+              label="Exit Workspace"
               onClick={onExit}
-              className={`w-full flex items-center h-12 rounded-xl text-rose-500/80 hover:bg-rose-500/10 hover:text-rose-500 transition-colors
-                ${collapsed ? 'justify-center' : 'justify-start'}
-              `}
-            >
-              <div className="w-12 h-12 flex items-center justify-center shrink-0"><LogOut className="w-5 h-5" /></div>
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.span 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="font-medium text-sm truncate whitespace-nowrap"
-                  >
-                    Exit Workspace
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
+              variant="danger"
+              isExpanded={isExpanded}
+            />
+            <SidebarUtilButton
+              icon={sidebarPinned ? <ChevronLeft className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
+              label={sidebarPinned ? "Collapse Sidebar" : "Pin Sidebar"}
+              onClick={() => setSidebarPinned(!sidebarPinned)}
+              isExpanded={isExpanded}
+            />
           </div>
         </motion.aside>
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 relative h-full overflow-hidden">
-          {/* Topbar */}
-          <header className="h-16 shrink-0 flex items-center justify-between px-6 z-10 border-b border-white/[0.04]">
-            <div className="flex items-center gap-4">
-              {prevItem && (
-                <button
-                  onClick={() => setActiveTab(prevItem.id)}
-                  className="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-100 transition-all text-xs font-bold flex items-center gap-1.5 shadow-[0_2px_8px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
-                </button>
-              )}
-              <div className="text-secondary text-sm font-medium flex items-center gap-2">
-                <span className="text-white/30 text-xs">Step {currentStep?.stepNum || 1} / {sidebarItems.length}</span>
-                <span className="text-white/[0.15]">&bull;</span> 
-                <span className="text-white font-semibold">{currentStep?.name || activeTab}</span>
-                <span className="text-white/[0.15]">&bull;</span> 
-                <DatasetModeBadge />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {nextItem && (
-                <button
-                  onClick={() => setActiveTab(nextItem.id)}
-                  className="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-100 transition-all text-xs font-bold flex items-center gap-1.5 shadow-[0_2px_8px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  Next <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {telemetryData.active_jobs_count > 0 && (
-                <div className="px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
-                  </span>
-                  Processing
-                </div>
-              )}
-            </div>
+          {/* Topbar with Crumbs and Chips */}
+          <header className="flex-shrink-0 flex flex-col justify-center px-6 py-3 bg-[#050d1a]/80 backdrop-blur-md border-b border-white/[0.04] z-10 min-h-[72px]">
+            <HeaderWorkflowNavigator studioId="qsar" isProcessing={telemetryData.active_jobs_count > 0} />
           </header>
 
-          {/* Content Area — truly fullscreen for hierarchy/analysis canvases, scrollable full-width for other scientific tabs, padded for general pages */}
+          {nav && <WarningBanner />}
+
+          {/* Content Area */}
           {TRUE_FULLSCREEN_TABS.has(activeTab) ? (
-            <div className="flex-1 overflow-hidden flex flex-col justify-between">
+            <div className="flex-1 overflow-hidden flex flex-col justify-between relative">
               <div className="flex-1 overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -404,7 +381,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </div>
             </div>
           ) : SCROLLABLE_FULL_WIDTH_TABS.has(activeTab) ? (
-            <div className="flex-1 overflow-y-auto flex flex-col justify-between">
+            <div className="flex-1 overflow-y-auto flex flex-col justify-between relative">
               <div className="flex-1 flex flex-col">
                 {['structure', 'recovery', 'enrichment', 'readiness', 'sci-intelligence', 'compound-explorer', 'feature-selection', 'reports'].includes(activeTab) && (
                   <div className="px-6 pt-4 shrink-0">
@@ -427,7 +404,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto flex flex-col justify-between">
+            <div className="flex-1 overflow-y-auto flex flex-col justify-between relative">
               <div className="px-8 py-8 pb-16 max-w-6xl mx-auto flex-1 w-full">
                 {['structure', 'recovery', 'enrichment', 'readiness', 'sci-intelligence', 'compound-explorer', 'feature-selection', 'reports'].includes(activeTab) && (
                   <ActiveSubgroupBanner onChangeSubgroup={() => setActiveTab('subgroup-selection')} />
@@ -449,6 +426,56 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         </main>
 
       </div>
+      <CommandPalette />
     </Tooltip.Provider>
+  );
+};
+
+const SidebarUtilButton: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: 'default' | 'danger' | 'hub';
+  isExpanded: boolean;
+  isActive?: boolean;
+}> = ({ icon, label, onClick, disabled, variant = 'default', isExpanded, isActive }) => {
+  const cls = variant === 'danger'
+    ? 'text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10'
+    : isActive
+      ? 'bg-white/[0.08] text-white'
+      : 'text-slate-400 hover:bg-white/[0.05] hover:text-white';
+
+  const ButtonContent = (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full flex items-center h-12 rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed ${cls} ${isExpanded ? 'justify-start px-3 gap-3' : 'justify-center'}`}
+    >
+      <div className="w-10 h-10 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="font-semibold text-sm truncate whitespace-nowrap">
+            {label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  );
+
+  return !isExpanded ? (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>{ButtonContent}</Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content side="right" sideOffset={16} className="bg-[#050d1a] border border-white/[0.08] px-3 py-1.5 rounded-lg text-xs font-medium text-white shadow-xl animate-in fade-in z-50">
+           {label}
+           <Tooltip.Arrow className="fill-[#050d1a]" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  ) : (
+    <div key={label}>{ButtonContent}</div>
   );
 };

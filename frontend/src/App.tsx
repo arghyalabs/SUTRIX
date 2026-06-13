@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, lazy, Suspense } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,8 +14,25 @@ import { workspaceApi } from './services/workspaceApi';
 import { useWorkspaceStore } from './store/useWorkspaceStore';
 import { useWebSocket } from './performance/useWebSocket';
 
-// Components
+// V6 Hub & Studio Architecture
 import { LandingPage } from './components/landing/LandingPage';
+import { WorkspaceSelectionHub } from './components/hub/WorkspaceSelectionHub';
+import { StudioShell } from './components/studio/StudioShell';
+import { NormalizationStudio } from './components/studio/normalization/NormalizationStudio';
+import { AnalyticsStudio } from './components/studio/analytics/AnalyticsStudio';
+import { QSARStudio } from './components/studio/qsar/QSARStudio';
+import { OECDValidationStudio } from './components/studio/oecd/OECDValidationStudio';
+import { IntelligenceStudio } from './components/studio/intelligence/IntelligenceStudio';
+import { HierarchyStudio } from './components/studio/hierarchy/HierarchyStudio';
+import { CompoundStudio } from './components/studio/compound/CompoundStudio';
+import { VerificationDashboard } from './components/dashboard/VerificationDashboard';
+import type { StudioId } from './services/workspaceManagerService';
+import { workspaceManager } from './services/workspaceManagerService';
+import { useStudioInit } from './hooks/useStudioInit';
+import { StudioNavigationProvider } from './components/studio/navigation/StudioNavigationProvider';
+import type { NavigationStep } from './components/studio/navigation/StudioNavigationProvider';
+
+// Legacy workspace components (still used inside studios)
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 import { UploadWorkspace } from './components/upload/UploadWorkspace';
 import { DatasetMapping } from './components/mapping/DatasetMapping';
@@ -22,7 +40,7 @@ import { HierarchyBuilder } from './components/segregation/HierarchyBuilder';
 import { DataAnalysisWorkspace } from './components/analysis/DataAnalysisWorkspace';
 import { DescriptorEnrichment } from './components/enrichment/DescriptorEnrichment';
 import { SubgroupSelectionHub } from './components/analysis/SubgroupSelectionHub';
-import { FeatureSelection } from './components/modeling/FeatureSelection';
+import { DescriptorEndpointOptimization } from './components/modeling/DescriptorEndpointOptimization';
 import { GlobalEnrichmentWorkspace } from './components/export/GlobalEnrichmentWorkspace';
 import { ReadinessDashboard } from './components/readiness/ReadinessDashboard';
 import ModelingReadinessWorkspace from './components/modeling/ModelingReadinessWorkspace';
@@ -35,10 +53,10 @@ import { DatasetStructureAssessment } from './components/assessment/DatasetStruc
 import { ChemicalStructureRecovery } from './components/recovery/ChemicalStructureRecovery';
 import { QSARReadinessWorkspace } from './components/readiness/QSARReadinessWorkspace';
 
-// SUTRIX Dual Environment Workspaces and Modals
+// SUTRIX Scientific Workspaces
 import { ScientificInsightsWorkspace } from './components/scientific/ScientificInsightsWorkspace';
 import { ScientificDataExplorer } from './components/scientific/ScientificDataExplorer';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Upload, Filter, FileDigit, Search, Zap, CheckSquare, Sliders, Download, Grid } from 'lucide-react';
 import type { DatasetMode } from './types';
 
 // AGPL-3.0 Compliance Views
@@ -46,6 +64,7 @@ import { LicenseGate } from './components/license/LicenseGate';
 import { LicenseModal } from './components/license/LicenseModal';
 import { SUTRIXLogo, LogoLoader } from './components/ui/SUTRIXLogo';
 import { LoadingScreen } from './components/ui/LoadingScreen';
+
 
 // ===========================================================================
 // ERROR BOUNDARY – catches React render crashes and shows a recoverable UI
@@ -143,12 +162,369 @@ const getErrorMessage = (error: any, fallback: string): string => {
   return fallback;
 };
 
+// ==========================================================================
+// V6 ROOT APP — thin router: landing → hub → studio
+// ==========================================================================
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [licenseAccepted] = useState(() =>
+    localStorage.getItem('sdo_agpl_agreed') === 'true'
+  );
+
+  // Derive current view from URL path
+  const getView = () => {
+    if (location.pathname === '/hub') return 'hub';
+    if (location.pathname === '/verification-dashboard') return 'verification';
+    const studioPaths = ['/hierarchy', '/analytics', '/compound', '/normalization', '/qsar', '/intelligence', '/oecd'];
+    if (studioPaths.some(p => location.pathname.startsWith(p))) return 'studio';
+    return 'landing';
+  };
+
+  const getStudioId = (): StudioId | null => {
+    const map: Record<string, StudioId> = {
+      '/hierarchy': 'hierarchy',
+      '/analytics': 'analytics',
+      '/compound': 'compound',
+      '/normalization': 'normalization',
+      '/qsar': 'qsar',
+      '/intelligence': 'intelligence',
+      '/oecd': 'oecd',
+    };
+    for (const [path, id] of Object.entries(map)) {
+      if (location.pathname.startsWith(path)) return id;
+    }
+    return null;
+  };
+
+  const currentView = getView();
+  const currentStudio = getStudioId();
+
+  if (!licenseAccepted) {
+    return <LicenseGate onAccept={() => {
+      localStorage.setItem('sdo_agpl_agreed', 'true');
+      window.location.reload();
+    }} />;
+  }
+
+  if (currentView === 'landing') {
+    return <LandingPage onEnterHub={() => navigate('/hub')} />;
+  }
+
+  if (currentView === 'hub') {
+    return (
+      <WorkspaceSelectionHub
+        onOpenStudio={(id) => navigate(`/${id}`)}
+        onGoLanding={() => navigate('/')}
+      />
+    );
+  }
+
+  if (currentView === 'verification') {
+    return (
+      <>
+        <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+        <VerificationDashboard onGoBack={() => navigate('/hub')} />
+      </>
+    );
+  }
+
+  // Studio view — route dedicated studios, else fall back to LegacyWorkspaceApp
+  if (currentView === 'studio' && currentStudio) {
+    const goHub = () => navigate('/hub');
+
+    // Studio 1: Hierarchy Builder & Segregation
+    if (currentStudio === 'hierarchy') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl', loading: { icon: <LogoLoader size="w-5 h-5" compact /> } }} />
+          <HierarchyStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 3: Compound Explorer
+    if (currentStudio === 'compound') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl', loading: { icon: <LogoLoader size="w-5 h-5" compact /> } }} />
+          <CompoundStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 4: Normalization — dedicated standalone studio
+    if (currentStudio === 'normalization') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{
+            className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
+          }} />
+          <NormalizationStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 2: Scientific Data Analysis — dedicated standalone studio
+    if (currentStudio === 'analytics') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <AnalyticsStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 5: QSAR / AI Dataset Engineering
+    if (currentStudio === 'qsar') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <QSARStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 7: OECD Validation
+    if (currentStudio === 'oecd') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <OECDValidationStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 6: Scientific Intelligence
+    if (currentStudio === 'intelligence') {
+      return (
+        <>
+          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <IntelligenceStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // All other studios: Legacy pipeline wrapped in studio context
+    return (
+      <>
+        <Toaster position="top-right" toastOptions={{
+          className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
+          loading: { icon: <LogoLoader size="w-5 h-5" compact /> },
+        }} />
+        <LegacyWorkspaceApp
+          studioId={currentStudio}
+          onGoHub={goHub}
+        />
+      </>
+    );
+  }
+
+  return <LandingPage onEnterHub={() => navigate('/hub')} />;
+};
+
+// ==========================================================================
+// QSAR STUDIO STEPS GRAPH CONFIGURATION
+// ==========================================================================
+const qsarStepsConfig: NavigationStep[] = [
+  {
+    id: 'ingest',
+    label: 'Dataset Assessment',
+    icon: <Upload className="w-4 h-4" />,
+    desc: 'Upload and assess dataset structures',
+    nextLabel: 'Proceed to Recovery',
+    nextStep: (store) => {
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'MOLECULAR' || state === 'INCHI_ONLY') {
+        return 'enrichment';
+      }
+      return 'structure-recovery';
+    },
+    validation: (store) => {
+      if (!store.filename) return 'Please upload a dataset or load the demo dataset first.';
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      return true;
+    }
+  },
+  {
+    id: 'structure-recovery',
+    label: 'Structure Recovery',
+    icon: <Search className="w-4 h-4" />,
+    desc: 'Resolve synonyms via PubChem',
+    nextLabel: 'Continue to Descriptor Generation',
+    nextStep: 'enrichment',
+    prevLabel: 'Back to Assessment',
+    previousStep: 'ingest',
+    shouldShow: (store) => {
+      const state = (store.structureState || '').toUpperCase();
+      return state !== 'MOLECULAR' && state !== 'INCHI_ONLY';
+    },
+    validation: (store) => {
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      if ((state === 'MIXED' || state === 'NAME_ONLY') && !store.recoveryCompleted) {
+        return 'Structure recovery is required for Name Only/Mixed datasets.';
+      }
+      return true;
+    },
+    isBlocked: (store) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      return false;
+    },
+    warning: (store) => {
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'FORMULA_ONLY') {
+        return 'Formula-only compounds might not resolve fully during enrichment. Recovery is optional but recommended.';
+      }
+      if (state === 'CAS_ONLY') {
+        return 'CAS-only compounds might not resolve fully. Recovery is optional but recommended.';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'enrichment',
+    label: 'Descriptor Engineering',
+    icon: <Zap className="w-4 h-4" />,
+    desc: 'Generate and optimize descriptors',
+    nextLabel: 'Audit AI Readiness',
+    nextStep: 'readiness',
+    previousStep: (store) => {
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'MOLECULAR' || state === 'INCHI_ONLY') {
+        return 'ingest';
+      }
+      return 'structure-recovery';
+    },
+    validation: (store) => {
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      if ((state === 'MIXED' || state === 'NAME_ONLY') && !store.recoveryCompleted) {
+        return 'Descriptor generation is blocked because recovery was not completed.';
+      }
+      return true;
+    },
+    isBlocked: (store) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      if ((state === 'MIXED' || state === 'NAME_ONLY') && !store.recoveryCompleted) {
+        return 'Structure recovery required first.';
+      }
+      return false;
+    }
+  },
+  {
+    id: 'readiness',
+    label: 'Applicability Domain',
+    icon: <CheckSquare className="w-4 h-4" />,
+    desc: 'OECD compliance and ML readiness assessment',
+    nextLabel: 'Proceed to Export',
+    nextStep: 'reports',
+    prevLabel: 'Back to Descriptors',
+    previousStep: 'enrichment',
+    isBlocked: (store) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      return false;
+    }
+  },
+  {
+    id: 'reports',
+    label: 'OECD Audit',
+    icon: <Download className="w-4 h-4" />,
+    desc: 'OECD validation reports and export',
+    prevLabel: 'Back to Readiness',
+    previousStep: 'readiness',
+    isBlocked: (store) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      const state = (store.structureState || '').toUpperCase();
+      if (state === 'UNRESOLVED') {
+        return 'Dataset contains completely unresolved chemical structures. Progression is blocked.';
+      }
+      return false;
+    }
+  }
+];
+
+
+// ==========================================================================
+// LEGACY WORKSPACE APP — original pipeline, now running inside a studio
+// ==========================================================================
+interface LegacyWorkspaceAppProps {
+  studioId: StudioId;
+  onGoHub: () => void;
+}
+
+export const LegacyWorkspaceApp: React.FC<LegacyWorkspaceAppProps> = (props) => {
+  if (props.studioId === 'qsar') {
+    return (
+      <StudioNavigationProvider
+        steps={qsarStepsConfig}
+        studioId="qsar"
+        onReset={async () => {
+          const store = useWorkspaceStore.getState();
+          const clientId = store.workspaceId || 'qsar_temp';
+          try {
+            await workspaceApi.resetWorkspace(clientId);
+            toast.success('Workspace session reset.');
+          } catch {
+            toast.error('Failed to reset workspace session.');
+          }
+          store.resetWorkspace();
+          window.location.href = '/hub';
+        }}
+        onResetStep={(stepId) => {
+          if (stepId === 'mapping') {
+            const resetMap: any = {};
+            useWorkspaceStore.getState().columns.forEach(c => { resetMap[c] = 'none'; });
+            useWorkspaceStore.getState().setMappings(resetMap);
+          } else if (stepId === 'enrichment') {
+            useWorkspaceStore.getState().setSelectedDescriptors([]);
+          }
+          toast.success(`Cleared inputs for ${stepId}`);
+        }}
+      >
+        <LegacyWorkspaceAppInner {...props} />
+      </StudioNavigationProvider>
+    );
+  }
+
+  return <LegacyWorkspaceAppInner {...props} />;
+};
+
+const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, onGoHub }) => {
   const storeWorkspaceId = useWorkspaceStore(s => s.workspaceId);
+  const currentStudioId = useWorkspaceStore(s => s.currentStudioId);
   const generatedClientId = useRef(`SDO_CORE_${Math.random().toString(36).substring(2, 9)}`).current;
   const clientId = storeWorkspaceId || generatedClientId;
   
-  const [hasLaunched, setHasLaunched] = useState(false);
+  // V6: Clear stale global store when this studio opens fresh
+  useStudioInit(studioId);
+
+  if (currentStudioId !== studioId) {
+    return null;
+  }
+
+  // V6: In studio context, auto-launch pipeline (no landing gate needed)
+  const [hasLaunched, setHasLaunched] = useState(true);
   const [isAppLoading, setIsAppLoading] = useState(false);
 
   // AGPL-3.0 Open-Source License compliance state variables
@@ -619,7 +995,8 @@ const App: React.FC = () => {
   };
 
   if (!hasLaunched && !isAppLoading) {
-    return <LandingPage onLaunch={handleLaunch} />;
+    // V6: immediately show pipeline (studio context already set by parent router)
+    return null;
   }
 
   // Calculate generic telemetry data to pass to topbar
@@ -632,6 +1009,9 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'ingest':
+        if (filename) {
+          return <DatasetStructureAssessment />;
+        }
         return (
           <UploadWorkspace
             filename={filename} rowCount={rowCount} columns={columns} preview={preview}
@@ -672,6 +1052,14 @@ const App: React.FC = () => {
       case 'structure-recovery':
         return <ChemicalStructureRecovery />;
       case 'enrichment':
+        if (useWorkspaceStore.getState().descriptorDatasetReady) {
+          return (
+            <DescriptorEndpointOptimization
+              clientId={clientId}
+              onContinue={() => setActiveTab('readiness')}
+            />
+          );
+        }
         return (
           <DescriptorEnrichment
             enrichmentMode={enrichmentMode} setEnrichmentMode={setEnrichmentMode}
@@ -691,7 +1079,7 @@ const App: React.FC = () => {
         );
       case 'feature-selection':
         return (
-          <FeatureSelection
+          <DescriptorEndpointOptimization
             clientId={clientId}
             onContinue={() => setActiveTab('sci-intelligence')}
           />
@@ -733,6 +1121,7 @@ const App: React.FC = () => {
             clientId={clientId}
             activeJobId={activeJobId || null}
             handleResetWorkspace={handleExit}
+            onNavigate={setActiveTab}
           />
         );
       case 'global-enrichment':
@@ -758,8 +1147,8 @@ const App: React.FC = () => {
       <DashboardLayout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onExit={handleExit}
-        onGoHome={() => setHasLaunched(false)}
+        onExit={onGoHub}
+        onGoHome={onGoHub}
         onOpenLicense={() => setIsLicenseModalOpen(true)}
         onSwitchWorkspace={handleSwitchWorkspace}
         telemetryData={mockTelemetry}

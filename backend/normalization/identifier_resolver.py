@@ -37,7 +37,7 @@ class IdentifierResolver:
                     compounds = pcp.get_compounds(identifier, 'name')
                     if compounds:
                         return compounds[0].isomeric_smiles
-                except:
+                except Exception:
                     pass
         
         return None
@@ -76,6 +76,6 @@ class IdentifierResolver:
                     "name": c.synonyms[0] if c.synonyms else identifier,
                     "cid": c.cid
                 }
-        except:
+        except Exception:
             pass
         return {"name": identifier, "cid": None}

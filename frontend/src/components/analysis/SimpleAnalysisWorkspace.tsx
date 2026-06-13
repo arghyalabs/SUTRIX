@@ -255,23 +255,26 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
 
   // Fetch Tree structure
   const fetchTree = async () => {
-    if (!workspaceId) return;
     try {
+      // 1️⃣  Try in-memory store first (set by WS JOB_COMPLETED handler)
       const lineage = activeLineage || (activeSegregationResult?.graph ? {
         nodes: activeSegregationResult.graph.nodes || [],
         edges: activeSegregationResult.graph.edges || [],
-        root_id: 'root',
+        root_id: activeSegregationResult.graph.root_id || 'root',
       } : null);
 
-      if (lineage?.nodes) {
+      if (lineage?.nodes?.length) {
         setNodesList(lineage.nodes);
         setSelectedNodeId(lineage.root_id || lineage.nodes[0].id);
-      } else {
-        const treeData = await hierarchyApi.getTree(workspaceId);
-        if (treeData && treeData.nodes) {
-          setNodesList(treeData.nodes);
-          setSelectedNodeId(treeData.root_id || treeData.nodes[0].id);
-        }
+        return;
+      }
+
+      // 2️⃣  Fall back to the REST API (requires workspaceId in the store)
+      if (!workspaceId) return;
+      const treeData = await hierarchyApi.getTree(workspaceId);
+      if (treeData && treeData.nodes?.length) {
+        setNodesList(treeData.nodes);
+        setSelectedNodeId(treeData.root_id || treeData.nodes[0].id);
       }
     } catch (err: any) {
       console.error(err);
@@ -291,6 +294,20 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
     try {
       const data = await simpleAnalysisApi.getBranchDetail(nodeId, workspaceId);
       setBranchDetail(data);
+      useWorkspaceStore.getState().setSegregation(data, true);
+      // Sync harmonization data into the store for cross-studio access
+      const storeState = useWorkspaceStore.getState();
+      if (data.harmonization_audit) {
+        storeState.setHarmonizationAudit(data.harmonization_audit);
+      }
+      if (data.harmonization_settings) {
+        storeState.setHarmonizationSettings(data.harmonization_settings);
+      }
+      if (data.raw_ingestion_count && data.raw_ingestion_count > 0) {
+        storeState.setRawIngestionCount(data.raw_ingestion_count);
+      } else if (data.segmentation_results?.original_count > 0) {
+        storeState.setRawIngestionCount(data.segmentation_results.original_count);
+      }
     } catch (err: any) {
       console.error(err);
       setError(err?.response?.data?.detail || 'Failed to analyze selected branch.');
@@ -298,6 +315,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   const fetchNodeDetail = async (nodeId: string) => {
     if (!workspaceId) return;
@@ -701,6 +719,71 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           </div>
         )}
 
+        {/* ── Data Harmonization Summary Banner ─────────────────────────────── */}
+        {explorerTab === 'overview' && (() => {
+          const segRes = branchDetail?.segmentation_results || {};
+          const harmAudit = branchDetail?.harmonization_audit;
+          const rawCount = branchDetail?.raw_ingestion_count || segRes?.original_count || 0;
+          const activeCount = segRes?.input_records || branchDetail?.stats?.total_rows || 0;
+          const prunedCount = rawCount > 0 ? rawCount - activeCount : 0;
+
+          // Show banner only if: we have raw count AND rows were pruned
+          if (rawCount <= 0 || prunedCount <= 0) return null;
+
+          const dedupRemoved = harmAudit?.deduplication?.removed_rows ?? (segRes?.dedup_stats?.duplicates_removed ?? 0);
+          const varianceRemoved = harmAudit?.variance_pruning?.removed_rows ?? (prunedCount - dedupRemoved);
+          const consistencyScore = harmAudit?.variance_pruning?.consistency_score ?? (segRes?.variance_summary?.consistency_score ?? null);
+
+          return (
+            <div className="bg-violet-500/[0.06] border border-violet-500/25 rounded-2xl overflow-hidden">
+              <div className="flex items-start gap-3 p-4">
+                <div className="shrink-0 w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center mt-0.5">
+                  <Database className="w-4 h-4 text-violet-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-extrabold text-violet-300 tracking-wide">Dataset Harmonization Summary</span>
+                    <span className="text-[9px] font-bold text-violet-500 uppercase tracking-wider bg-violet-500/10 px-1.5 py-0.5 rounded">Auto-Detected</span>
+                  </div>
+                  <p className="text-[11px] text-white/50 leading-relaxed">
+                    Raw dataset was reduced from{' '}
+                    <span className="text-white font-bold">{rawCount.toLocaleString()} rows</span>{' '}to{' '}
+                    <span className="text-violet-300 font-bold">{activeCount.toLocaleString()} rows</span>{' '}
+                    (<span className="text-rose-400 font-semibold">{prunedCount.toLocaleString()} rows pruned</span>).
+                  </p>
+                  {/* Reduction Steps Inline */}
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <span className="text-[10px] font-bold text-white/70 bg-white/[0.04] border border-white/[0.07] px-2.5 py-1 rounded-lg">
+                      📥 Raw: {rawCount.toLocaleString()}
+                    </span>
+                    {dedupRemoved > 0 && (
+                      <>
+                        <span className="text-white/20 text-xs">→</span>
+                        <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                          🔁 Dedup: −{dedupRemoved.toLocaleString()}
+                        </span>
+                      </>
+                    )}
+                    {varianceRemoved > 0 && (
+                      <>
+                        <span className="text-white/20 text-xs">→</span>
+                        <span className="text-[10px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                          📊 Variance: −{varianceRemoved.toLocaleString()}
+                          {consistencyScore !== null && <span className="ml-1 text-rose-400/70">({consistencyScore}% consistent)</span>}
+                        </span>
+                      </>
+                    )}
+                    <span className="text-white/20 text-xs">→</span>
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                      ✅ Active: {activeCount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {explorerTab === 'overview' ? (
           /* 6 Grid Scientific Charts Panel — styled identical to Advanced Tree NodeVisualization */
           <div className="bg-white/[0.02] border border-white/[0.04] p-6 rounded-3xl backdrop-blur-md flex flex-col gap-6">
@@ -815,29 +898,68 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-3">
-                      {branchDetail.compound_attrition?.length > 0 ? (
-                        branchDetail.compound_attrition.map((node: any, idx: number) => (
-                          <div key={node.label} className="flex items-center gap-3">
-                            {idx > 0 && <ArrowDown className="w-3.5 h-3.5 text-rose-400/50 shrink-0" />}
-                            <div className="flex-1 bg-white/[0.01] border border-white/[0.04] px-4 py-2.5 rounded-xl flex justify-between items-center text-xs">
-                              <div className="font-bold text-white flex items-center gap-1.5">
-                                <span className="text-[10px] text-white/30 font-mono">#{idx+1}</span>
-                                {node.label}
+                      {(() => {
+                        // Prepend a #0 Raw Ingestion row if we have raw_ingestion_count
+                        const segRes = branchDetail?.segmentation_results || {};
+                        const rawCount = branchDetail?.raw_ingestion_count || segRes?.original_count || 0;
+                        const attrition = branchDetail.compound_attrition || [];
+                        const firstRowCount = attrition[0]?.rows || 0;
+                        const showRawStep = rawCount > 0 && rawCount !== firstRowCount;
+
+                        return (
+                          <>
+                            {/* #0 Raw Ingestion Step */}
+                            {showRawStep && (
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 bg-violet-500/[0.06] border border-violet-500/20 px-4 py-2.5 rounded-xl flex justify-between items-center text-xs">
+                                  <div className="font-bold text-violet-300 flex items-center gap-1.5">
+                                    <span className="text-[10px] text-violet-400/50 font-mono">#0</span>
+                                    Raw Ingestion
+                                    <span className="text-[9px] text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded font-semibold ml-1">Original File</span>
+                                  </div>
+                                  <div className="flex items-center gap-3 font-semibold">
+                                    <span className="text-violet-300">{rawCount.toLocaleString()} rows</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-3 font-semibold">
-                                <span className="text-emerald-400">{node.unique_compounds} compounds</span>
-                                {idx > 0 && (
-                                  <span className="text-rose-400 text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-lg">
-                                    -{node.reduction_pct}%
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center text-white/30 text-xs py-4">No attrition data available.</div>
-                      )}
+                            )}
+                            {showRawStep && attrition.length > 0 && (
+                              <ArrowDown className="w-3.5 h-3.5 text-violet-400/50 shrink-0" />
+                            )}
+
+                            {/* Existing attrition steps */}
+                            {attrition.length > 0 ? (
+                              attrition.map((node: any, idx: number) => (
+                                <div key={node.label} className="flex items-center gap-3">
+                                  {idx > 0 && <ArrowDown className="w-3.5 h-3.5 text-rose-400/50 shrink-0" />}
+                                  <div className="flex-1 bg-white/[0.01] border border-white/[0.04] px-4 py-2.5 rounded-xl flex justify-between items-center text-xs">
+                                    <div className="font-bold text-white flex items-center gap-1.5">
+                                      <span className="text-[10px] text-white/30 font-mono">#{showRawStep ? idx + 1 : idx + 1}</span>
+                                      {node.label}
+                                    </div>
+                                    <div className="flex items-center gap-3 font-semibold">
+                                      <span className="text-emerald-400">{node.unique_compounds} compounds</span>
+                                      {/* Show row count reduction from raw if this is the root (idx=0) */}
+                                      {idx === 0 && showRawStep && rawCount !== node.rows && (
+                                        <span className="text-rose-400 text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-lg">
+                                          -{((rawCount - node.rows) / rawCount * 100).toFixed(1)}% rows
+                                        </span>
+                                      )}
+                                      {idx > 0 && (
+                                        <span className="text-rose-400 text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-lg">
+                                          -{node.reduction_pct}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center text-white/30 text-xs py-4">No attrition data available.</div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </motion.div>

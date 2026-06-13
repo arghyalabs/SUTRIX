@@ -6,6 +6,7 @@ interface WorkspaceState {
   // Navigation
   inWorkspace: boolean;
   activeTab: string;
+  currentStudioId: string | null;
 
   // Pipeline Dataset
   workspaceId: string;
@@ -65,6 +66,16 @@ interface WorkspaceState {
   varianceFilterEnabled: boolean;
   varianceSummary: any | null;
 
+  // ── Harmonization Control (Data Reduction Audit) ───────────────
+  harmonizationSettings: {
+    variance_conflict_strategy: string;
+    duplicate_segregation_strategy: string;
+    settings_confirmed: boolean;
+    applied_at: string | null;
+  };
+  harmonizationAudit: any | null;
+  rawIngestionCount: number;
+
   // ── V5: Subgroup Gate (Step 5) ─────────────────────────────────
   subgroupSelected: boolean;
   activeSubgroupName: string;
@@ -88,7 +99,14 @@ interface WorkspaceState {
   descriptorCount: number;
   descriptorSizeTier: 'SMALL' | 'MEDIUM' | 'LARGE' | '';
 
+  // ── V5 Navigation / Workspace Preference ──────────────────────
+  sidebarPinned: boolean;
+  setSidebarPinned: (pinned: boolean) => void;
+  recentCommands: string[];
+  addRecentCommand: (cmd: string) => void;
+
   // Setters
+  setCurrentStudioId: (id: string | null) => void;
   setWorkspaceId: (id: string) => void;
   setInWorkspace: (inWS: boolean) => void;
   setActiveTab: (tab: string) => void;
@@ -124,6 +142,9 @@ interface WorkspaceState {
   setGenericBannerDismissed: (dismissed: boolean) => void;
   setVarianceFilterEnabled: (enabled: boolean) => void;
   setVarianceSummary: (summary: any | null) => void;
+  setHarmonizationSettings: (settings: any) => void;
+  setHarmonizationAudit: (audit: any | null) => void;
+  setRawIngestionCount: (count: number) => void;
 
   // ── V5 Actions ────────────────────────────────────────────────
   setActiveSubgroup: (name: string, rows: number, compounds: number) => void;
@@ -146,6 +167,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     (set) => ({
       inWorkspace: false,
       activeTab: 'ingest',
+      currentStudioId: null,
 
       workspaceId: '',
       filename: '',
@@ -195,6 +217,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       varianceFilterEnabled: true,
       varianceSummary: null,
 
+      harmonizationSettings: {
+        variance_conflict_strategy: 'KEEP_ALL',
+        duplicate_segregation_strategy: 'KEEP_ALL',
+        settings_confirmed: false,
+        applied_at: null,
+      },
+      harmonizationAudit: null,
+      rawIngestionCount: 0,
+
       subgroupSelected: false,
       activeSubgroupName: '',
       activeSubgroupRows: 0,
@@ -211,6 +242,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       descriptorCount: 0,
       descriptorSizeTier: '',
 
+      sidebarPinned: true,
+      recentCommands: [],
+
+      setCurrentStudioId: (id) => set({ currentStudioId: id }),
       setWorkspaceId: (id) => set({ workspaceId: id }),
       setInWorkspace: (inWS) => set({ inWorkspace: inWS }),
       setActiveTab: (tab) => {
@@ -255,6 +290,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setGenericBannerDismissed: (dismissed) => set({ genericBannerDismissed: dismissed }),
       setVarianceFilterEnabled: (enabled) => set({ varianceFilterEnabled: enabled }),
       setVarianceSummary: (summary) => set({ varianceSummary: summary }),
+      setHarmonizationSettings: (settings) => set({ harmonizationSettings: settings }),
+      setHarmonizationAudit: (audit) => set({ harmonizationAudit: audit }),
+      setRawIngestionCount: (count) => set({ rawIngestionCount: count }),
 
       setActiveSubgroup: (name, rows, compounds) => set({
         subgroupSelected: true,
@@ -308,6 +346,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         descriptorSizeTier: '',
       }),
 
+      setSidebarPinned: (pinned) => set({ sidebarPinned: pinned }),
+      addRecentCommand: (cmd) => set((state) => {
+        const filtered = state.recentCommands.filter(c => c !== cmd);
+        return { recentCommands: [cmd, ...filtered].slice(0, 5) };
+      }),
+
       resetWorkspace: () =>
         set({
           workspaceId: '', filename: '', parquetPath: '', rowCount: 0,
@@ -323,6 +367,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           analysisMode: 'simple', simpleFunnelData: null,
           genericMode: false, recoverableMode: false, genericBannerDismissed: false,
           varianceFilterEnabled: true, varianceSummary: null,
+          harmonizationSettings: {
+            variance_conflict_strategy: 'KEEP_ALL',
+            duplicate_segregation_strategy: 'KEEP_ALL',
+            settings_confirmed: false,
+            applied_at: null,
+          },
+          harmonizationAudit: null,
+          rawIngestionCount: 0,
           subgroupSelected: false, activeSubgroupName: '', activeSubgroupRows: 0, activeSubgroupCompounds: 0,
           structureState: 'UNKNOWN', smilesCoveragePct: 0, structuresAvailable: 0, structuresMissing: 0,
           structureRecommendation: '', recoveryAttempted: false, recoveryCompleted: false,
@@ -330,11 +382,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }),
     }),
     { 
-      name: 'sdo-workspace-storage-v4',
-      version: 4,
+      name: 'sdo-workspace-storage-v5',
+      version: 5,
       migrate: (_persistedState: any, _version: number) => {
         // Hard wipe on any version upgrade — forces fresh defaults
-        if (_version < 4) {
+        if (_version < 5) {
           return {
             inWorkspace: false,
             activeTab: 'ingest',

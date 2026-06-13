@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../../config';
 import { motion } from 'framer-motion';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import axios from 'axios';
@@ -14,7 +15,7 @@ export const VarianceFilterPanel: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiBase = API_BASE_URL;
 
   useEffect(() => {
     const fetchSummary = async () => {

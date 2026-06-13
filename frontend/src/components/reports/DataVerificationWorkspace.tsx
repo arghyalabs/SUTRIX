@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { API_BASE_URL } from '../../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Loader2, AlertCircle, Database, BarChart3,
@@ -35,7 +36,7 @@ export const DataVerificationWorkspace: React.FC<DataVerificationWorkspaceProps>
   clientId,
   activeJobId,
 }) => {
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const API_BASE = API_BASE_URL;
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PreviewResult | null>(null);

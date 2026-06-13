@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { API_BASE_URL } from '../../config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, ArrowUpDown, ChevronLeft, ChevronRight, BarChart3, Database, 
@@ -31,7 +32,7 @@ export const ScientificDataExplorer: React.FC<ScientificDataExplorerProps> = ({
   const [activeCol, setActiveCol] = useState<string | null>(null);
   const [colStats, setColStats] = useState<any>(null);
 
-  const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  const apiBase = API_BASE_URL;
 
   useEffect(() => {
     fetchData();

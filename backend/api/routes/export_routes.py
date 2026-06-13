@@ -38,12 +38,18 @@ def run_selective_export_background(job_id: str, client_id: str, selected_featur
         job.started_at = asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else 0
         asyncio.run(pipeline_manager.broadcast_stage_change(job, "PROCESSING", "Generating selective subgroup exports..."))
         
-        engine = registry.get_hierarchy_engine(client_id)
+        context = registry.get_context(client_id)
+        engine = context.hierarchy_engine if context else None
         if not engine:
             raise ValueError("Hierarchy engine not found")
             
         zip_buffer = io.BytesIO()
-        df_base = pd.read_parquet(context.parquet_path)
+        if not context.parquet_path or not os.path.exists(context.parquet_path):
+            raise ValueError(f"Base dataset file not found: {context.parquet_path}")
+        try:
+            df_base = pd.read_parquet(context.parquet_path)
+        except Exception as e:
+            raise ValueError(f"Failed to read base dataset: {e}")
         
         with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
             for node_id in subgroup_ids:

@@ -31,13 +31,13 @@ export const DataAnalysisWorkspace: React.FC = () => {
   const lineage = activeLineage || (activeSegregationResult?.graph ? {
     nodes: activeSegregationResult.graph.nodes || [],
     edges: activeSegregationResult.graph.edges || [],
-    root_id: 'root',
+    root_id: activeSegregationResult.graph.root_id || 'root',
     total_nodes: activeSegregationResult.graph.nodes?.length || 0,
     max_depth: activeSegregationResult.graph.max_depth || 1,
   } : null);
 
-  // Empty state
-  if (!lineage) {
+  // Empty state — no nodes yet (hierarchy not built or nodes is empty)
+  if (!lineage || !lineage.nodes?.length) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
