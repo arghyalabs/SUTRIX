@@ -12,7 +12,7 @@ import { toast } from 'react-hot-toast';
 import {
   Upload, GitBranch, GitMerge, BarChart2, Layers,
   Cpu, Search, FlaskConical, ShieldCheck, FileText,
-  Activity, Dna, Globe
+  Activity, Dna, Globe, Database
 } from 'lucide-react';
 
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
@@ -106,8 +106,8 @@ const stepsConfig: NavigationStep[] = [
     label: 'Variance & Segregation',
     icon: <BarChart2 className="w-4 h-4" />,
     desc: 'Statistical analysis workspace',
-    nextLabel: 'Proceed to Reports',
-    nextStep: 'reports',
+    nextLabel: 'Proceed to Data Explorer',
+    nextStep: 'sci-explorer',
     prevLabel: 'Back to Hierarchy',
     previousStep: 'hierarchy',
     validation: (store: any) => {
@@ -120,15 +120,40 @@ const stepsConfig: NavigationStep[] = [
     }
   },
   {
+    id: 'sci-explorer',
+    label: 'Data Explorer',
+    icon: <Search className="w-4 h-4" />,
+    desc: 'Column searches & value scans',
+    nextLabel: 'Proceed to Scientific Workspace',
+    nextStep: 'sci-intelligence',
+    prevLabel: 'Back to Segregation',
+    previousStep: 'analysis',
+    isBlocked: (store: any) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      return false;
+    }
+  },
+  {
+    id: 'sci-intelligence',
+    label: 'Scientific Workspace',
+    icon: <Database className="w-4 h-4" />,
+    desc: 'SPSS/Excel Spreadsheet Grid & Stats',
+    nextLabel: 'Proceed to Reports',
+    nextStep: 'reports',
+    prevLabel: 'Back to Explorer',
+    previousStep: 'sci-explorer',
+    isBlocked: (store: any) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      return false;
+    }
+  },
+  {
     id: 'reports',
     label: 'Reports & Export',
     icon: <FileText className="w-4 h-4" />,
     desc: 'Generate & download reports',
-    prevLabel: 'Back to Analysis',
-    previousStep: (store: any) => {
-      if (!store.segregationExecuted) return 'hierarchy';
-      return 'analysis';
-    },
+    prevLabel: 'Back to Scientific Workspace',
+    previousStep: 'sci-intelligence',
     isBlocked: (store: any) => {
       if (!store.filename) return 'Upload a dataset first.';
       return false;
