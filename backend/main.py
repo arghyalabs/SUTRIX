@@ -47,6 +47,9 @@ from backend.api.routes.qsar_studio_routes import router as qsar_studio_router
 from backend.api.routes.oecd_routes import router as oecd_router
 from backend.api.routes.intelligence_routes import router as intelligence_router
 from backend.api.routes.harmonization_routes import router as harmonization_router
+from backend.api.routes.spreadsheet_routes import router as spreadsheet_router
+from backend.api.routes.replay_routes import router as replay_router
+from backend.api.routes.statistics_routes import router as statistics_router
 from backend.core.config import settings
 
 app = FastAPI(title="Scientific Data Orchestrator", version="5.0")
@@ -77,6 +80,9 @@ app.include_router(qsar_studio_router)
 app.include_router(oecd_router)
 app.include_router(intelligence_router)
 app.include_router(harmonization_router)
+app.include_router(spreadsheet_router)
+app.include_router(replay_router)
+app.include_router(statistics_router)
 
 memory_guard = MemoryGuard()
 
