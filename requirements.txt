@@ -32,6 +32,7 @@ pytest>=7.4.0
 pytest-cov>=4.1.0
 
 # Scientific & Machine Learning Computing
+duckdb>=1.0.0
 rdkit>=2023.9.1
 pubchempy>=1.0.4
 scikit-learn>=1.2.0

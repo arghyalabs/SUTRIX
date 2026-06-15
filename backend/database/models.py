@@ -65,3 +65,40 @@ class WorkflowOutput(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     compound = relationship("CompoundRegistry", back_populates="workflow_outputs")
+
+class Workspace(Base):
+    __tablename__ = 'workspaces'
+    workspace_id = Column(String, primary_key=True)
+    title = Column(String, nullable=False)
+    dataset_mode = Column(String, nullable=False)  # MOLECULAR, CLINICAL, SURVEY, DOE, QSAR
+    user_persona = Column(String, nullable=False)  # TOXICOLOGIST, CLINICAL, SOCIAL, FORMULATION
+    active_branch_id = Column(String, nullable=False, default='main')
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    branches = relationship("WorkspaceBranch", back_populates="workspace", cascade="all, delete-orphan")
+    events = relationship("WorkflowEvent", back_populates="workspace", cascade="all, delete-orphan")
+
+class WorkspaceBranch(Base):
+    __tablename__ = 'workspace_branches'
+    branch_id = Column(String, primary_key=True)
+    workspace_id = Column(String, ForeignKey('workspaces.workspace_id'), nullable=False)
+    name = Column(String, nullable=False)  # main, test_group_b, etc.
+    parent_event_id = Column(String, nullable=True)  # event_id at which branching occurred
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    workspace = relationship("Workspace", back_populates="branches")
+    events = relationship("WorkflowEvent", back_populates="branch")
+
+class WorkflowEvent(Base):
+    __tablename__ = 'workflow_events'
+    event_id = Column(String, primary_key=True)
+    workspace_id = Column(String, ForeignKey('workspaces.workspace_id'), nullable=False)
+    branch_id = Column(String, ForeignKey('workspace_branches.branch_id'), nullable=False)
+    sequence_order = Column(Integer, nullable=False)
+    timestamp = Column(Float, nullable=False)
+    action_type = Column(String, nullable=False)  # INGEST, CLEAN, STATS_TEST, RUN_QSAR, etc.
+    payload = Column(JSON, nullable=False)  # JSON parameters and state diff
+    signature_hash = Column(String, nullable=False)  # SHA-256 state signature
+
+    workspace = relationship("Workspace", back_populates="events")
+    branch = relationship("WorkspaceBranch", back_populates="events")
