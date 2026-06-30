@@ -16,6 +16,8 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+*.duckdb
+*.duckdb.*
 exports/
 uploads/
 temp/
