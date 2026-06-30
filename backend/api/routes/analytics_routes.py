@@ -68,7 +68,12 @@ async def upload_dataset_test(client_id: str, file: UploadFile = File(...)):
     content = await file.read()
     fname = file.filename or "dataset.csv"
     try:
-        df = pd.read_parquet(io.BytesIO(content)) if fname.endswith(".parquet") else pd.read_csv(io.BytesIO(content))
+        if fname.endswith(".parquet"):
+            df = pd.read_parquet(io.BytesIO(content))
+        elif fname.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(io.BytesIO(content))
+        else:
+            df = pd.read_csv(io.BytesIO(content))
     except Exception as e:
         raise HTTPException(400, f"Cannot parse file: {e}")
     context = registry.get_context(client_id)

@@ -577,6 +577,10 @@ async def process_segregation_task(job_id: str, payload: Dict[str, Any]):
         context.parquet_path = new_path
         context.dataframe_cache = df
         
+        # Set default active subgroup to the entire segregated dataset to allow exploration and enrichment
+        context.active_subgroup_path = new_path
+        context.subgroup_selected = True
+        
         # Populate segmentation_results and variance_summary for frontend and PDF audits
         from dataclasses import asdict
         dedup_stats_dict = asdict(dedup_res) if dedup_res else None

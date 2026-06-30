@@ -31,10 +31,6 @@ export const OECDValidationStudio: React.FC<OECDStudioProps> = ({ onGoHub }) => 
   const { workspaceId, setWorkspaceId, currentStudioId } = useWorkspaceStore();
   const [clientId] = useState(() => workspaceId || `OECD_${Math.random().toString(36).slice(2, 7)}`);
 
-  if (currentStudioId !== 'oecd') {
-    return null;
-  }
-
   React.useEffect(() => {
     if (clientId) setWorkspaceId(clientId);
   // eslint-disable-next-line react-hooks/exhaustive-deps

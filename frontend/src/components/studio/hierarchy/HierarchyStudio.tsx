@@ -40,6 +40,7 @@ import { DescriptorEndpointOptimization } from '../../modeling/DescriptorEndpoin
 import ModelingReadinessWorkspace from '../../modeling/ModelingReadinessWorkspace';
 import { QSARReadinessWorkspace } from '../../readiness/QSARReadinessWorkspace';
 import { ScientificInsightsWorkspace } from '../../scientific/ScientificInsightsWorkspace';
+import { ScientificDataExplorer } from '../../scientific/ScientificDataExplorer';
 import { ReportsExport } from '../../reports/ReportsExport';
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
@@ -397,6 +398,7 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
       const d = await uploadApi.curateColumns(colsToDrop, clientId);
       toast.success('Dataset curated.', { id: t });
       setDataset(filename || 'dataset.parquet', d.parquet_path, d.row_count, d.columns, d.preview);
+      setActiveTab('mapping');
     } catch (e: any) { toast.error(e?.message || 'Curation failed'); }
   };
 
@@ -416,6 +418,7 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
         setPrimaryEntityType(mapRes.dataset_passport?.primary_entity_type || 'Compound');
       }
       toast.success('Mapping complete.', { id: t });
+      setActiveTab('hierarchy');
     } catch (e: any) { toast.error(e?.message || 'Mapping failed'); }
   };
 
@@ -539,6 +542,8 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
               activePanel={modelingActivePanel} setActivePanel={setModelingActivePanel}
             />
           );
+      case 'sci-explorer':
+        return <ScientificDataExplorer clientId={clientId} />;
       case 'sci-intelligence':
         return <ScientificInsightsWorkspace clientId={clientId} />;
       case 'reports':

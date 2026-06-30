@@ -562,7 +562,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start text-left relative">
       
       {/* Searchable Branch Tree Navigator (4 spans) */}
-      <div className="xl:col-span-4 flex flex-col gap-6 h-full min-h-[600px] xl:max-h-[850px] xl:overflow-hidden">
+      <div className="xl:col-span-4 flex flex-col gap-6 h-full min-h-[600px] xl:max-h-[calc(100vh-120px)] xl:overflow-hidden sticky top-6 self-start">
         
         <div className="bg-white/[0.02] border border-white/[0.04] p-5 rounded-3xl backdrop-blur-md flex flex-col h-full overflow-hidden">
           

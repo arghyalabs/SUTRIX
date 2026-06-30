@@ -16,6 +16,18 @@ from backend.database.models import Workspace, WorkspaceBranch
 
 logger = logging.getLogger("sdo.api.routes.spreadsheet")
 
+def ensure_active_table_exists(client_id: str, context) -> str:
+    table_name = f"ws_{client_id}_active"
+    if not duckdb_engine.table_exists(table_name):
+        try:
+            df = context.load_active_dataset()
+            duckdb_engine.register_dataframe(df, table_name)
+            logger.info(f"Auto-initialized active table {table_name} in DuckDB from parquet source of truth.")
+        except Exception as e:
+            logger.error(f"Failed to auto-initialize active table: {e}")
+            raise HTTPException(status_code=400, detail=f"Active table not found and failed to auto-initialize: {str(e)}")
+    return table_name
+
 router = APIRouter(prefix="/api/spreadsheet", tags=["Spreadsheet"])
 
 @router.post("/ingest")
@@ -115,9 +127,7 @@ def execute_spreadsheet_query(client_id: str, query: str) -> Dict[str, Any]:
     if not context:
         raise HTTPException(status_code=404, detail="Workspace context not found")
 
-    table_name = f"ws_{client_id}_active"
-    if not duckdb_engine.table_exists(table_name):
-        raise HTTPException(status_code=400, detail="Spreadsheet table does not exist. Ingest data first.")
+    table_name = ensure_active_table_exists(client_id, context)
 
     # Prevent SQL injections targeting system tables or dropping databases
     query_lower = query.lower().strip()
@@ -146,9 +156,7 @@ def apply_row_filter(
     if not context:
         raise HTTPException(status_code=404, detail="Workspace context not found")
 
-    table_name = f"ws_{client_id}_active"
-    if not duckdb_engine.table_exists(table_name):
-        raise HTTPException(status_code=400, detail="Active table not found")
+    table_name = ensure_active_table_exists(client_id, context)
 
     # Validate operators to prevent raw query injections
     valid_operators = ["=", ">", "<", ">=", "<=", "!=", "like", "ilike"]
@@ -190,9 +198,7 @@ def apply_imputation(
     if not context:
         raise HTTPException(status_code=404, detail="Workspace context not found")
 
-    table_name = f"ws_{client_id}_active"
-    if not duckdb_engine.table_exists(table_name):
-        raise HTTPException(status_code=400, detail="Active table not found")
+    table_name = ensure_active_table_exists(client_id, context)
 
     try:
         # Record IMPUTE_VALUES event

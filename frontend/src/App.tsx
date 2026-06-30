@@ -519,10 +519,6 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
   // V6: Clear stale global store when this studio opens fresh
   useStudioInit(studioId);
 
-  if (currentStudioId !== studioId) {
-    return null;
-  }
-
   // V6: In studio context, auto-launch pipeline (no landing gate needed)
   const [hasLaunched, setHasLaunched] = useState(true);
   const [isAppLoading, setIsAppLoading] = useState(false);

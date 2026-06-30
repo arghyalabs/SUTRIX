@@ -312,6 +312,12 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
 
     setIsBuilding(true);
     try {
+      // Auto-save mappings to ensure backend has completed the mapping stage
+      await apiClient.post('/api/mapping', {
+        client_id: clientId,
+        mappings: mappings,
+      });
+
       const response = await apiClient.post('/api/segregate', {
         client_id: clientId,
         enable_dedup: enableDedup,

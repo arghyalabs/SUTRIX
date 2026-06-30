@@ -71,6 +71,8 @@ async def upload_dataset(client_id: str, file: UploadFile = File(...)):
     try:
         if fname.endswith(".parquet"):
             df = pd.read_parquet(io.BytesIO(content))
+        elif fname.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(io.BytesIO(content))
         else:
             df = pd.read_csv(io.BytesIO(content))
     except Exception as e:
@@ -85,6 +87,40 @@ async def upload_dataset(client_id: str, file: UploadFile = File(...)):
         "status": "ok", "filename": fname,
         "rows": len(df), "cols": len(df.columns),
         "columns": df.columns.tolist(),
+    }
+
+
+@router.post("/{client_id}/load-demo")
+async def load_demo(client_id: str):
+    import os
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    candidates = [
+        os.path.join(project_root, "data", "eco_toxicity_dataset.csv"),
+        os.path.join(project_root, "eco_toxicity_dataset.csv"),
+    ]
+    demo_path = None
+    for c in candidates:
+        if os.path.exists(c):
+            demo_path = c
+            break
+            
+    if not demo_path:
+        raise HTTPException(404, "Demo dataset file not found on server.")
+        
+    try:
+        df = pd.read_csv(demo_path)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to load demo file: {e}")
+        
+    _sessions[client_id] = {
+        "df": df,
+        "filename": "eco_toxicity_dataset.csv",
+        "model_info": {}
+    }
+    return {
+        "status": "ok", "filename": "eco_toxicity_dataset.csv",
+        "rows": len(df), "cols": len(df.columns),
+        "columns": df.columns.tolist()
     }
 
 

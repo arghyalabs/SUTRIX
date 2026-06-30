@@ -367,7 +367,6 @@ async def get_available_subgroups(client_id: str):
     if not engine:
         # If hierarchy engine is not initialized (e.g. Compound Studio / flat dataset),
         # return a single "Root Dataset" subgroup.
-        from backend.core.predictability_engine import AIPredictabilityEngine
         analysis = AIPredictabilityEngine.analyze_subgroup(df_base, context.mappings, "Root Dataset")
         
         # Calculate 9 scores from predictability engine metrics

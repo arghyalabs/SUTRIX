@@ -126,12 +126,7 @@ export const StudioShell: React.FC<StudioShellProps> = ({
     ? Math.round((completedCount / nav.steps.length) * 100)
     : 0;
 
-  const renderProgressBar = (percentage: number) => {
-    const totalBars = 10;
-    const filledBars = Math.round((percentage / 100) * totalBars);
-    const emptyBars = totalBars - filledBars;
-    return '█'.repeat(filledBars) + '░'.repeat(emptyBars);
-  };
+
 
   // Auto-save to workspace manager every 30s
   useEffect(() => {
@@ -238,9 +233,18 @@ export const StudioShell: React.FC<StudioShellProps> = ({
               {isExpanded && nav && nav.steps && nav.steps.length > 0 && (
                 <div className="mb-4 flex flex-col gap-1.5 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                   <div className="text-xs font-extrabold text-white/90 leading-tight">{meta.shortName}</div>
-                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 font-bold mt-1">
-                    <span>{renderProgressBar(pct)}</span>
-                    <span className="text-cyan-400">{pct}%</span>
+                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 font-bold mt-1.5 w-full">
+                    <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden mr-3">
+                      <div 
+                        className="h-full rounded-full transition-all duration-500 ease-out"
+                        style={{ 
+                          width: `${pct}%`, 
+                          backgroundColor: meta.accentHex,
+                          boxShadow: `0 0 8px ${meta.accentHex}40`
+                        }}
+                      />
+                    </div>
+                    <span style={{ color: meta.accentHex }} className="font-bold shrink-0">{pct}%</span>
                   </div>
                   {rowCount > 0 && (
                     <div className="text-[9px] text-slate-500 font-semibold mt-0.5">

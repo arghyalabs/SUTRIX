@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { toast } from 'react-hot-toast';
 import { API_BASE_URL } from '../../config';
 import { AgGridReact } from 'ag-grid-react';
+import { AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
@@ -473,6 +474,7 @@ export const ScientificInsightsWorkspace: React.FC<ScientificInsightsWorkspacePr
                 columnDefs={gridColumns}
                 pagination={true}
                 paginationPageSize={20}
+                modules={[AllCommunityModule]}
               />
             </div>
           </div>

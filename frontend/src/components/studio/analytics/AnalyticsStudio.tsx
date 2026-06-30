@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import {
   BarChart2, AlertTriangle, Activity, GitBranch, TrendingUp,
-  Layers, Download, Upload, FileText
+  Layers, Download, Upload, FileText, UploadCloud, Loader2, Play
 } from 'lucide-react';
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
 import { ProfilePanel } from './ProfilePanel';
@@ -58,26 +58,80 @@ const TABS = [
   },
 ];
 
-const EmptyState: React.FC<{ onLoadDemo: () => void, isDemoLoading: boolean }> = ({ onLoadDemo, isDemoLoading }) => (
-  <div className="flex flex-col items-center justify-center h-64 text-center gap-4">
-    <div className="p-4 rounded-2xl bg-violet-500/10 text-violet-400">
-      <Upload className="w-8 h-8 animate-pulse" />
-    </div>
-    <div>
-      <div className="text-white font-bold text-base mb-1">No Dataset Loaded</div>
-      <div className="text-slate-500 text-sm max-w-sm mb-4">
-        Use the "Upload Dataset" button in the sidebar to upload a file, or load the demo dataset to begin analysis.
+const EmptyState: React.FC<{
+  handleUpload: (file: File) => Promise<void>;
+  isUploading: boolean;
+  onLoadDemo: () => void;
+  isDemoLoading: boolean;
+}> = ({ handleUpload, isUploading, onLoadDemo, isDemoLoading }) => {
+  const [dragging, setDragging] = useState(false);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleUpload(file);
+  }, [handleUpload]);
+
+  const loading = isUploading || isDemoLoading;
+
+  return (
+    <div className="max-w-4xl mx-auto py-12 flex flex-col items-center w-full">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl font-bold text-white tracking-tight mb-3">Upload Dataset</h1>
+        <p className="text-secondary text-sm max-w-lg mx-auto">
+          Simple Analysis data ingestion. Upload your dataset to begin profiling and diagnostics.
+        </p>
       </div>
-      <button
-        onClick={onLoadDemo}
-        disabled={isDemoLoading}
-        className="px-4 py-2 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-300 text-xs font-bold hover:bg-violet-500/30 transition-all disabled:opacity-50"
-      >
-        {isDemoLoading ? 'Loading Demo...' : 'Load Demo Dataset'}
-      </button>
+
+      <div className="w-full max-w-2xl space-y-6">
+        <label
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          className={`relative flex flex-col items-center justify-center w-full h-80 rounded-[2rem] border-2 border-dashed cursor-pointer transition-all duration-300 group overflow-hidden
+            ${dragging
+              ? 'border-violet-400 bg-violet-400/[0.03] shadow-[0_0_30px_rgba(139,92,246,0.15)]'
+              : 'border-white/[0.08] glass hover:border-white/[0.2] hover:bg-white/[0.02]'}`}
+        >
+          <input type="file" className="hidden" accept=".csv,.parquet,.xlsx,.xls" onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ''; }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.02] pointer-events-none" />
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform duration-500
+            ${dragging ? 'bg-violet-400 text-void scale-110' : 'bg-white/[0.04] text-secondary group-hover:bg-white/[0.08] group-hover:text-white'}`}>
+            {loading ? <Loader2 className="w-8 h-8 text-violet-400 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-2">
+            {loading ? 'Processing…' : dragging ? 'Drop file to upload' : 'Drag & drop or click to browse'}
+          </h3>
+          <div className="flex items-center gap-2 mt-4">
+            {['.CSV', '.XLSX', '.PARQUET'].map(ext => (
+              <span key={ext} className="px-2 py-1 rounded-md bg-white/[0.04] text-[10px] font-mono text-muted uppercase tracking-wider">{ext}</span>
+            ))}
+          </div>
+        </label>
+
+        {!loading && (
+          <>
+            <div className="flex items-center justify-center gap-4 text-sm text-secondary pt-2">
+              <span className="w-12 h-px bg-white/[0.1]" />
+              <span>or try it out with</span>
+              <span className="w-12 h-px bg-white/[0.1]" />
+            </div>
+
+            <div className="flex justify-center">
+              <button
+                onClick={onLoadDemo}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white font-medium hover:bg-white/[0.08] transition-colors"
+              >
+                <Play className="w-4 h-4 text-violet-400" />
+                Load Demo Dataset
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface AnalyticsStudioProps {
   onGoHub: () => void;
@@ -88,10 +142,6 @@ export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => 
   useStudioInit('analytics');
   const { filename, rowCount, workspaceId, setWorkspaceId, currentStudioId } = useWorkspaceStore();
   const clientId = workspaceId || 'ANALYTICS_demo';
-
-  if (currentStudioId !== 'analytics') {
-    return null;
-  }
 
   useEffect(() => {
     if (clientId) setWorkspaceId(clientId);
@@ -230,7 +280,12 @@ export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => 
               className="p-6"
             >
               {!filename ? (
-                <EmptyState onLoadDemo={handleLoadDemo} isDemoLoading={isDemoLoading} />
+                <EmptyState
+                  handleUpload={handleUpload}
+                  isUploading={isUploading}
+                  onLoadDemo={handleLoadDemo}
+                  isDemoLoading={isDemoLoading}
+                />
               ) : (
                 renderPanel()
               )}

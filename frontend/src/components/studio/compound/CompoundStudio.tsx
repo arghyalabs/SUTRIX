@@ -33,7 +33,6 @@ import { SubgroupSelectionHub } from '../../analysis/SubgroupSelectionHub';
 
 const STEPS = [
   { id: 'ingest',            label: 'Upload Dataset',         icon: <Upload className="w-4 h-4" />,       desc: 'Load a dataset with SMILES column' },
-  { id: 'subgroup-selection',label: 'Subgroup Selection',     icon: <Layers className="w-4 h-4" />,       desc: 'Select and isolate primary target subgroup', needsData: true },
   { id: 'enrichment',        label: 'Descriptor Enrichment',  icon: <Cpu className="w-4 h-4" />,          desc: 'RDKit / Mordred descriptor calc', needsData: true },
   { id: 'compound-explorer', label: 'Compound Explorer',      icon: <Search className="w-4 h-4" />,       desc: 'Browse structures & similarity search', needsData: true },
   { id: 'reports',           label: 'Reports & Export',       icon: <FileText className="w-4 h-4" />,     desc: 'Generate & download reports', needsData: true },
@@ -62,10 +61,6 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
   const genId = useRef(`CMPD_${Math.random().toString(36).substring(2, 9)}`).current;
   const storeId = useWorkspaceStore(s => s.workspaceId);
   const clientId = storeId || genId;
-
-  if (currentStudioId !== 'compound') {
-    return null;
-  }
 
   const socket = useWebSocket(clientId);
 
@@ -167,6 +162,16 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
     } catch (e: any) { setIsUploadProcessing(false); toast.error(e?.message || 'Failed to load demo'); }
   }, [clientId]);
 
+  const handleCurateColumns = async (colsToDrop: string[]) => {
+    try {
+      const t = toast.loading('Curating columns…');
+      const d = await uploadApi.curateColumns(colsToDrop, clientId);
+      toast.success('Dataset curated.', { id: t });
+      setDataset(filename || 'dataset.parquet', d.parquet_path, d.row_count, d.columns, d.preview);
+      setActiveTab('enrichment');
+    } catch (e: any) { toast.error(e?.message || 'Curation failed'); }
+  };
+
   const handleRunEnrichment = async () => {
     try {
       const s = useWorkspaceStore.getState();
@@ -240,11 +245,10 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
             processingItemsPerSec={uploadItemsPerSec} processingStageLogs={uploadLogs}
             activeJobId={uploadJobId}
             handleIngestFile={handleIngestFile} handleLoadDemo={handleLoadDemo}
-            handleCurateColumns={async () => {}} onCancelJob={handleCancelJob}
+            handleCurateColumns={handleCurateColumns} onCancelJob={handleCancelJob}
           />
         );
-      case 'subgroup-selection':
-        return <SubgroupSelectionHub clientId={clientId} onContinue={() => setActiveTab('enrichment')} />;
+
       case 'enrichment':
         return (
           <DescriptorEnrichment

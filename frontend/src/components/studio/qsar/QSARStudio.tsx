@@ -15,10 +15,6 @@ export const QSARStudio: React.FC<QSARStudioProps> = ({ onGoHub }) => {
   useStudioInit('qsar');
   const { currentStudioId } = useWorkspaceStore();
 
-  if (currentStudioId !== 'qsar') {
-    return null;
-  }
-
   return (
     <React.Suspense fallback={null}>
       <LegacyWorkspaceApp studioId="qsar" onGoHub={onGoHub} />
