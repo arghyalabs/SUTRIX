@@ -1,38 +1,32 @@
-version: "3.8"
+version: '3.8'
 
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: sdo_backend
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     volumes:
-      - sdo_data:/app/backend/uploads
-      - sdo_data:/app/backend/exports
-      - sdo_data:/app/backend/cache
-      - sdo_logs:/app/backend/logs
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/telemetry"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    environment:
+      - DATABASE_URL=sqlite:///sutrix_science.db
+      - SDO_UPLOAD_DIR=uploads
+      - SDO_OUTPUT_DIR=outputs
+      - SDO_MAX_FILE_SIZE_MB=100
+      - SDO_API_RATE_LIMIT=0.1
+      - SENTRY_DSN=
+    restart: always
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: sdo_frontend
     ports:
       - "80:80"
-    env_file:
-      - .env
-    restart: unless-stopped
     depends_on:
       - backend
-
-volumes:
-  sdo_data:
-  sdo_logs:
+    restart: always
