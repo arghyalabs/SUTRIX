@@ -543,12 +543,12 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
       >
         <div className="h-full flex flex-col bg-[#030b18] overflow-y-auto relative pb-4 animate-fade-in">
           <WarningBanner />
-          <div className="flex-1">
+        <div className={`${activeTab === 'analysis' ? 'flex-1 flex flex-col overflow-hidden' : 'flex-1'}`}>
             <AnimatePresence mode="wait">
               <motion.div key={activeTab}
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-                className="p-6"
+                className={activeTab === 'analysis' ? 'h-full' : 'p-6'}
               >
                 {renderPanel()}
               </motion.div>

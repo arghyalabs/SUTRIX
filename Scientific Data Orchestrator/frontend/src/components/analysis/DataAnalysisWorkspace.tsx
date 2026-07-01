@@ -1,25 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
-import { hierarchyApi } from '../../services/hierarchyApi';
-import { Activity, ChevronRight, Database, AlertCircle } from 'lucide-react';
+import { Activity, ChevronRight, AlertCircle } from 'lucide-react';
 import { SimpleAnalysisWorkspace } from './SimpleAnalysisWorkspace';
-
-interface HierarchyNodeMeta {
-  id: string;
-  parent_id: string | null;
-  level: number;
-  node_name: string;
-  filter_col: string;
-  filter_val: string;
-  path: string;
-  inherited_filters: Record<string, string>;
-  applied_filter: Record<string, string>;
-  row_count: number;
-  unique_compounds: number;
-  is_leaf: boolean;
-  children: string[];
-}
 
 export const DataAnalysisWorkspace: React.FC = () => {
   const {
@@ -27,7 +10,6 @@ export const DataAnalysisWorkspace: React.FC = () => {
     activeSegregationResult,
   } = useWorkspaceStore();
 
-  // Build nodeMap for efficient lookup
   const lineage = activeLineage || (activeSegregationResult?.graph ? {
     nodes: activeSegregationResult.graph.nodes || [],
     edges: activeSegregationResult.graph.edges || [],
@@ -36,7 +18,6 @@ export const DataAnalysisWorkspace: React.FC = () => {
     max_depth: activeSegregationResult.graph.max_depth || 1,
   } : null);
 
-  // Empty state — no nodes yet (hierarchy not built or nodes is empty)
   if (!lineage || !lineage.nodes?.length) {
     return (
       <motion.div
@@ -68,17 +49,7 @@ export const DataAnalysisWorkspace: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Top Dual Mode Bar */}
-      <div className="flex items-center justify-between px-6 py-3.5 bg-[#080f1f]/80 border-b border-white/[0.06] shrink-0 backdrop-blur-md z-10 text-left">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider">Step 4: Data Analysis Workspace</h2>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-auto custom-scrollbar p-6">
-        <SimpleAnalysisWorkspace />
-      </div>
+      <SimpleAnalysisWorkspace />
     </div>
   );
 };

@@ -559,12 +559,12 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start text-left relative">
+    <div className="flex h-full overflow-hidden bg-[#060c18] text-left">
       
-      {/* Searchable Branch Tree Navigator (4 spans) */}
-      <div className="xl:col-span-4 flex flex-col gap-6 h-full min-h-[600px] xl:max-h-[calc(100vh-120px)] xl:overflow-hidden sticky top-6 self-start">
+      {/* LEFT PANEL: Searchable Branch Tree Navigator */}
+      <div className="w-[280px] shrink-0 flex flex-col h-full border-r border-white/[0.05] bg-[#060c18]">
         
-        <div className="bg-white/[0.02] border border-white/[0.04] p-5 rounded-3xl backdrop-blur-md flex flex-col h-full overflow-hidden">
+        <div className="px-3 py-4 flex flex-col h-full overflow-hidden">
           
           <div className="flex items-center justify-between mb-4 shrink-0">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -640,14 +640,13 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           </div>
 
         </div>
-
       </div>
 
-      {/* RIGHT PANE: Scientific Visualization Workspace (8 spans) */}
-      <div className="xl:col-span-8 flex flex-col gap-6">
+      {/* RIGHT PANE: Scientific Visualization Workspace */}
+      <div className="flex-1 flex flex-col gap-0 min-w-0 overflow-y-auto custom-scrollbar">
         
         {/* Breadcrumb Header + Exporters */}
-        <div className="bg-white/[0.02] border border-white/[0.04] p-5 rounded-3xl backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-[#060c18]/80 border-b border-white/[0.05] px-5 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
           <div>
             <span className="text-[10px] font-extrabold text-cyan-400 uppercase tracking-wider">Active Analysis Path</span>
             <div className="text-xs font-bold text-white mt-1 flex flex-wrap items-center gap-1">
@@ -687,29 +686,34 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="flex bg-white/[0.02] border border-white/[0.06] p-0.5 rounded-xl shrink-0">
+
+        {/* Tab switcher */}
+        <div className="flex bg-white/[0.02] border-b border-white/[0.05] shrink-0">
           <button
             onClick={() => setExplorerTab('advanced')}
-            className={`flex-1 py-2 text-center text-[10px] font-bold uppercase transition-all rounded-lg
-              ${explorerTab === 'advanced' ? 'bg-cyan-500/20 text-cyan-300' : 'text-white/40 hover:text-white/60'}`}
+            className={`flex-1 py-2.5 text-center text-[10px] font-bold uppercase transition-all border-b-2
+              ${explorerTab === 'advanced' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
           >
             Overview
           </button>
           <button
             onClick={() => setExplorerTab('overview')}
-            className={`flex-1 py-2 text-center text-[10px] font-bold uppercase transition-all rounded-lg
-              ${explorerTab === 'overview' ? 'bg-cyan-500/20 text-cyan-300' : 'text-white/40 hover:text-white/60'}`}
+            className={`flex-1 py-2.5 text-center text-[10px] font-bold uppercase transition-all border-b-2
+              ${explorerTab === 'overview' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
           >
             Advanced Analytics
           </button>
           <button
             onClick={() => setExplorerTab('inspector')}
-            className={`flex-1 py-2 text-center text-[10px] font-bold uppercase transition-all rounded-lg
-              ${explorerTab === 'inspector' ? 'bg-cyan-500/20 text-cyan-300' : 'text-white/40 hover:text-white/60'}`}
+            className={`flex-1 py-2.5 text-center text-[10px] font-bold uppercase transition-all border-b-2
+              ${explorerTab === 'inspector' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
           >
             Node Inspector
           </button>
         </div>
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 flex flex-col gap-4">
 
         {/* Dynamic Shift Warnings Banner */}
         {explorerTab === 'overview' && branchDetail?.distribution_shift?.shift_detected && (
@@ -785,13 +789,8 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
         })()}
 
         {explorerTab === 'overview' ? (
-          /* 6 Grid Scientific Charts Panel — styled identical to Advanced Tree NodeVisualization */
-          <div className="bg-white/[0.02] border border-white/[0.04] p-6 rounded-3xl backdrop-blur-md flex flex-col gap-6">
-            <div className="border-b border-white/[0.04] pb-3 shrink-0">
-              <h3 className="text-sm font-extrabold text-white">Visualization Workspace
-                <span className="ml-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">Active Subgroup Distribution & Path Attrition</span>
-              </h3>
-            </div>
+          <div className="flex flex-col gap-4">
+
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
@@ -799,7 +798,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
                 <span className="text-sm font-semibold text-white/50">Recalculating responsive distributions...</span>
               </div>
             ) : branchDetail ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* ── Chart 1: Subgroup Composition Pie ── */}
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.05 }}>
@@ -1081,9 +1080,8 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           </div>
         )}
 
-      </div>
-
-
+        </div> {/* end scrollable content area */}
+      </div> {/* end right pane */}
 
       <FullscreenPieModal
         isOpen={activeFullscreenChart === 'composition_pie'}
