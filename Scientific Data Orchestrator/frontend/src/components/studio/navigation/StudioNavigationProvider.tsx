@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useWorkspaceStore } from '../../../store/useWorkspaceStore';
 import { workspaceManager } from '../../../services/workspaceManagerService';
 import { toast } from 'react-hot-toast';
-import { AlertTriangle, Clock } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 export interface NavigationStep {
   id: string;
@@ -109,7 +109,7 @@ export const StudioNavigationProvider: React.FC<ProviderProps> = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Modals / Warnings state (used inside subcomponents by rendering overlays in a portal or inline)
-  const [showJobModal, setShowJobModal] = useState<{ nextTab: string; onResolve: () => void } | null>(null);
+
   const [showUnsavedModal, setShowUnsavedModal] = useState<{ nextTab: string; onResolve: () => void } | null>(null);
 
   // Resolve dynamic steps based on store state
@@ -270,15 +270,6 @@ export const StudioNavigationProvider: React.FC<ProviderProps> = ({
       return false;
     }
 
-    // 3. Background Job Check
-    if (store.activeJobId && store.activeJobType) {
-      return new Promise<boolean>((resolve) => {
-        setShowJobModal({
-          nextTab,
-          onResolve: () => resolve(true)
-        });
-      });
-    }
 
     // 4. Unsaved Changes Check
     if (hasUnsavedChanges) {
@@ -414,40 +405,6 @@ export const StudioNavigationProvider: React.FC<ProviderProps> = ({
     >
       {children}
 
-      {/* Background Job Awareness Overlay */}
-      {showJobModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="w-full max-w-md p-6 border rounded-3xl bg-slate-900 border-slate-800 shadow-2xl flex flex-col items-center text-center space-y-4">
-            <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400">
-              <Clock className="w-8 h-8 animate-pulse" />
-            </div>
-            <h3 className="text-lg font-bold text-white">Active Background Process</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              A scientific calculation job is currently running in the background. If you leave this step, the job will continue processing.
-            </p>
-            <div className="flex flex-col gap-2 w-full pt-2">
-              <button
-                onClick={() => {
-                  const { nextTab, onResolve } = showJobModal;
-                  setShowJobModal(null);
-                  setActiveTab(nextTab);
-                  setHasUnsavedChanges(false);
-                  onResolve();
-                }}
-                className="w-full px-4 py-2.5 rounded-xl bg-cyan-400 text-slate-950 font-black hover:bg-cyan-300 text-xs transition-colors"
-              >
-                Continue in Background
-              </button>
-              <button
-                onClick={() => setShowJobModal(null)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white font-bold text-xs transition-colors"
-              >
-                Wait for Completion
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Unsaved Changes Protection Overlay */}
       {showUnsavedModal && (
