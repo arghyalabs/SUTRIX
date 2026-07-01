@@ -40,7 +40,7 @@ import { DescriptorEndpointOptimization } from '../../modeling/DescriptorEndpoin
 import ModelingReadinessWorkspace from '../../modeling/ModelingReadinessWorkspace';
 import { QSARReadinessWorkspace } from '../../readiness/QSARReadinessWorkspace';
 import { ScientificInsightsWorkspace } from '../../scientific/ScientificInsightsWorkspace';
-import { ScientificDataExplorer } from '../../scientific/ScientificDataExplorer';
+
 import { ReportsExport } from '../../reports/ReportsExport';
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
@@ -107,8 +107,8 @@ const stepsConfig: NavigationStep[] = [
     label: 'Variance & Segregation',
     icon: <BarChart2 className="w-4 h-4" />,
     desc: 'Statistical analysis workspace',
-    nextLabel: 'Proceed to Data Explorer',
-    nextStep: 'sci-explorer',
+    nextLabel: 'Proceed to Scientific Workspace',
+    nextStep: 'sci-intelligence',
     prevLabel: 'Back to Hierarchy',
     previousStep: 'hierarchy',
     validation: (store: any) => {
@@ -121,28 +121,14 @@ const stepsConfig: NavigationStep[] = [
     }
   },
   {
-    id: 'sci-explorer',
-    label: 'Data Explorer',
-    icon: <Search className="w-4 h-4" />,
-    desc: 'Column searches & value scans',
-    nextLabel: 'Proceed to Scientific Workspace',
-    nextStep: 'sci-intelligence',
-    prevLabel: 'Back to Segregation',
-    previousStep: 'analysis',
-    isBlocked: (store: any) => {
-      if (!store.filename) return 'Upload a dataset first.';
-      return false;
-    }
-  },
-  {
     id: 'sci-intelligence',
     label: 'Scientific Workspace',
     icon: <Database className="w-4 h-4" />,
     desc: 'SPSS/Excel Spreadsheet Grid & Stats',
     nextLabel: 'Proceed to Reports',
     nextStep: 'reports',
-    prevLabel: 'Back to Explorer',
-    previousStep: 'sci-explorer',
+    prevLabel: 'Back to Segregation',
+    previousStep: 'analysis',
     isBlocked: (store: any) => {
       if (!store.filename) return 'Upload a dataset first.';
       return false;
@@ -542,8 +528,7 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
               activePanel={modelingActivePanel} setActivePanel={setModelingActivePanel}
             />
           );
-      case 'sci-explorer':
-        return <ScientificDataExplorer clientId={clientId} />;
+
       case 'sci-intelligence':
         return <ScientificInsightsWorkspace clientId={clientId} />;
       case 'reports':
