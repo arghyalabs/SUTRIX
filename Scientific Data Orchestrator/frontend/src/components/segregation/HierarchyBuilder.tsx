@@ -129,6 +129,12 @@ export const HierarchyBuilder: React.FC<HierarchyBuilderProps> = ({ clientId, so
     }
   }, [socket.jobStatus]);
 
+  // Reset stale building state on mount — if server restarted, the active job is gone
+  useEffect(() => {
+    setIsBuilding(false);
+    setIsComplete(false);
+  }, []);
+
   // Compute available candidate columns
   const candidateColumns = useMemo(() => {
     const safeColumns = columns || [];

@@ -78,6 +78,17 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
           if (!activeJobIdRef.current) return;
           try {
             const res = await fetch(`/api/jobs/${activeJobIdRef.current}`);
+            if (res.status === 404) {
+              // Job no longer exists on backend (likely a server restart)
+              // Emit a fake JOB_FAILED to unblock the UI
+              const fakeEvent = {
+                data: JSON.stringify({ type: 'JOB_FAILED', job_id: activeJobIdRef.current, error: 'Job not found. The server may have restarted. Please re-run the operation.' })
+              };
+              if (socketRef.current?.onmessage) socketRef.current.onmessage(fakeEvent as any);
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+              return;
+            }
             if (res.ok) {
               const data = await res.json();
               const status = data.status;
