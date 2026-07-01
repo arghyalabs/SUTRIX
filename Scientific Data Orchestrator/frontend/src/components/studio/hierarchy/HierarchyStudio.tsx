@@ -39,7 +39,7 @@ import { CompoundExplorer } from '../../reports/CompoundExplorer';
 import { DescriptorEndpointOptimization } from '../../modeling/DescriptorEndpointOptimization';
 import ModelingReadinessWorkspace from '../../modeling/ModelingReadinessWorkspace';
 import { QSARReadinessWorkspace } from '../../readiness/QSARReadinessWorkspace';
-import { ScientificInsightsWorkspace } from '../../scientific/ScientificInsightsWorkspace';
+
 
 import { ReportsExport } from '../../reports/ReportsExport';
 
@@ -107,8 +107,8 @@ const stepsConfig: NavigationStep[] = [
     label: 'Variance & Segregation',
     icon: <BarChart2 className="w-4 h-4" />,
     desc: 'Statistical analysis workspace',
-    nextLabel: 'Proceed to Scientific Workspace',
-    nextStep: 'sci-intelligence',
+    nextLabel: 'Proceed to Reports',
+    nextStep: 'reports',
     prevLabel: 'Back to Hierarchy',
     previousStep: 'hierarchy',
     validation: (store: any) => {
@@ -121,26 +121,12 @@ const stepsConfig: NavigationStep[] = [
     }
   },
   {
-    id: 'sci-intelligence',
-    label: 'Scientific Workspace',
-    icon: <Database className="w-4 h-4" />,
-    desc: 'SPSS/Excel Spreadsheet Grid & Stats',
-    nextLabel: 'Proceed to Reports',
-    nextStep: 'reports',
-    prevLabel: 'Back to Segregation',
-    previousStep: 'analysis',
-    isBlocked: (store: any) => {
-      if (!store.filename) return 'Upload a dataset first.';
-      return false;
-    }
-  },
-  {
     id: 'reports',
     label: 'Reports & Export',
     icon: <FileText className="w-4 h-4" />,
     desc: 'Generate & download reports',
-    prevLabel: 'Back to Scientific Workspace',
-    previousStep: 'sci-intelligence',
+    prevLabel: 'Back to Segregation',
+    previousStep: 'analysis',
     isBlocked: (store: any) => {
       if (!store.filename) return 'Upload a dataset first.';
       return false;
@@ -511,7 +497,7 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
       case 'compound-explorer':
         return <CompoundExplorer clientId={clientId} activeJobId={activeJobId || null} onContinue={() => setActiveTab('feature-selection')} />;
       case 'feature-selection':
-        return <DescriptorEndpointOptimization clientId={clientId} onContinue={() => setActiveTab('sci-intelligence')} />;
+        return <DescriptorEndpointOptimization clientId={clientId} onContinue={() => setActiveTab('reports')} />;
       case 'readiness':
         return datasetMode === 'SCIENTIFIC'
           ? <QSARReadinessWorkspace />
@@ -529,8 +515,7 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
             />
           );
 
-      case 'sci-intelligence':
-        return <ScientificInsightsWorkspace clientId={clientId} />;
+
       case 'reports':
         return <ReportsExport clientId={clientId} activeJobId={activeJobId || null} handleResetWorkspace={handleReset} onNavigate={setActiveTab} />;
       default:
