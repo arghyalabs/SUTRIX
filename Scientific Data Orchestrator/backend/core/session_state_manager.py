@@ -151,7 +151,7 @@ class SessionStateManager:
             # Restore V5 Subgroup Gate & Structure State fields
             context.active_subgroup_path = state_data.get("active_subgroup_path", None)
             context.subgroup_metadata = state_data.get("subgroup_metadata", {})
-            context.subgroup_selected = state_data.get("subgroup_selected", False)
+            context.subgroup_selected = state_data.get("subgroup_selected", True)
             context.selected_node_ids = state_data.get("selected_node_ids", [])
             context.structure_state = state_data.get("structure_state", "UNKNOWN")
             context.smiles_coverage_pct = state_data.get("smiles_coverage_pct", 0.0)

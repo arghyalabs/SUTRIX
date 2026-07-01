@@ -58,7 +58,7 @@ class PipelineContext:
     pipeline_version: int = 5
     active_subgroup_path: Optional[str] = None
     subgroup_metadata: Dict[str, Any] = field(default_factory=dict)
-    subgroup_selected: bool = False
+    subgroup_selected: bool = True
     selected_node_ids: List[str] = field(default_factory=list)
 
     # ── V5: Structure State (Step 6) ─────────────────────────────────────────────
@@ -190,23 +190,20 @@ class PipelineContext:
 
     def load_active_dataset(self) -> pd.DataFrame:
         """V5: Single source of truth for all post-step-5 operations.
-        Priority: recovered_subgroup_path > active_subgroup_path > parquet_path (pre-step-5 only).
-        Raises ValueError if subgroup_selected is True but no subgroup path exists.
+        Priority: recovered_subgroup_path > active_subgroup_path > parquet_path.
         """
-        if self.subgroup_selected:
-            if self.recovered_subgroup_path and os.path.exists(self.recovered_subgroup_path):
-                self.touch()
-                return pd.read_parquet(self.recovered_subgroup_path)
-            if self.active_subgroup_path and os.path.exists(self.active_subgroup_path):
-                self.touch()
-                return pd.read_parquet(self.active_subgroup_path)
-            raise ValueError(
-                "Active subgroup dataset not found. "
-                "Please complete Step 5 (Subgroup Selection) before proceeding."
-            )
-        else:
-            # Pre-step-5 pages are allowed to fall through to the root parquet
-            return self.load_slice()
+        if self.recovered_subgroup_path and os.path.exists(self.recovered_subgroup_path):
+            self.touch()
+            return pd.read_parquet(self.recovered_subgroup_path)
+        if self.active_subgroup_path and os.path.exists(self.active_subgroup_path):
+            self.touch()
+            return pd.read_parquet(self.active_subgroup_path)
+        if self.parquet_path and os.path.exists(self.parquet_path):
+            self.touch()
+            return pd.read_parquet(self.parquet_path)
+        raise ValueError(
+            "Active dataset not found. Please upload a dataset first."
+        )
 
 class WorkspaceRegistry:
     def __init__(self, ttl_seconds: int = 3600):
