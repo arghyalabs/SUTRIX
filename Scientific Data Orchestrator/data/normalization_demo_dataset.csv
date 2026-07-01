@@ -1,0 +1,106 @@
+Chemical_Name,CAS_Number,SMILES,Molecular_Formula,Endpoint,Value,Qualifier,Unit,Species,Exposure_Duration,Data_Quality
+Methane,74-82-8,C,CH4,LC50,-5.0,>=,mg/L,rainbow trout,24h,medium
+Ethanol,64-17-5,CCO,C2H6O,lc50,99999.0,<,ug/L,rainbow_trout,48h,high
+Benzene,71-43-2,c1ccccc1,C6H6,LC-50,,=,ng/L,Oncorhynchus mykiss,72h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,L.C. 50,0.0004 mol/L,=,mol/L,fathead minnow,96h,medium
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,EC50,7.5,=,mmol/L,fathead_minnow,24h,high
+Caffeine,,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,ec50,15.0e-3,=,umol/L,Pimephales promelas,48h,high
+Glucose,50-99-7,,C6H12O6,EC-50,0.07,=,nmol/L,daphnia,72h,medium
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,E.C. 50,12.0,=,mg/kg,daphnia magna,96h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,NOEC,22.5e-3,=,ug/kg,Daphnia magna,24h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,noec,0.1,=,ng/kg,algae,48h,medium
+Methane,74-82-8,C,CH4,NO-EC,16.5,>=,%,green algae,72h,high
+Ethanol,64-17-5,CCO,C2H6O,NOAEL,30.0e-3,<,pLC50,Pseudokirchneriella subcapitata,96h,high
+Benzene,71-43-2,c1ccccc1,C6H6,noael,0.13,=,pEC50,zebrafish,24h,medium
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,LOEC,21.0,=,mg/L,Danio rerio,48h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,loec,37.5e-3,=,ug/L,rat,72h,high
+Caffeine,58-08-2,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,LC50,-5.0,=,ng/L,Rattus norvegicus,96h,medium
+Glucose,50-99-7,C(C1C(C(C(C(O1)O)O)O)O)O,C6H12O6,lc50,99999.0,=,mol/L,rainbow trout,24h,high
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,LC-50,,=,mmol/L,rainbow_trout,48h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,L.C. 50,0.0019 umol/L,=,umol/L,Oncorhynchus mykiss,72h,medium
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,EC50,30.0,=,nmol/L,fathead minnow,96h,high
+Methane,74-82-8,C,CH4,ec50,52.5e-3,>=,mg/kg,fathead_minnow,24h,high
+Methane,74-82-8,C,CH4,ec50,52.5e-3,>=,mg/kg,fathead_minnow,24h,high
+Benzene,71-43-2,c1ccccc1,C6H6,E.C. 50,34.5,=,ng/kg,daphnia,72h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,NOEC,60.0e-3,=,%,daphnia magna,96h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,noec,0.25,=,pLC50,Daphnia magna,24h,medium
+Caffeine,,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,NO-EC,39.0,=,pEC50,algae,48h,high
+Glucose,50-99-7,,C6H12O6,NOAEL,67.5e-3,=,mg/L,green algae,72h,high
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,noael,0.28,=,ug/L,Pseudokirchneriella subcapitata,96h,medium
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,LOEC,43.5,=,ng/L,zebrafish,24h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,loec,75.0e-3,=,mol/L,Danio rerio,48h,high
+Methane,74-82-8,C,CH4,LC50,-5.0,>=,mmol/L,rat,72h,medium
+Ethanol,64-17-5,CCO,C2H6O,lc50,99999.0,<,umol/L,Rattus norvegicus,96h,high
+Benzene,71-43-2,c1ccccc1,C6H6,LC-50,,=,nmol/L,rainbow trout,24h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,L.C. 50,0.0034 mg/kg,=,mg/kg,rainbow_trout,48h,medium
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,EC50,52.5,=,ug/kg,Oncorhynchus mykiss,72h,high
+Caffeine,58-08-2,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,ec50,90.0e-3,=,ng/kg,fathead minnow,96h,high
+Glucose,50-99-7,C(C1C(C(C(C(O1)O)O)O)O)O,C6H12O6,EC-50,0.37,=,%,fathead_minnow,24h,medium
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,E.C. 50,57.0,=,pLC50,Pimephales promelas,48h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,NOEC,97.5e-3,=,pEC50,daphnia,72h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,noec,0.4,=,mg/L,daphnia magna,96h,medium
+Methane,74-82-8,C,CH4,NO-EC,61.5,>=,ug/L,Daphnia magna,24h,high
+Ethanol,64-17-5,CCO,C2H6O,NOAEL,105.0e-3,<,ng/L,algae,48h,high
+Benzene,71-43-2,c1ccccc1,C6H6,noael,0.43,=,mol/L,green algae,72h,medium
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,LOEC,66.0,=,mmol/L,Pseudokirchneriella subcapitata,96h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,loec,112.5e-3,=,umol/L,zebrafish,24h,high
+Caffeine,,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,LC50,-5.0,=,nmol/L,Danio rerio,48h,medium
+Glucose,50-99-7,,C6H12O6,lc50,99999.0,=,mg/kg,rat,72h,high
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,LC-50,,=,ug/kg,Rattus norvegicus,96h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,L.C. 50,0.0049 ng/kg,=,ng/kg,rainbow trout,24h,medium
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,EC50,75.0,=,%,rainbow_trout,48h,high
+Methane,74-82-8,C,CH4,ec50,127.5e-3,>=,pLC50,Oncorhynchus mykiss,72h,high
+Ethanol,64-17-5,CCO,C2H6O,EC-50,0.52,<,pEC50,fathead minnow,96h,medium
+Benzene,71-43-2,c1ccccc1,C6H6,E.C. 50,79.5,=,mg/L,fathead_minnow,24h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,NOEC,135.0e-3,=,ug/L,Pimephales promelas,48h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,noec,0.55,=,ng/L,daphnia,72h,medium
+Caffeine,58-08-2,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,NO-EC,84.0,=,mol/L,daphnia magna,96h,high
+Glucose,50-99-7,C(C1C(C(C(C(O1)O)O)O)O)O,C6H12O6,NOAEL,142.5e-3,=,mmol/L,Daphnia magna,24h,high
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,noael,0.58,=,umol/L,algae,48h,medium
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,LOEC,88.5,=,nmol/L,green algae,72h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,loec,150.0e-3,=,mg/kg,Pseudokirchneriella subcapitata,96h,high
+Methane,74-82-8,C,CH4,LC50,-5.0,>=,ug/kg,zebrafish,24h,medium
+Ethanol,64-17-5,CCO,C2H6O,lc50,99999.0,<,ng/kg,Danio rerio,48h,high
+Benzene,71-43-2,c1ccccc1,C6H6,LC-50,,=,%,rat,72h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,L.C. 50,0.0064 pLC50,=,pLC50,Rattus norvegicus,96h,medium
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,EC50,97.5,=,pEC50,rainbow trout,24h,high
+Caffeine,,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,ec50,165.0e-3,=,mg/L,rainbow_trout,48h,high
+Glucose,50-99-7,,C6H12O6,EC-50,0.67,=,ug/L,Oncorhynchus mykiss,72h,medium
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,E.C. 50,102.0,=,ng/L,fathead minnow,96h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,NOEC,172.5e-3,=,mol/L,fathead_minnow,24h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,noec,0.7,=,mmol/L,Pimephales promelas,48h,medium
+Methane,74-82-8,C,CH4,NO-EC,106.5,>=,umol/L,daphnia,72h,high
+Ethanol,64-17-5,CCO,C2H6O,NOAEL,180.0e-3,<,nmol/L,daphnia magna,96h,high
+Benzene,71-43-2,c1ccccc1,C6H6,noael,0.73,=,mg/kg,Daphnia magna,24h,medium
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,LOEC,111.0,=,ug/kg,algae,48h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,loec,187.5e-3,=,ng/kg,green algae,72h,high
+Caffeine,58-08-2,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,LC50,-5.0,=,%,Pseudokirchneriella subcapitata,96h,medium
+Glucose,50-99-7,C(C1C(C(C(C(O1)O)O)O)O)O,C6H12O6,lc50,99999.0,=,pLC50,zebrafish,24h,high
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,LC-50,,=,pEC50,Danio rerio,48h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,L.C. 50,0.0079 mg/L,=,mg/L,rat,72h,medium
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,EC50,120.0,=,ug/L,Rattus norvegicus,96h,high
+Methane,74-82-8,C,CH4,ec50,202.5e-3,>=,ng/L,rainbow trout,24h,high
+Ethanol,64-17-5,CCO,C2H6O,EC-50,0.82,<,mol/L,rainbow_trout,48h,medium
+Benzene,71-43-2,c1ccccc1,C6H6,E.C. 50,124.5,=,mmol/L,Oncorhynchus mykiss,72h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,NOEC,210.0e-3,=,umol/L,fathead minnow,96h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,noec,0.85,=,nmol/L,fathead_minnow,24h,medium
+Caffeine,,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,NO-EC,129.0,=,mg/kg,Pimephales promelas,48h,high
+Glucose,50-99-7,,C6H12O6,NOAEL,217.5e-3,=,ug/kg,daphnia,72h,high
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,noael,0.88,=,ng/kg,daphnia magna,96h,medium
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,LOEC,133.5,=,%,Daphnia magna,24h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,loec,225.0e-3,=,pLC50,algae,48h,high
+Methane,74-82-8,C,CH4,LC50,-5.0,>=,pEC50,green algae,72h,medium
+Ethanol,64-17-5,CCO,C2H6O,lc50,99999.0,<,mg/L,Pseudokirchneriella subcapitata,96h,high
+Benzene,71-43-2,c1ccccc1,C6H6,LC-50,,=,ug/L,zebrafish,24h,high
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,L.C. 50,0.0094 ng/L,=,ng/L,Danio rerio,48h,medium
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,EC50,142.5,=,mol/L,rat,72h,high
+Caffeine,58-08-2,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,C8H10N4O2,ec50,240.0e-3,=,mmol/L,Rattus norvegicus,96h,high
+Glucose,50-99-7,C(C1C(C(C(C(O1)O)O)O)O)O,C6H12O6,EC-50,0.97,=,umol/L,rainbow trout,24h,medium
+Glyphosate,1071-83-6,OP(=O)(O)CNCC(=O)O,C3H8NO5P,E.C. 50,147.0,=,nmol/L,rainbow_trout,48h,high
+Atenolol,29122-68-7,CC(C)NC[C@H](O)c1ccc(CC(C)C)cc1,C14H22N2O3,NOEC,247.5e-3,=,mg/kg,Oncorhynchus mykiss,72h,high
+Triclosan,3380-34-5,Oc1ccc(cc1Cl)c2c(Cl)cccc2,C12H7Cl3O2,noec,1.0,=,ug/kg,fathead minnow,96h,medium
+Methane,74-82-8,C,CH4,NO-EC,151.5,>=,ng/kg,fathead_minnow,24h,high
+Ethanol,64-17-5,CCO,C2H6O,NOAEL,255.0e-3,<,%,Pimephales promelas,48h,high
+Benzene,71-43-2,c1ccccc1,C6H6,noael,1.03,=,pLC50,daphnia,72h,medium
+Phenol,108-95-2,c1ccc(cc1)O,C6H6O,LOEC,156.0,=,pEC50,daphnia magna,96h,high
+Aspirin,50-78-2,CC(=O)Oc1ccccc1C(=O)O,C9H8O4,loec,262.5e-3,=,mg/L,Daphnia magna,24h,high

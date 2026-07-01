@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRightLeft, TrendingDown, Target, Users,
-  ShieldCheck, BarChart2, Upload, AlertTriangle, UploadCloud, Loader2
+  ShieldCheck, BarChart2, Upload, AlertTriangle, UploadCloud, Loader2, Play
 } from 'lucide-react';
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
 import { IntelligentNormalizationPanel } from './IntelligentNormalizationPanel';
@@ -148,6 +148,21 @@ export const NormalizationStudioInner: React.FC<NormalizationStudioProps> = ({ o
     }
   };
 
+  const handleLoadDemo = async () => {
+    setIsUploading(true);
+    try {
+      const r = await fetch(`${API}/api/normalization/${clientId}/load-demo`, { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Failed to load demo dataset');
+      useWorkspaceStore.getState().setDataset(d.filename || 'normalization_demo_dataset.csv', '', d.rows ?? 0, d.columns ?? [], []);
+      toast.success('Normalization demo dataset loaded successfully!');
+    } catch (e: any) {
+      toast.error(`Failed to load demo: ${e.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleReset = async () => {
     try {
       await workspaceApi.resetWorkspace(clientId);
@@ -225,6 +240,7 @@ export const NormalizationStudioInner: React.FC<NormalizationStudioProps> = ({ o
                 {!filename ? (
                   <EmptyState
                     handleUpload={handleUpload}
+                    handleLoadDemo={handleLoadDemo}
                     isUploading={isUploading}
                   />
                 ) : (
@@ -241,8 +257,9 @@ export const NormalizationStudioInner: React.FC<NormalizationStudioProps> = ({ o
 
 const EmptyState: React.FC<{
   handleUpload: (file: File) => Promise<void>;
+  handleLoadDemo: () => Promise<void>;
   isUploading: boolean;
-}> = ({ handleUpload, isUploading }) => {
+}> = ({ handleUpload, handleLoadDemo, isUploading }) => {
   const [dragging, setDragging] = useState(false);
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -285,6 +302,17 @@ const EmptyState: React.FC<{
             ))}
           </div>
         </label>
+
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={handleLoadDemo}
+            disabled={isUploading}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-all duration-200 shadow-lg hover:shadow-amber-500/5 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          >
+            <Play className="w-4 h-4" />
+            <span>Load Normalization Demo Dataset</span>
+          </button>
+        </div>
       </div>
     </div>
   );

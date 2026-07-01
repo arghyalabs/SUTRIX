@@ -348,6 +348,37 @@ async def upload_dataset_test(client_id: str, file: UploadFile = File(...)):
     return {"status": "ok", "filename": fname, "rows": len(df), "cols": len(df.columns)}
 
 
+@router.post("/{client_id}/load-demo")
+async def load_demo_dataset(client_id: str):
+    """Loads the custom normalization demo dataset (minimum 100 rows)."""
+    import os
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    candidates = [
+        os.path.join(project_root, "data", "normalization_demo_dataset.csv"),
+        os.path.join(project_root, "eco_toxicity_dataset.csv"),
+    ]
+    demo_path = next((p for p in candidates if os.path.exists(p)), None)
+    if not demo_path:
+        raise HTTPException(404, "Custom normalization demo dataset not found on server.")
+        
+    try:
+        df = pd.read_csv(demo_path)
+    except Exception as e:
+        raise HTTPException(400, f"Cannot parse demo file: {e}")
+        
+    context = registry.get_context(client_id)
+    base_dir = os.path.join(getattr(context, "workspace_dir", f"workspaces/{client_id}"), "uploads")
+    os.makedirs(base_dir, exist_ok=True)
+    parquet_path = os.path.join(base_dir, "dataset.parquet")
+    df.to_parquet(parquet_path, index=False)
+    context.parquet_path = parquet_path
+    context.dataframe_cache = df
+    context.reset_subgroup_state()
+    context.add_trace("ingest")
+    context.touch(save_to_disk=True)
+    return {"status": "ok", "filename": "normalization_demo_dataset.csv", "rows": len(df), "cols": len(df.columns)}
+
+
 @router.get("/{client_id}/scan")
 async def scan_dataset(client_id: str):
     """
