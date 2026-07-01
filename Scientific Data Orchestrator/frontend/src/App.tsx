@@ -67,7 +67,7 @@ import { LoadingScreen } from './components/ui/LoadingScreen';
 
 
 // ===========================================================================
-// ERROR BOUNDARY – catches React render crashes and shows a recoverable UI
+// ERROR BOUNDARY â€“ catches React render crashes and shows a recoverable UI
 // instead of a full black screen
 // ===========================================================================
 class ErrorBoundary extends React.Component<
@@ -163,7 +163,7 @@ const getErrorMessage = (error: any, fallback: string): string => {
 };
 
 // ==========================================================================
-// V6 ROOT APP — thin router: landing → hub → studio
+// V6 ROOT APP â€” thin router: landing â†’ hub â†’ studio
 // ==========================================================================
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -224,13 +224,13 @@ const App: React.FC = () => {
   if (currentView === 'verification') {
     return (
       <>
-        <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+        <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
         <VerificationDashboard onGoBack={() => navigate('/hub')} />
       </>
     );
   }
 
-  // Studio view — route dedicated studios, else fall back to LegacyWorkspaceApp
+  // Studio view â€” route dedicated studios, else fall back to LegacyWorkspaceApp
   if (currentView === 'studio' && currentStudio) {
     const goHub = () => navigate('/hub');
 
@@ -238,7 +238,7 @@ const App: React.FC = () => {
     if (currentStudio === 'hierarchy') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl', loading: { icon: <LogoLoader size="w-5 h-5" compact /> } }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' }, loading: { icon: <LogoLoader size="w-4 h-4" compact /> } }} />
           <HierarchyStudio onGoHub={goHub} />
         </>
       );
@@ -248,29 +248,27 @@ const App: React.FC = () => {
     if (currentStudio === 'compound') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl', loading: { icon: <LogoLoader size="w-5 h-5" compact /> } }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' }, loading: { icon: <LogoLoader size="w-4 h-4" compact /> } }} />
           <CompoundStudio onGoHub={goHub} />
         </>
       );
     }
 
-    // Studio 4: Normalization — dedicated standalone studio
+    // Studio 4: Normalization â€” dedicated standalone studio
     if (currentStudio === 'normalization') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{
-            className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
-          }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
           <NormalizationStudio onGoHub={goHub} />
         </>
       );
     }
 
-    // Studio 2: Scientific Data Analysis — dedicated standalone studio
+    // Studio 2: Scientific Data Analysis â€” dedicated standalone studio
     if (currentStudio === 'analytics') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
           <AnalyticsStudio onGoHub={goHub} />
         </>
       );
@@ -280,7 +278,7 @@ const App: React.FC = () => {
     if (currentStudio === 'qsar') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
           <QSARStudio onGoHub={goHub} />
         </>
       );
@@ -290,7 +288,7 @@ const App: React.FC = () => {
     if (currentStudio === 'oecd') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
           <OECDValidationStudio onGoHub={goHub} />
         </>
       );
@@ -300,7 +298,7 @@ const App: React.FC = () => {
     if (currentStudio === 'intelligence') {
       return (
         <>
-          <Toaster position="top-right" toastOptions={{ className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl' }} />
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
           <IntelligenceStudio onGoHub={goHub} />
         </>
       );
@@ -309,10 +307,7 @@ const App: React.FC = () => {
     // All other studios: Legacy pipeline wrapped in studio context
     return (
       <>
-        <Toaster position="top-right" toastOptions={{
-          className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
-          loading: { icon: <LogoLoader size="w-5 h-5" compact /> },
-        }} />
+        <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' }, loading: { icon: <LogoLoader size="w-4 h-4" compact /> } }} />
         <LegacyWorkspaceApp
           studioId={currentStudio}
           onGoHub={goHub}
@@ -466,7 +461,7 @@ const qsarStepsConfig: NavigationStep[] = [
 
 
 // ==========================================================================
-// LEGACY WORKSPACE APP — original pipeline, now running inside a studio
+// LEGACY WORKSPACE APP â€” original pipeline, now running inside a studio
 // ==========================================================================
 interface LegacyWorkspaceAppProps {
   studioId: StudioId;
@@ -556,7 +551,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
 
   const socket = useWebSocket(clientId);
 
-  // ── Upload processing state ──────────────────────────────────
+  // â”€â”€ Upload processing state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [isUploadProcessing, setIsUploadProcessing] = useState(false);
   const [uploadJobId, setUploadJobId] = useState<string | null>(null);
   // Ref for synchronous access in WS listener (avoids stale-closure race)
@@ -634,7 +629,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
       }
       if (msg.type === 'PARTIAL_SAVE') {
         setIsUploadProcessing(false);
-        toast('Processing cancelled. Progress saved.', { icon: '⚠️' });
+        toast('Processing cancelled. Progress saved.', { icon: 'âš ï¸' });
       }
     } catch {
       // ignore parse errors
@@ -879,7 +874,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
       
       if (mapRes.dataset_type) {
         toast.success(`Dataset classified: ${mapRes.dataset_type}`, {
-          icon: '🧠',
+          icon: 'ðŸ§ ',
           duration: 5000
         });
       }
@@ -887,7 +882,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
       if (mapRes.warnings && mapRes.warnings.length > 0) {
         mapRes.warnings.forEach((warn: string) => {
           toast.error(warn, {
-            icon: '⚠️',
+            icon: 'âš ï¸',
             duration: 8000
           });
         });
@@ -902,7 +897,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
     }
   };
 
-  // Workspace locked → "Switch Workspace" warning modal -> new session
+  // Workspace locked â†’ "Switch Workspace" warning modal -> new session
   const handleSwitchWorkspace = () => {
     setShowSwitchWorkspaceModal(true);
   };
@@ -943,7 +938,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
       if (targetId === uploadJobId) {
         await fetch(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/api/jobs/${targetId}/cancel`, { method: 'POST' });
         setIsUploadProcessing(false);
-        toast('Upload cancelled. Partial progress saved.', { icon: '⚠️' });
+        toast('Upload cancelled. Partial progress saved.', { icon: 'âš ï¸' });
         return;
       }
       await enrichmentApi.cancelJob(clientId);
@@ -1134,12 +1129,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
   return (
     <>
       <LoadingScreen isLoading={isAppLoading} />
-      <Toaster position="top-right" toastOptions={{ 
-        className: '!bg-[#111827] !text-white !border !border-white/[0.08] !shadow-2xl',
-        loading: {
-          icon: <LogoLoader size="w-5 h-5" compact />,
-        }
-      }} />
+      <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' }, loading: { icon: <LogoLoader size="w-4 h-4" compact /> } }} />
       <DashboardLayout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -1196,3 +1186,4 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
 };
 
 export default App;
+
