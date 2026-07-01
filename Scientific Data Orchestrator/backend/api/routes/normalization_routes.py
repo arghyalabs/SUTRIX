@@ -352,10 +352,11 @@ async def upload_dataset_test(client_id: str, file: UploadFile = File(...)):
 async def load_demo_dataset(client_id: str):
     """Loads the custom normalization demo dataset (minimum 100 rows)."""
     import os
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sdo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     candidates = [
-        os.path.join(project_root, "data", "normalization_demo_dataset.csv"),
-        os.path.join(project_root, "eco_toxicity_dataset.csv"),
+        os.path.join(sdo_root, "data", "normalization_demo_dataset.csv"),
+        os.path.join(sdo_root, "data", "eco_toxicity_dataset.csv"),
+        os.path.join(sdo_root, "eco_toxicity_dataset.csv"),
     ]
     demo_path = next((p for p in candidates if os.path.exists(p)), None)
     if not demo_path:

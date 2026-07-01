@@ -70,11 +70,11 @@ async def upload(client_id: str, file: UploadFile = File(...)):
 async def load_demo(client_id: str):
     import os
     # Find demo file: check data/ first, then project root, then backend root
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sdo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     candidates = [
-        os.path.join(project_root, "data", "intelligence_demo_dataset.csv"),
-        os.path.join(project_root, "data", "eco_toxicity_dataset.csv"),
-        os.path.join(project_root, "eco_toxicity_dataset.csv"),
+        os.path.join(sdo_root, "data", "intelligence_demo_dataset.csv"),
+        os.path.join(sdo_root, "data", "eco_toxicity_dataset.csv"),
+        os.path.join(sdo_root, "eco_toxicity_dataset.csv"),
     ]
     demo_path = None
     for c in candidates:
