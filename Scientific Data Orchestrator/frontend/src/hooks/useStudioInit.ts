@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import { workspaceManager } from '../services/workspaceManagerService';
 import type { StudioId } from '../services/workspaceManagerService';
 import { useWorkspaceStore } from '../store/useWorkspaceStore';
+import { workspaceApi } from '../services/workspaceApi';
 
 export function useStudioInit(studioId: StudioId) {
   const initialised = useRef(false);
@@ -23,6 +24,23 @@ export function useStudioInit(studioId: StudioId) {
 
     const snap = workspaceManager.getSnapshot(studioId);
     const store = useWorkspaceStore.getState();
+
+    // Verify session integrity on backend
+    const verifyActiveSession = async (wsId: string) => {
+      try {
+        const res = await workspaceApi.verifyWorkspace(wsId);
+        if (!res.valid) {
+          console.warn(`[useStudioInit] Backend session ${wsId} is missing or invalid. Wiping local state.`);
+          workspaceManager.resetWorkspace(studioId);
+          const activeStore = useWorkspaceStore.getState();
+          activeStore.resetWorkspace();
+          activeStore.setCurrentStudioId(studioId);
+          activeStore.setActiveTab('ingest');
+        }
+      } catch (e) {
+        console.error('[useStudioInit] Failed to verify backend session:', e);
+      }
+    };
 
     // Fresh open -> wipe global store
     if (snap.status === 'empty') {
@@ -56,6 +74,10 @@ export function useStudioInit(studioId: StudioId) {
       store.setCurrentStudioId(studioId);
     }
 
+    if (snap.status !== 'empty' && snap.workspaceId) {
+      verifyActiveSession(snap.workspaceId);
+    }
+
     // Mark the studio as active in the session registry
     workspaceManager.saveWorkspaceState(studioId, {
       status: 'active',
@@ -63,3 +85,4 @@ export function useStudioInit(studioId: StudioId) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);   // intentionally runs once on mount only
 }
+

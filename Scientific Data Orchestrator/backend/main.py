@@ -422,6 +422,25 @@ async def api_workspace_mode(client_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/workspace/{client_id}/verify")
+async def api_verify_workspace(client_id: str):
+    """
+    Checks if the workspace exists on the backend and has a valid parquet file.
+    """
+    try:
+        from backend.core.session_state_manager import session_manager
+        context = registry.workspaces.get(client_id)
+        if not context:
+            context = session_manager.load_session(client_id)
+        
+        if context and context.parquet_path and os.path.exists(context.parquet_path):
+            return {"valid": True}
+        return {"valid": False}
+    except Exception as e:
+        logger.error(f"Workspace verification failed: {e}")
+        return {"valid": False}
+
+
 @app.delete("/api/workspace/{client_id}/reset")
 async def reset_workspace(client_id: str):
     """

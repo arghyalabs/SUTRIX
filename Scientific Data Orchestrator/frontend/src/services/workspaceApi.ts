@@ -50,5 +50,13 @@ export const workspaceApi = {
     const response = await apiClient.delete<{ success: boolean; message: string }>(`/api/workspace/${clientId}/reset`);
     return response.data;
   },
+
+  /**
+   * Verifies if the workspace exists on the backend and has a valid source parquet.
+   */
+  verifyWorkspace: async (clientId: string): Promise<{ valid: boolean }> => {
+    const response = await apiClient.get<{ valid: boolean }>(`/api/workspace/${clientId}/verify`);
+    return response.data;
+  },
 };
 
