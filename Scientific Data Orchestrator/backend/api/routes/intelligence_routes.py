@@ -72,6 +72,7 @@ async def load_demo(client_id: str):
     # Find demo file: check data/ first, then project root, then backend root
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     candidates = [
+        os.path.join(project_root, "data", "intelligence_demo_dataset.csv"),
         os.path.join(project_root, "data", "eco_toxicity_dataset.csv"),
         os.path.join(project_root, "eco_toxicity_dataset.csv"),
     ]
@@ -89,8 +90,8 @@ async def load_demo(client_id: str):
     except Exception as e:
         raise HTTPException(500, f"Failed to load demo file: {e}")
         
-    _sessions[client_id] = {"df": df, "filename": "eco_toxicity_dataset.csv"}
-    return {"status": "ok", "filename": "eco_toxicity_dataset.csv", "rows": len(df), "cols": len(df.columns), "columns": df.columns.tolist()}
+    _sessions[client_id] = {"df": df, "filename": "intelligence_demo_dataset.csv"}
+    return {"status": "ok", "filename": "intelligence_demo_dataset.csv", "rows": len(df), "cols": len(df.columns), "columns": df.columns.tolist()}
 
 
 @router.get("/{client_id}/dataset-info")
