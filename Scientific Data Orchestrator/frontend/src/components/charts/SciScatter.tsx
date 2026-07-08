@@ -267,7 +267,7 @@ export const SciScatter: React.FC<SciScatterProps> = ({
                   series: s.name,
                   x: data.x,
                   y: data.y,
-                  label: data.label,
+                  label: (data as any).label,
                 });
               }
             }}

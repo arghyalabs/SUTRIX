@@ -511,6 +511,77 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           </ResponsiveContainer>
         );
         break;
+      case 'composition_pie':
+        title = "Subgroup Composition %";
+        subtitle = branchDetail.charts?.composition_pie?.title ? `column: ${branchDetail.charts.composition_pie.title}` : "";
+        chartComponent = (
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 h-full">
+            <div className="relative w-full max-w-[400px] h-[350px] shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={compositionPieData} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={3} dataKey="value" labelLine={false} label={false}>
+                    {compositionPieData.map((_: any, i: number) => <Cell key={`c-${i}`} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip content={<CustomPieTooltip categoryLabel={branchDetail.charts?.composition_pie?.title || 'Category'} />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[11px] uppercase tracking-wider text-white/40 font-bold">TOTAL</span>
+                <span className="text-3xl font-extrabold text-white leading-none my-1">
+                  {pieTotal.toLocaleString()}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-bold">
+                  Records
+                </span>
+              </div>
+            </div>
+            <ul className="space-y-3 w-full max-w-md max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+              {compositionPieData.map((entry: any, index: number) => {
+                const count = entry.value;
+                const pct = entry.pct;
+                const color = CHART_COLORS[index % CHART_COLORS.length];
+                return (
+                  <li key={`item-${index}`} className="flex items-center justify-between w-full text-sm font-mono border-b border-white/[0.03] pb-2">
+                    <span className="flex items-center gap-3 text-white/80">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className="truncate max-w-[200px]">{entry.name}</span>
+                    </span>
+                    <span className="text-white font-bold">
+                      {count.toLocaleString()} <span className="text-cyan-400 ml-1 text-xs">({pct.toFixed(1)}%)</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+        break;
+      case 'composition_bar':
+        title = "Subgroup Frequencies";
+        subtitle = branchDetail.charts?.composition_bar?.title ? `column: ${branchDetail.charts.composition_bar.title}` : "";
+        chartComponent = (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={compositionBarData} margin={{ top: 40, right: 30, left: 10, bottom: 65 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis 
+                dataKey="name" 
+                tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 500 }} 
+                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} 
+                tickLine={false} 
+                interval={0}
+                angle={-20}
+                textAnchor="end"
+                height={75}
+              />
+              <YAxis tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomBarTooltip categoryLabel={branchDetail.charts?.composition_bar?.title || 'Category'} total={compositionBarData.reduce((sum: number, item: any) => sum + item.count, 0)} />} />
+              <Bar dataKey="count" fill="#22d3ee" radius={[6, 6, 0, 0]}>
+                <LabelList dataKey="count" content={renderCustomBarLabel} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+        break;
     }
 
     return (
@@ -624,7 +695,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="w-max min-w-full">
+              <div className="w-full">
                 {rootNode ? (
                   <BranchTreeNode
                     node={rootNode}
@@ -792,13 +863,17 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           <div className="flex flex-col gap-4">
 
 
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-32 gap-4">
-                <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
-                <span className="text-sm font-semibold text-white/50">Recalculating responsive distributions...</span>
-              </div>
-            ) : branchDetail ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {branchDetail ? (
+              <div className="relative">
+                {/* Smooth Loading Overlay */}
+                {loading && (
+                  <div className="absolute inset-0 bg-[#060c18]/60 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center gap-3 rounded-2xl transition-all duration-300">
+                    <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin" />
+                    <span className="text-xs font-semibold text-cyan-300 font-mono tracking-wide">Recalculating subgroup distributions...</span>
+                  </div>
+                )}
+                
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity duration-300 ${loading ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
                 
                 {/* ── Chart 1: Subgroup Composition Pie ── */}
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.05 }}>
@@ -870,9 +945,18 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
                     <div className="h-[260px]">
                       {compositionBarData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={compositionBarData} margin={{ top: 35, right: 10, left: -10, bottom: 5 }}>
+                          <BarChart data={compositionBarData} margin={{ top: 35, right: 10, left: -10, bottom: 45 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                            <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600 }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                            <XAxis 
+                              dataKey="name" 
+                              tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 9, fontWeight: 500 }} 
+                              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} 
+                              tickLine={false}
+                              interval={0}
+                              angle={-20}
+                              textAnchor="end"
+                              height={55}
+                            />
                             <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
                             <Tooltip content={<CustomBarTooltip categoryLabel={branchDetail.charts?.composition_bar?.title || 'Category'} total={compositionBarData.reduce((sum: number, item: any) => sum + item.count, 0)} />} />
                             <Bar dataKey="count" fill="#22d3ee" radius={[4, 4, 0, 0]}>
@@ -1065,6 +1149,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
                   </ChartCard>
                 </motion.div>
 
+                </div>
               </div>
             ) : (
               <div className="py-20 text-center text-xs text-white/30">No analysis details loaded.</div>

@@ -712,7 +712,7 @@ export const SciPanel: React.FC<SciPanelProps> = ({
                           >
                             {columns.map(col => (
                               <td key={col.key} style={{ padding: '6px 8px', color: '#CBD5E1' }}>
-                                {col.format(row[col.key])}
+                                {col.format ? col.format(row[col.key]) : String(row[col.key] ?? '')}
                               </td>
                             ))}
                           </tr>
@@ -865,7 +865,7 @@ export const SciPanel: React.FC<SciPanelProps> = ({
 
               {/* Interactive Settings Tab */}
               {activeTab === 'SETTINGS' && (
-                <div style={{ flex: 1, padding: 20, spaceY: 20, display: 'flex', flexDirection: 'column', gap: 24 }}>
+                 <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column', gap: 24 }}>
                   
                   {/* Zoom controls */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

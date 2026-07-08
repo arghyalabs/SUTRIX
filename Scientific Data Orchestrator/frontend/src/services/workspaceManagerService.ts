@@ -23,6 +23,23 @@ export interface StudioProgress {
   lastActivity: number;
 }
 
+export interface StudioSnapshot {
+  studioId: StudioId;
+  workspaceId: string;
+  schemaVersion: number;
+  status: SessionStatus;
+  createdAt: number;
+  lastActivity: number;
+  datasetCount: number;
+  processingStatus: 'running' | 'idle';
+  datasetFilename: string;
+  parquetPath: string;
+  rowCount: number;
+  columns: string[];
+  activeStep: string;
+  studioState: any;
+}
+
 export interface SharedWorkspaceState {
   workspaceId: string;
   createdAt: number;
@@ -240,13 +257,13 @@ class WorkspaceManagerService {
   }
 
   onMajorAction(_studioId: StudioId, _action: string, _statePatch?: any): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.debug('[WorkspaceManager] onMajorAction (shared mode):', _studioId, _action);
     }
   }
 
   pauseWorkspace(_studioId: StudioId): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.debug('[WorkspaceManager] pauseWorkspace (shared mode):', _studioId);
     }
   }
