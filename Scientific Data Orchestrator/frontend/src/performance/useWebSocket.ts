@@ -46,10 +46,123 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
     setIsConnected(false);
   }, []);
 
+  const handleJobMessage = useCallback((msg: any) => {
+    setLastMessage(msg);  // expose raw message to consumers
+    
+    // Only filter by job_id for enrichment/segmentation messages
+    // Upload/stage messages use workspace_id filter handled by consumer
+    const isJobSpecific = msg.job_id && activeJobIdRef.current;
+    if (isJobSpecific && msg.job_id !== activeJobIdRef.current) return;
+
+    if ((msg.type === 'PROGRESS' || msg.type === 'PROGRESS_UPDATE') && msg.data) {
+      const data: JobTelemetry = msg.data;
+      setProgress(data.progress_pct);
+      setEta(data.eta_seconds);
+      setSpeed(data.compounds_per_sec || data.items_per_sec || 0);
+      
+      if (msg.data.active_node) {
+        setPhase(msg.data.active_node);
+      } else {
+        setPhase(data.phase || data.stage_label || 'Processing...');
+      }
+      
+      if (data.logs && data.logs.length > 0) {
+        setLogs(prev => {
+          // Merge logs unique by reference
+          const newLogs = [...prev, ...data.logs];
+          return Array.from(new Set(newLogs)).slice(-100); // Limit list buffer
+        });
+      }
+    } else if (msg.type === 'JOB_COMPLETED') {
+      setProgress(100);
+      setJobStatus('COMPLETED');
+      setPhase('Complete');
+      toast.success('Computational toxicology job completed successfully!', {
+        id: 'job-completed-' + (msg.job_id || activeJobIdRef.current || 'active'),
+        icon: '🏁',
+        duration: 5000,
+        style: { background: '#0B132B', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.2)' }
+      });
+      
+      // Store the new lineage (field: 'lineage')
+      if (msg.data && msg.data.lineage) {
+        useWorkspaceStore.getState().setActiveLineage(msg.data.lineage);
+        useWorkspaceStore.getState().setSegregation(msg.data.lineage, true);
+      }
+      // Keep backward compat: also handle old 'graph' field
+      if (msg.data && msg.data.graph) {
+        useWorkspaceStore.getState().setActiveSegregationResult(msg.data);
+        useWorkspaceStore.getState().setSegregation(msg.data.graph, true);
+      }
+      
+      activeJobIdRef.current = null; // Prevent exponential reconnect loop
+      disconnect();
+    } else if (msg.type === 'JOB_FAILED') {
+      setJobStatus('FAILED');
+      setError(msg.error || 'Job execution failed');
+      toast.error(`Job calculations failed: ${msg.error || 'Unknown Error'}`, {
+        style: { background: '#0B132B', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)' }
+      });
+      activeJobIdRef.current = null;
+      disconnect();
+    } else if (msg.type === 'JOB_CANCELLED') {
+      setJobStatus('CANCELLED');
+      toast('Job computations aborted by user.', {
+        icon: '🛑',
+        style: { background: '#0B132B', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.2)' }
+      });
+      activeJobIdRef.current = null;
+      disconnect();
+    }
+  }, [disconnect]);
+
   const connect = useCallback((jobId: string) => {
     disconnect();
     activeJobIdRef.current = jobId;
     
+    // HTTP Fallback Polling — runs immediately and independently of WS connection
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    pollingIntervalRef.current = setInterval(async () => {
+      if (!activeJobIdRef.current) return;
+      try {
+        const res = await fetch(`/api/jobs/${activeJobIdRef.current}`);
+        if (res.status === 404) {
+          handleJobMessage({
+            type: 'JOB_FAILED',
+            job_id: activeJobIdRef.current,
+            error: 'Job not found. The server may have restarted. Please re-run the operation.'
+          });
+          return;
+        }
+        if (res.ok) {
+          const data = await res.json();
+          const status = data.status;
+
+          if (status === 'RUNNING' || status === 'QUEUED') {
+            if (typeof data.progress === 'number') setProgress(data.progress);
+            if (typeof data.progress_pct === 'number') setProgress(data.progress_pct);
+            if (data.speed != null) setSpeed(data.speed);
+            if (data.eta != null) setEta(data.eta);
+            if (data.phase) setPhase(data.phase);
+          } else if (status === 'COMPLETED' && data.result) {
+            handleJobMessage({
+              type: 'JOB_COMPLETED',
+              job_id: activeJobIdRef.current,
+              data: data.result
+            });
+          } else if (status === 'FAILED') {
+            handleJobMessage({
+              type: 'JOB_FAILED',
+              job_id: activeJobIdRef.current,
+              error: data.error || 'Job failed'
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore fetch errors during polling
+      }
+    }, 1000);
+
     // Dynamically calculate WebSocket URL based on location
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
@@ -71,129 +184,18 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
           icon: '🔌',
           style: { background: '#0B132B', color: '#06B6D4', border: '1px solid rgba(6, 182, 212, 0.2)' }
         });
-
-        // HTTP Fallback Polling — updates progress bar even when WS messages are throttled
-        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = setInterval(async () => {
-          if (!activeJobIdRef.current) return;
-          try {
-            const res = await fetch(`/api/jobs/${activeJobIdRef.current}`);
-            if (res.status === 404) {
-              // Job no longer exists on backend (likely a server restart)
-              // Emit a fake JOB_FAILED to unblock the UI
-              const fakeEvent = {
-                data: JSON.stringify({ type: 'JOB_FAILED', job_id: activeJobIdRef.current, error: 'Job not found. The server may have restarted. Please re-run the operation.' })
-              };
-              if (socketRef.current?.onmessage) socketRef.current.onmessage(fakeEvent as any);
-              clearInterval(pollingIntervalRef.current);
-              pollingIntervalRef.current = null;
-              return;
-            }
-            if (res.ok) {
-              const data = await res.json();
-              const status = data.status;
-
-              if (status === 'RUNNING' || status === 'QUEUED') {
-                // Always update progress from job registry — this is our reliable source
-                if (typeof data.progress === 'number') setProgress(data.progress);
-                if (typeof data.progress_pct === 'number') setProgress(data.progress_pct);
-                if (data.speed != null) setSpeed(data.speed);
-                if (data.eta != null) setEta(data.eta);
-                if (data.phase) setPhase(data.phase);
-              } else if (status === 'COMPLETED' && data.result) {
-                // Simulate WS JOB_COMPLETED message
-                const fakeEvent = {
-                  data: JSON.stringify({ type: 'JOB_COMPLETED', job_id: activeJobIdRef.current, data: data.result })
-                };
-                if (socketRef.current?.onmessage) socketRef.current.onmessage(fakeEvent as any);
-              } else if (status === 'FAILED') {
-                const fakeEvent = {
-                  data: JSON.stringify({ type: 'JOB_FAILED', job_id: activeJobIdRef.current, error: data.error || 'Job failed' })
-                };
-                if (socketRef.current?.onmessage) socketRef.current.onmessage(fakeEvent as any);
-              }
-            }
-          } catch (e) {
-            // Ignore fetch errors during polling
-          }
-        }, 800); // Poll every 800ms for smooth progress updates
       };
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          setLastMessage(msg);  // expose raw message to consumers
           
           if (msg.type === 'PING') {
             ws.send(JSON.stringify({ type: 'PONG' }));
             return;
           }
           
-          // Only filter by job_id for enrichment/segmentation messages
-          // Upload/stage messages use workspace_id filter handled by consumer
-          const isJobSpecific = msg.job_id && activeJobIdRef.current;
-          if (isJobSpecific && msg.job_id !== activeJobIdRef.current) return;
-
-          if ((msg.type === 'PROGRESS' || msg.type === 'PROGRESS_UPDATE') && msg.data) {
-            const data: JobTelemetry = msg.data;
-            setProgress(data.progress_pct);
-            setEta(data.eta_seconds);
-            setSpeed(data.compounds_per_sec || data.items_per_sec || 0);
-            
-            if (msg.data.active_node) {
-              setPhase(msg.data.active_node);
-            } else {
-              setPhase(data.phase || data.stage_label || 'Processing...');
-            }
-            
-            if (data.logs && data.logs.length > 0) {
-              setLogs(prev => {
-                // Merge logs unique by reference
-                const newLogs = [...prev, ...data.logs];
-                return Array.from(new Set(newLogs)).slice(-100); // Limit list buffer
-              });
-            }
-          } else if (msg.type === 'JOB_COMPLETED') {
-            setProgress(100);
-            setJobStatus('COMPLETED');
-            setPhase('Complete');
-            toast.success('Computational toxicology job completed successfully!', {
-              id: 'job-completed-' + (msg.job_id || activeJobIdRef.current || 'active'),
-              icon: '🏁',
-              duration: 5000,
-              style: { background: '#0B132B', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.2)' }
-            });
-            
-            // Store the new lineage (field: 'lineage')
-            if (msg.data && msg.data.lineage) {
-              useWorkspaceStore.getState().setActiveLineage(msg.data.lineage);
-              useWorkspaceStore.getState().setSegregation(msg.data.lineage, true);
-            }
-            // Keep backward compat: also handle old 'graph' field
-            if (msg.data && msg.data.graph) {
-              useWorkspaceStore.getState().setActiveSegregationResult(msg.data);
-              useWorkspaceStore.getState().setSegregation(msg.data.graph, true);
-            }
-            
-            activeJobIdRef.current = null; // Prevent exponential reconnect loop
-            disconnect();
-          } else if (msg.type === 'JOB_FAILED') {
-            setJobStatus('FAILED');
-            setError(msg.error || 'Job execution failed');
-            toast.error(`Job calculations failed: ${msg.error || 'Unknown Error'}`, {
-              style: { background: '#0B132B', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)' }
-            });
-            activeJobIdRef.current = null;
-            disconnect();
-          } else if (msg.type === 'JOB_CANCELLED') {
-            setJobStatus('CANCELLED');
-            toast('Job computations aborted by user.', {
-              icon: '🛑',
-              style: { background: '#0B132B', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.2)' }
-            });
-            activeJobIdRef.current = null;
-            disconnect();
-          }
+          handleJobMessage(msg);
         } catch (err) {
           console.error('Failed to parse socket message frame:', err);
         }
@@ -218,7 +220,7 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
     } catch (err: any) {
       setError(err.message || 'Failed to establish WebSocket connection');
     }
-  }, [clientId, disconnect]);
+  }, [clientId, disconnect, handleJobMessage]);
 
   const connectToJob = useCallback((jobId: string) => {
     connect(jobId);
