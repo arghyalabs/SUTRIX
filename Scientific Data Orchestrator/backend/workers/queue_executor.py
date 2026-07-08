@@ -35,6 +35,10 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
     # Helper to find the best user column for a set of target scientific roles
     def get_best_col(roles: List[str], preferred_pattern: str = None) -> Optional[str]:
         candidates = [col for col, role in mappings.items() if role in roles and col in df.columns]
+        if not candidates and preferred_pattern:
+            import re
+            pat = re.compile(preferred_pattern, re.IGNORECASE)
+            candidates = [c for c in df.columns if pat.search(c)]
         if not candidates:
             return None
         if len(candidates) == 1:
@@ -53,6 +57,12 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
     smiles_col = get_best_col(["canonical_smiles", "isomeric_smiles", "smiles"], r"(smile|struct)")
     name_col = get_best_col(["chemical_name", "chemical_id", "compound_name", "substance_name", "test_substance", "material_name"], r"(name|chem|comp|substance)")
     
+    # Ensure auto-resolved columns are populated in mappings dict if missing
+    if smiles_col and smiles_col in df.columns and smiles_col not in mappings:
+        mappings[smiles_col] = 'canonical_smiles'
+    if name_col and name_col in df.columns and name_col not in mappings:
+        mappings[name_col] = 'chemical_name'
+        
     # If no smiles column is mapped, but we have a chemical name/CAS column, dynamically add canonical_smiles column
     if (not smiles_col or smiles_col not in df.columns) and name_col and name_col in df.columns:
         df['canonical_smiles'] = None

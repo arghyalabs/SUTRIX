@@ -1,7 +1,8 @@
 /**
  * SUTRIX V6 — WorkspaceManagerService
- * Manages N independent studio sessions using localStorage.
- * Each studio gets its own workspace_id, state snapshot, and lifecycle.
+ * Shared workspace manager.
+ * All studios now share a SINGLE workspace and dataset.
+ * Each studio tracks only its own progress within that shared workspace.
  */
 
 export type StudioId =
@@ -15,60 +16,29 @@ export type StudioId =
 
 export type SessionStatus = 'active' | 'paused' | 'empty';
 
-export interface StudioSnapshot {
+export interface StudioProgress {
   studioId: StudioId;
-  workspaceId: string;         // e.g. 'HIER_abc123'
-  schemaVersion: number;       // for migration safety
-  status: SessionStatus;
-  createdAt: number;           // Unix ms timestamp
-  lastActivity: number;        // Unix ms timestamp
-  datasetCount: number;        // how many datasets loaded
-  processingStatus: 'idle' | 'running' | 'error';
+  status: 'pending' | 'in_progress' | 'completed';
+  activeStep: string;
+  lastActivity: number;
+}
+
+export interface SharedWorkspaceState {
+  workspaceId: string;
+  createdAt: number;
+  lastActivity: number;
   datasetFilename: string;
   parquetPath: string;
   rowCount: number;
   columns: string[];
-  activeStep: string;
-  studioState: Record<string, any>;  // studio-specific state blob
+  studioProgress: Partial<Record<StudioId, StudioProgress>>;
 }
 
-const STORAGE_KEY = 'sutrix_v6_studio_sessions';
-const SCHEMA_VERSION = 6;
-
-// Major actions that trigger an auto-save
-export const MAJOR_ACTIONS = [
-  'upload_dataset',
-  'build_hierarchy',
-  'select_subgroup',
-  'run_enrichment',
-  'generate_descriptors',
-  'run_readiness',
-  'generate_dataset',
-  'run_normalization',
-  'run_benchmark',
-] as const;
-export type MajorAction = typeof MAJOR_ACTIONS[number];
-
-const DEFAULT_SNAPSHOT = (studioId: StudioId): StudioSnapshot => ({
-  studioId,
-  workspaceId: `${studioId.toUpperCase().slice(0, 4)}_${Math.random().toString(36).substring(2, 9)}`,
-  schemaVersion: SCHEMA_VERSION,
-  status: 'empty',
-  createdAt: Date.now(),
-  lastActivity: Date.now(),
-  datasetCount: 0,
-  processingStatus: 'idle',
-  datasetFilename: '',
-  parquetPath: '',
-  rowCount: 0,
-  columns: [],
-  activeStep: '',
-  studioState: {},
-});
+const STORAGE_KEY = 'sutrix_v7_shared_workspace';
+const SCHEMA_VERSION = 7;
 
 class WorkspaceManagerService {
-  private sessions: Record<StudioId, StudioSnapshot> = {} as any;
-  private autoSaveTimers: Record<StudioId, ReturnType<typeof setInterval>> = {} as any;
+  private workspace: SharedWorkspaceState | null = null;
 
   constructor() {
     this.loadFromStorage();
@@ -80,140 +50,237 @@ class WorkspaceManagerService {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
-      const parsed: Record<string, StudioSnapshot> = JSON.parse(raw);
-      // Validate schema version — hard wipe if schema mismatch
-      for (const [id, snap] of Object.entries(parsed)) {
-        if (snap.schemaVersion !== SCHEMA_VERSION) {
-          console.warn(`[WorkspaceManager] Schema mismatch for ${id}, wiping.`);
-          continue;
-        }
-        // Mark any previously 'active' sessions as 'paused' (browser was closed)
-        if (snap.status === 'active') snap.status = 'paused';
-        this.sessions[id as StudioId] = snap;
+      const parsed: SharedWorkspaceState = JSON.parse(raw);
+      if (parsed && parsed.workspaceId) {
+        this.workspace = parsed;
       }
     } catch (e) {
-      console.error('[WorkspaceManager] Failed to load sessions:', e);
+      console.error('[WorkspaceManager] Failed to load workspace:', e);
     }
   }
 
   private persistToStorage(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.sessions));
+      if (this.workspace) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.workspace));
+      }
     } catch (e) {
-      console.error('[WorkspaceManager] Failed to persist sessions:', e);
+      console.error('[WorkspaceManager] Failed to persist workspace:', e);
     }
   }
 
-  // ─── Public API ─────────────────────────────────────────────────────────────
+  // ─── Workspace Lifecycle ─────────────────────────────────────────────────────
 
-  getSnapshot(studioId: StudioId): StudioSnapshot {
-    if (!this.sessions[studioId]) {
-      this.sessions[studioId] = DEFAULT_SNAPSHOT(studioId);
-    }
-    return this.sessions[studioId];
+  createWorkspace(workspaceId: string): void {
+    this.workspace = {
+      workspaceId,
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      datasetFilename: '',
+      parquetPath: '',
+      rowCount: 0,
+      columns: [],
+      studioProgress: {},
+    };
+    this.persistToStorage();
+    console.info(`[WorkspaceManager] Shared workspace created: ${workspaceId}`);
   }
 
-  getAllSnapshots(): StudioSnapshot[] {
-    return Object.values(this.sessions);
+  getWorkspace(): SharedWorkspaceState | null {
+    return this.workspace;
+  }
+
+  getWorkspaceId(): string {
+    return this.workspace?.workspaceId || '';
+  }
+
+  hasWorkspace(): boolean {
+    return this.workspace !== null && this.workspace.workspaceId.length > 0;
+  }
+
+  setWorkspaceDataset(
+    filename: string,
+    parquetPath: string,
+    rowCount: number,
+    columns: string[]
+  ): void {
+    if (!this.workspace) return;
+    this.workspace.datasetFilename = filename;
+    this.workspace.parquetPath = parquetPath;
+    this.workspace.rowCount = rowCount;
+    this.workspace.columns = columns;
+    this.workspace.lastActivity = Date.now();
+    this.persistToStorage();
+  }
+
+  // ─── Studio Progress ────────────────────────────────────────────────────────
+
+  getStudioProgress(studioId: StudioId): StudioProgress | undefined {
+    return this.workspace?.studioProgress?.[studioId];
+  }
+
+  setStudioProgress(
+    studioId: StudioId,
+    status: 'pending' | 'in_progress' | 'completed',
+    activeStep: string = ''
+  ): void {
+    if (!this.workspace) return;
+    this.workspace.studioProgress = {
+      ...this.workspace.studioProgress,
+      [studioId]: {
+        studioId,
+        status,
+        activeStep,
+        lastActivity: Date.now(),
+      },
+    };
+    this.workspace.lastActivity = Date.now();
+    this.persistToStorage();
   }
 
   getActiveStudios(): StudioId[] {
-    return Object.values(this.sessions)
-      .filter(s => s.status !== 'empty')
-      .map(s => s.studioId);
+    if (!this.workspace) return [];
+    return (Object.entries(this.workspace.studioProgress) as [StudioId, StudioProgress][])
+      .filter(([_, p]) => p.status === 'in_progress' || p.status === 'completed')
+      .map(([id]) => id);
   }
 
-  /**
-   * Save a patch to a studio's snapshot.
-   * Marks status as 'active' and updates lastActivity.
-   */
-  saveWorkspaceState(studioId: StudioId, patch: Partial<StudioSnapshot>): void {
-    const current = this.getSnapshot(studioId);
-    this.sessions[studioId] = {
-      ...current,
-      ...patch,
+  // ─── Snapshot (backward compat shim) ─────────────────────────────────────────
+
+  getSnapshot(studioId: StudioId): any {
+    const ws = this.workspace;
+    if (!ws) {
+      return {
+        studioId,
+        workspaceId: '',
+        schemaVersion: SCHEMA_VERSION,
+        status: 'empty',
+        createdAt: Date.now(),
+        lastActivity: Date.now(),
+        datasetCount: 0,
+        processingStatus: 'idle',
+        datasetFilename: '',
+        parquetPath: '',
+        rowCount: 0,
+        columns: [],
+        activeStep: '',
+        studioState: {},
+      };
+    }
+    const progress = ws.studioProgress[studioId];
+    return {
       studioId,
+      workspaceId: ws.workspaceId,
       schemaVersion: SCHEMA_VERSION,
-      status: 'active',
-      lastActivity: Date.now(),
+      status: progress ? 'active' : 'empty',
+      createdAt: ws.createdAt,
+      lastActivity: progress?.lastActivity || ws.lastActivity,
+      datasetCount: ws.datasetFilename ? 1 : 0,
+      processingStatus: progress?.status === 'in_progress' ? 'running' : 'idle',
+      datasetFilename: ws.datasetFilename,
+      parquetPath: ws.parquetPath,
+      rowCount: ws.rowCount,
+      columns: ws.columns,
+      activeStep: progress?.activeStep || '',
+      studioState: {},
     };
-    this.persistToStorage();
   }
 
-  /**
-   * Called after a major action — saves state and updates processingStatus.
-   */
-  onMajorAction(studioId: StudioId, action: MajorAction, statePatch?: Partial<StudioSnapshot>): void {
-    console.info(`[WorkspaceManager] Major action: ${action} in studio ${studioId}`);
-    this.saveWorkspaceState(studioId, {
-      processingStatus: 'idle',
-      ...statePatch,
-    });
+  getAllSnapshots(): any[] {
+    if (!this.workspace) return [];
+    return (Object.keys(this.workspace.studioProgress) as StudioId[]).map(id =>
+      this.getSnapshot(id)
+    );
   }
 
-  /**
-   * Pause a studio — marks it as paused, stops auto-save, persists.
-   */
-  pauseWorkspace(studioId: StudioId): void {
-    const snap = this.getSnapshot(studioId);
-    this.sessions[studioId] = { ...snap, status: 'paused', lastActivity: Date.now() };
-    this.persistToStorage();
-    this.stopAutoSave(studioId);
-    console.info(`[WorkspaceManager] Studio ${studioId} paused.`);
-  }
+  // ─── Legacy shim methods (keep for backward compat) ─────────────────────────
 
-  /**
-   * Restore a paused/active studio — returns snapshot or null if empty.
-   */
-  restoreWorkspace(studioId: StudioId): StudioSnapshot | null {
-    const snap = this.sessions[studioId];
-    if (!snap || snap.status === 'empty') return null;
-    // Mark as active again
-    this.sessions[studioId] = { ...snap, status: 'active', lastActivity: Date.now() };
-    this.persistToStorage();
-    return this.sessions[studioId];
-  }
-
-  /**
-   * Reset a studio — clears all state, resets to empty.
-   */
-  resetWorkspace(studioId: StudioId): void {
-    this.stopAutoSave(studioId);
-    this.sessions[studioId] = DEFAULT_SNAPSHOT(studioId);
-    this.persistToStorage();
-    console.info(`[WorkspaceManager] Studio ${studioId} reset.`);
-  }
-
-  resetAllWorkspaces(): void {
-    const studioIds: StudioId[] = ['hierarchy', 'analytics', 'compound', 'normalization', 'qsar', 'intelligence', 'oecd'];
-    studioIds.forEach(id => this.resetWorkspace(id));
-  }
-
-  // ─── Auto-Save ──────────────────────────────────────────────────────────────
-
-  /**
-   * Start 30-second background auto-save for a studio.
-   * stateGetter is called each interval to get current state.
-   */
-  startAutoSave(studioId: StudioId, stateGetter: () => Partial<StudioSnapshot>): void {
-    this.stopAutoSave(studioId);
-    this.autoSaveTimers[studioId] = setInterval(() => {
-      const state = stateGetter();
-      if (Object.keys(state).length > 0) {
-        this.saveWorkspaceState(studioId, state);
+  saveWorkspaceState(studioId: StudioId, patch: any): void {
+    if (!this.workspace) {
+      const workspaceId = patch.workspaceId || `SDO_CORE_${Math.random().toString(36).substring(2, 9)}`;
+      this.createWorkspace(workspaceId);
+    }
+    if (this.workspace) {
+      if (patch.datasetFilename !== undefined) {
+        this.workspace.datasetFilename = patch.datasetFilename || '';
       }
-    }, 30_000);
-  }
+      if (patch.parquetPath !== undefined) {
+        this.workspace.parquetPath = patch.parquetPath || '';
+      }
+      if (patch.rowCount !== undefined) {
+        this.workspace.rowCount = patch.rowCount || 0;
+      }
+      if (patch.columns !== undefined) {
+        this.workspace.columns = patch.columns || [];
+      }
 
-  stopAutoSave(studioId: StudioId): void {
-    if (this.autoSaveTimers[studioId]) {
-      clearInterval(this.autoSaveTimers[studioId]);
-      delete this.autoSaveTimers[studioId];
+      let status = patch.status;
+      if (status === 'active') {
+        status = 'in_progress';
+      }
+      if (!status) {
+        status = this.workspace.datasetFilename ? 'in_progress' : 'pending';
+      }
+
+      const activeStep = patch.activeStep || this.workspace.studioProgress[studioId]?.activeStep || '';
+
+      this.workspace.studioProgress = {
+        ...this.workspace.studioProgress,
+        [studioId]: {
+          studioId,
+          status,
+          activeStep,
+          lastActivity: Date.now(),
+        },
+      };
+
+      this.workspace.lastActivity = Date.now();
+      this.persistToStorage();
     }
   }
 
+  onMajorAction(_studioId: StudioId, _action: string, _statePatch?: any): void {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[WorkspaceManager] onMajorAction (shared mode):', _studioId, _action);
+    }
+  }
+
+  pauseWorkspace(_studioId: StudioId): void {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[WorkspaceManager] pauseWorkspace (shared mode):', _studioId);
+    }
+  }
+
+  restoreWorkspace(_studioId: StudioId): any {
+    return this.getSnapshot(_studioId);
+  }
+
+  resetWorkspace(studioId: StudioId): void {
+    // In shared mode, reset only the studio progress, not the whole workspace
+    if (this.workspace) {
+      const progress = { ...this.workspace.studioProgress };
+      delete progress[studioId];
+      this.workspace.studioProgress = progress;
+      this.workspace.lastActivity = Date.now();
+      this.persistToStorage();
+    }
+  }
+
+  resetAllWorkspaces(): void {
+    this.workspace = null;
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  startAutoSave(_studioId: StudioId, _stateGetter: () => any): void {
+    // Auto-save not needed in shared mode — state is persisted immediately
+  }
+
+  stopAutoSave(_studioId: StudioId): void {
+    // No-op in shared mode
+  }
+
   stopAllAutoSave(): void {
-    Object.keys(this.autoSaveTimers).forEach(id => this.stopAutoSave(id as StudioId));
+    // No-op in shared mode
   }
 }
 

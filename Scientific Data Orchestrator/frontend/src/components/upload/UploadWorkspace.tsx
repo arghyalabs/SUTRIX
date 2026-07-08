@@ -304,7 +304,7 @@ export const UploadWorkspace: React.FC<UploadWorkspaceProps> = ({
                   ? 'border-cyan-400 bg-cyan-400/[0.03] shadow-[0_0_30px_rgba(34,211,238,0.15)]'
                   : 'border-white/[0.08] glass hover:border-white/[0.2] hover:bg-white/[0.02]'}`}
             >
-              <input type="file" className="hidden" accept=".csv,.xlsx,.parquet" onChange={onFileChange} />
+              <input type="file" className="hidden" accept=".csv,.tsv,.parquet,.xlsx,.xls" onChange={onFileChange} />
               <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.02] pointer-events-none" />
               <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform duration-500
                 ${isDragging ? 'bg-cyan-400 text-void scale-110' : 'bg-white/[0.04] text-secondary group-hover:bg-white/[0.08] group-hover:text-white'}`}>

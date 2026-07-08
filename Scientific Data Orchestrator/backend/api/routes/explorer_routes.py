@@ -195,6 +195,10 @@ def _load_df_and_mappings(client_id: str):
     # Helper to find the best user column for a set of target scientific roles
     def get_best_col(roles: List[str], preferred_pattern: str = None) -> Optional[str]:
         candidates = [col for col, role in mappings.items() if role in roles and col in df.columns]
+        if not candidates and preferred_pattern:
+            import re
+            pat = re.compile(preferred_pattern, re.IGNORECASE)
+            candidates = [c for c in df.columns if pat.search(c)]
         if not candidates:
             return None
         if len(candidates) == 1:
@@ -216,6 +220,20 @@ def _load_df_and_mappings(client_id: str):
     
     name_col = get_best_col(["chemical_name", "chemical_id", "compound_name", "substance_name", "test_substance", "material_name"], r"(name|chem|comp|substance)")
     cas_col = get_best_col(["cas_number", "cas"], r"cas")
+
+    # Ensure auto-resolved columns are populated in mappings dict if missing
+    if smiles_col and smiles_col in df.columns and smiles_col not in mappings:
+        mappings[smiles_col] = 'canonical_smiles'
+    if name_col and name_col in df.columns and name_col not in mappings:
+        mappings[name_col] = 'chemical_name'
+    if cas_col and cas_col in df.columns and cas_col not in mappings:
+        mappings[cas_col] = 'cas_number'
+    if val_col and val_col in df.columns and val_col not in mappings:
+        mappings[val_col] = 'value'
+    if unit_col and unit_col in df.columns and unit_col not in mappings:
+        mappings[unit_col] = 'unit'
+    if ep_col and ep_col in df.columns and ep_col not in mappings:
+        mappings[ep_col] = 'endpoint'
 
     return df, mappings, smiles_col, val_col, unit_col, ep_col, name_col, cas_col
 
@@ -241,12 +259,19 @@ async def render_structure_svg(smiles: str = Query(..., description="SMILES stri
             raise ValueError(f"RDKit could not parse SMILES: {smiles!r}")
 
         drawer = rdMolDraw2D.MolDraw2DSVG(600, 400)
+        drawer.drawOptions().useBWAtomPalette()
         drawer.drawOptions().addStereoAnnotation = True
         drawer.drawOptions().bondLineWidth = 4.5
         drawer.drawOptions().minFontSize = 18
         drawer.DrawMolecule(mol)
         drawer.FinishDrawing()
-        svg_content = drawer.GetDrawingText()
+        
+        raw_svg = drawer.GetDrawingText()
+        # Post-process SVG for transparent background and clean light-gray lines matching the UI
+        raw_svg = raw_svg.replace("fill:#FFFFFF", "fill:none;opacity:0.0")
+        raw_svg = raw_svg.replace("stroke:#000000", "stroke:#E2E8F0")
+        raw_svg = raw_svg.replace("fill:#000000", "fill:#E2E8F0")
+        svg_content = raw_svg
 
     except ImportError:
         # RDKit not installed — return a readable placeholder
@@ -272,6 +297,102 @@ async def render_structure_svg(smiles: str = Query(..., description="SMILES stri
         )
 
     return Response(content=svg_content, media_type="image/svg+xml")
+
+
+@router.get("/structure/graph")
+async def get_structure_graph(smiles: str = Query(..., description="SMILES string to parse as coordinate graph")):
+    """Parses a SMILES string and returns 2D coordinates for interactive graph rendering."""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import rdDepictor
+        from rdkit.Chem.rdMolDescriptors import CalcMolFormula
+        from rdkit.Chem import Descriptors
+        import urllib.request
+        import json
+        import urllib.parse
+
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            raise HTTPException(status_code=400, detail="Invalid SMILES string")
+
+        # Generate 2D Coordinates
+        rdDepictor.Compute2DCoords(mol)
+        conformer = mol.GetConformer()
+
+        # Extract atoms
+        atoms = []
+        for atom in mol.GetAtoms():
+            idx = atom.GetIdx()
+            pos = conformer.GetAtomPosition(idx)
+            symbol = atom.GetSymbol()
+            num_hs = atom.GetTotalNumHs()
+            
+            # Determine label (e.g. O, OH, CH3, H)
+            label = symbol
+            if symbol != "C":
+                if num_hs > 0:
+                    label = f"{symbol}{num_hs}" if num_hs > 1 else f"{symbol}H"
+            else:
+                label = "" # don't show label for Carbon
+                
+            # Properties
+            is_aromatic = atom.GetIsAromatic()
+            is_acceptor = symbol in ["N", "O", "F"]
+            is_donor = symbol in ["N", "O"] and num_hs > 0
+
+            atoms.append({
+                "id": idx,
+                "symbol": symbol,
+                "label": label,
+                "x": float(pos.x),
+                "y": float(pos.y),
+                "is_aromatic": is_aromatic,
+                "is_donor": is_donor,
+                "is_acceptor": is_acceptor
+            })
+
+        # Extract bonds
+        bonds = []
+        for bond in mol.GetBonds():
+            bonds.append({
+                "source": bond.GetBeginAtomIdx(),
+                "target": bond.GetEndAtomIdx(),
+                "type": str(bond.GetBondType()), # SINGLE, DOUBLE, TRIPLE, AROMATIC
+                "is_aromatic": bond.GetIsAromatic()
+            })
+
+        # Calculations
+        formula = CalcMolFormula(mol)
+        mw = float(Descriptors.MolWt(mol))
+        tpsa = float(Descriptors.TPSA(mol))
+        rotatable_bonds = int(Descriptors.NumRotatableBonds(mol))
+
+        # IUPAC Name Lookup
+        iupac_name = None
+        try:
+            escaped_smiles = urllib.parse.quote(smiles, safe='')
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{escaped_smiles}/property/IUPACName/JSON"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=2.0) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                iupac_name = res_data['PropertyTable']['Properties'][0]['IUPACName']
+        except Exception:
+            # Fallback if request fails
+            iupac_name = "Chemical Structure"
+
+        return {
+            "atoms": atoms,
+            "bonds": bonds,
+            "formula": formula,
+            "mw": mw,
+            "tpsa": tpsa,
+            "rotatable_bonds": rotatable_bonds,
+            "iupac_name": iupac_name
+        }
+
+    except Exception as exc:
+        logger.error(f"Error generating structure graph: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/{client_id}/search")

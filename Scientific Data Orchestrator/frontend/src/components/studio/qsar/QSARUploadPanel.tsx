@@ -85,7 +85,7 @@ export const QSARUploadPanel: React.FC<Props> = ({ clientId, apiBase, onSessionL
         onDrop={onDrop}
         className={`flex flex-col items-center justify-center gap-3 p-10 rounded-2xl border-2 border-dashed cursor-pointer transition-all
           ${dragging ? 'border-blue-400 bg-blue-500/10' : 'border-white/[0.08] hover:border-blue-500/30 hover:bg-white/[0.02]'}`}>
-        <input type="file" className="hidden" accept={mode === 'zip' ? '.zip' : '.csv,.parquet,.xlsx'}
+        <input type="file" className="hidden" accept={mode === 'zip' ? '.zip' : '.csv,.parquet,.xlsx,.xls,.tsv'}
           onChange={onFileInput} />
         {loading ? (
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />

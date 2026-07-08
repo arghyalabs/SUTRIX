@@ -50,6 +50,7 @@ from backend.api.routes.harmonization_routes import router as harmonization_rout
 from backend.api.routes.spreadsheet_routes import router as spreadsheet_router
 from backend.api.routes.replay_routes import router as replay_router
 from backend.api.routes.statistics_routes import router as statistics_router
+from backend.api.routes.render_routes import router as render_router
 from backend.core.config import settings
 
 app = FastAPI(title="Scientific Data Orchestrator", version="5.0")
@@ -83,6 +84,7 @@ app.include_router(harmonization_router)
 app.include_router(spreadsheet_router)
 app.include_router(replay_router)
 app.include_router(statistics_router)
+app.include_router(render_router)
 
 memory_guard = MemoryGuard()
 
@@ -118,6 +120,47 @@ async def startup_event():
     start_background_worker_queue()
     asyncio.create_task(registry_cleanup_loop())
     asyncio.create_task(ws_broadcaster.start_heartbeat_monitor())
+
+# ── WORKSPACE MANAGEMENT ─────────────────────────────────────────────────────
+def _sanitize_for_json(obj: Any) -> Any:
+    """Recursively sanitize a value for JSON serialization."""
+    import math
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return None if (math.isnan(float(obj)) or math.isinf(float(obj))) else float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
+@app.post("/api/workspace/create")
+async def api_create_workspace(label: str = ""):
+    import uuid
+    workspace_id = f"WS_{uuid.uuid4().hex[:12]}"
+    registry.create_workspace(workspace_id)
+    return {"workspace_id": workspace_id, "label": label or workspace_id}
+
+
+@app.get("/api/workspace/list")
+async def api_list_workspaces():
+    return {"workspaces": registry.list_workspaces()}
+
+
+@app.delete("/api/workspace/{workspace_id}")
+async def api_delete_workspace(workspace_id: str):
+    registry.destroy_workspace(workspace_id)
+    return {"success": True, "message": f"Workspace {workspace_id} deleted."}
+
 
 # ── 1. FILE INGESTION (ASYNC — returns job_id immediately) ────────────────────────────────────────
 async def _run_ingest_background(job_id: str, client_id: str, filename: str, temp_path: str, file_bytes: bytes):
@@ -448,27 +491,7 @@ async def reset_workspace(client_id: str):
     and in-memory registries for the specified client.
     """
     try:
-        from backend.core.session_state_manager import session_manager
-        import shutil
-
-        # 1. Delete session JSON state file
-        session_manager.delete_session(client_id)
-
-        # 2. Delete workspace directories (uploads, exports, lineage, etc.)
-        workspace_dir = os.path.join("workspaces", client_id)
-        if os.path.exists(workspace_dir):
-            try:
-                shutil.rmtree(workspace_dir)
-                logger.info(f"Workspace {client_id} directory deleted successfully.")
-            except Exception as e:
-                logger.error(f"Failed to delete directory {workspace_dir}: {e}")
-
-        # 3. Evict context from in-memory registry
-        ctx = registry.workspaces.pop(client_id, None)
-        if ctx:
-            ctx.flush_memory()
-
-        logger.info(f"Workspace {client_id} completely reset.")
+        registry.destroy_workspace(client_id)
         return {"success": True, "message": f"Workspace {client_id} completely reset."}
     except Exception as e:
         logger.error(f"Failed to reset workspace {client_id}: {e}")

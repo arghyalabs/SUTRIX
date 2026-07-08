@@ -508,9 +508,22 @@ export const LegacyWorkspaceApp: React.FC<LegacyWorkspaceAppProps> = (props) => 
 const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, onGoHub }) => {
   const storeWorkspaceId = useWorkspaceStore(s => s.workspaceId);
   const currentStudioId = useWorkspaceStore(s => s.currentStudioId);
-  const generatedClientId = useRef(`SDO_CORE_${Math.random().toString(36).substring(2, 9)}`).current;
-  const clientId = storeWorkspaceId || generatedClientId;
-  
+
+  // V7: Use shared workspace ID so all studios share the same workspace
+  const [sharedClientId] = useState(() => {
+    if (storeWorkspaceId) return storeWorkspaceId;
+    const existing = workspaceManager.getWorkspaceId();
+    if (existing) {
+      useWorkspaceStore.getState().setWorkspaceId(existing);
+      return existing;
+    }
+    const newId = `SDO_CORE_${Math.random().toString(36).substring(2, 9)}`;
+    workspaceManager.createWorkspace(newId);
+    useWorkspaceStore.getState().setWorkspaceId(newId);
+    return newId;
+  });
+  const clientId = sharedClientId;
+
   // V6: Clear stale global store when this studio opens fresh
   useStudioInit(studioId);
 
@@ -905,6 +918,7 @@ const LegacyWorkspaceAppInner: React.FC<LegacyWorkspaceAppProps> = ({ studioId, 
   const handleConfirmSwitchWorkspace = () => {
     // Generate new unique ID, reset workspace state, and close warning popup
     const newId = `SDO_CORE_${Math.random().toString(36).substring(2, 9)}`;
+    workspaceManager.createWorkspace(newId);
     resetWorkspace();
     setWorkspaceId(newId);
     setShowSwitchWorkspaceModal(false);

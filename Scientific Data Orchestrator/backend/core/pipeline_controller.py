@@ -59,6 +59,14 @@ class ScientificPipelineController:
     def validate_stage_transition(context: PipelineContext, requested_stage: str):
         """Deterministic stage ordering validation."""
         required_stages = ScientificPipelineController.VALID_TRANSITIONS.get(requested_stage, [])
+        ws_id = context.workspace_id or ""
+        if ws_id.startswith("CMPD_") or ws_id.startswith("QSAR_") or ws_id.startswith("SDO_CORE_"):
+            if requested_stage == "enrich":
+                required_stages = ["ingest"]
+            elif requested_stage == "readiness":
+                required_stages = ["ingest"]
+            else:
+                required_stages = []
         for req in required_stages:
             if req not in context.execution_trace:
                 raise ValueError(f"Scientific violation: Cannot execute '{requested_stage}' before '{req}'")

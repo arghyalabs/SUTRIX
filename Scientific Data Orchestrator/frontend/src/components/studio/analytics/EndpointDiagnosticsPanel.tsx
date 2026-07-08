@@ -1,22 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, RefreshCw, Info } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { SciPanel } from '../../../components/charts/SciPanel';
+import { SciHistogram } from '../../../components/charts/SciHistogram';
+import type { HistogramBin } from '../../../components/charts/SciHistogram';
+
 
 interface PanelProps { clientId: string; apiBase: string; }
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-[#0d1a2e] border border-white/[0.08] rounded-lg px-3 py-2 text-xs shadow-xl">
-      <div className="text-slate-400 mb-1">{label}</div>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} style={{ color: p.fill }}>
-          {p.name}: {p.value?.toLocaleString()}
-        </div>
-      ))}
-    </div>
-  );
-};
 
 export const EndpointDiagnosticsPanel: React.FC<PanelProps> = ({ clientId, apiBase }) => {
   const [data, setData] = useState<any>(null);
@@ -42,11 +31,19 @@ export const EndpointDiagnosticsPanel: React.FC<PanelProps> = ({ clientId, apiBa
   useEffect(() => { load(); }, [clientId]);
 
   const stats = data?.stats;
-  const histogram = useLog ? (data?.log_histogram ?? []) : (data?.histogram ?? []);
-  const chartData = histogram.map((b: any) => ({
-    name: b.bin_start?.toFixed(2),
+
+  // Map API bins { bin_start, bin_end, count, frequency } → HistogramBin { x0, x1, count, density }
+  const rawHistogram = useLog ? (data?.log_histogram ?? []) : (data?.histogram ?? []);
+  const bins: HistogramBin[] = rawHistogram.map((b: any) => ({
+    x0: b.bin_start,
+    x1: b.bin_end,
     count: b.count,
+    density: b.frequency,
   }));
+
+  // Normal KDE overlay: API shape [{ x, y }] — passed directly
+  const normalKDE: Array<{ x: number; y: number }> | undefined =
+    data?.normal_kde?.length ? data.normal_kde : undefined;
 
   const groupStats: any[] = data?.group_stats ?? [];
 
@@ -68,13 +65,13 @@ export const EndpointDiagnosticsPanel: React.FC<PanelProps> = ({ clientId, apiBa
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/[0.08] border border-rose-500/20 text-rose-300 text-xs">
           <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
         </div>
       )}
 
       {loading && !data && (
-        <div className="flex items-center justify-center h-32 gap-2 text-violet-400">
+        <div className="flex items-center justify-center h-32 gap-2 text-cyan-400">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span className="text-sm">Analysing endpoint distribution…</span>
         </div>
@@ -102,48 +99,53 @@ export const EndpointDiagnosticsPanel: React.FC<PanelProps> = ({ clientId, apiBa
             )}
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {/* Inline mono stat strip */}
+          <div className="flex flex-wrap gap-x-5 gap-y-1 py-1">
             {[
-              { label: 'N', value: stats.count?.toLocaleString() },
-              { label: 'Mean', value: stats.mean?.toFixed(4) },
-              { label: 'Median', value: stats.median?.toFixed(4) },
-              { label: 'Std Dev', value: stats.std?.toFixed(4) },
-              { label: 'Min', value: stats.min?.toFixed(4) },
-              { label: 'Max', value: stats.max?.toFixed(4) },
-              { label: 'Skewness', value: stats.skewness?.toFixed(3), highlight: stats.skewness && Math.abs(stats.skewness) > 2 ? 'text-amber-400' : '' },
-              { label: 'Orders of Magnitude', value: stats.range_orders_of_magnitude?.toFixed(2) ?? '—' },
+              { label: 'N', value: stats.count?.toLocaleString(), accent: '#22D3EE' },
+              { label: 'mean', value: stats.mean?.toFixed(4), accent: '#22D3EE' },
+              { label: 'median', value: stats.median?.toFixed(4), accent: '#22D3EE' },
+              { label: 'std', value: stats.std?.toFixed(4), accent: '#22D3EE' },
+              { label: 'min', value: stats.min?.toFixed(4), accent: '#94A3B8' },
+              { label: 'max', value: stats.max?.toFixed(4), accent: '#94A3B8' },
+              {
+                label: 'skew',
+                value: stats.skewness?.toFixed(3),
+                accent: stats.skewness && Math.abs(stats.skewness) > 2 ? '#F59E0B' : '#22D3EE',
+              },
+              { label: 'log₁₀ range', value: stats.range_orders_of_magnitude?.toFixed(2) ?? '—', accent: '#94A3B8' },
             ].map(s => (
-              <div key={s.label} className="p-2.5 rounded-lg bg-white/[0.03] border border-white/[0.05]">
-                <div className={`text-sm font-bold ${(s as any).highlight || 'text-slate-200'}`}>{s.value ?? '—'}</div>
-                <div className="text-[10px] text-slate-600 mt-0.5">{s.label}</div>
-              </div>
+              <span key={s.label} style={{ fontFamily: "'Geist Mono', monospace", fontSize: 11 }}>
+                <span style={{ color: '#64748B' }}>{s.label} </span>
+                <span style={{ color: s.accent, fontWeight: 600 }}>{s.value ?? '—'}</span>
+              </span>
             ))}
           </div>
 
-          {/* Histogram */}
-          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Distribution Histogram
-              </div>
+          {/* Histogram via SciHistogram inside SciPanel */}
+          <SciPanel title="ENDPOINT DISTRIBUTION" height={280}>
+            <div className="flex items-center justify-end px-3 pb-1">
               <button
                 onClick={() => setUseLog(v => !v)}
                 className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all
-                  ${useLog ? 'bg-violet-500/20 border border-violet-500/30 text-violet-300' : 'bg-white/[0.04] border border-white/[0.06] text-slate-500'}`}
+                  ${useLog ? 'bg-white/[0.03] border border-white/[0.05] text-cyan-300' : 'bg-white/[0.03] border border-white/[0.05] text-slate-500'}`}
               >
                 {useLog ? 'log₁₀ scale' : 'linear scale'}
               </button>
             </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#475569' }} />
-                <YAxis tick={{ fontSize: 9, fill: '#475569' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" fill="#7c3aed" radius={[2, 2, 0, 0]} fillOpacity={0.8} name="Count" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            {bins.length > 0 && (
+              <SciHistogram
+                bins={bins}
+                mode="count"
+                mean={stats?.mean}
+                std={stats?.std}
+                normalKDE={normalKDE}
+                height={220}
+                xLabel={stats?.column}
+                yLabel="count"
+              />
+            )}
+          </SciPanel>
 
           {/* Group stats */}
           {groupStats.length > 0 && (

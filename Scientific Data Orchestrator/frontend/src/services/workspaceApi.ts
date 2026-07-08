@@ -20,6 +20,28 @@ export interface AsyncJobResponse {
 
 export const workspaceApi = {
   /**
+   * Create a new workspace on the backend.
+   */
+  createWorkspace: async (label?: string): Promise<{ workspace_id: string; label: string }> => {
+    const params = new URLSearchParams();
+    if (label) params.append('label', label);
+    const response = await apiClient.post<{ workspace_id: string; label: string }>(
+      '/api/workspace/create',
+      params.toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    return response.data;
+  },
+
+  /**
+   * List all workspaces.
+   */
+  listWorkspaces: async (): Promise<{ workspaces: any[] }> => {
+    const response = await apiClient.get<{ workspaces: any[] }>('/api/workspace/list');
+    return response.data;
+  },
+
+  /**
    * Pre-seeds active user workspace with standard toxicology benchmark data.
    * Returns job_id immediately — progress streams via WebSocket.
    */

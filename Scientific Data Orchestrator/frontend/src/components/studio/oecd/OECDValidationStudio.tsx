@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileCheck, Download } from 'lucide-react';
+import { Upload, FileCheck } from 'lucide-react';
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
 import { OECDUploadPanel } from './OECDUploadPanel';
 import { OECDPrincipleView } from './OECDPrincipleView';
@@ -28,7 +28,7 @@ export const OECDValidationStudio: React.FC<OECDStudioProps> = ({ onGoHub }) => 
   const [activeTab, setActiveTab] = useState('upload');
   const [sessionInfo, setSessionInfo] = useState<any>(null);
   useStudioInit('oecd');
-  const { workspaceId, setWorkspaceId, currentStudioId } = useWorkspaceStore();
+  const { workspaceId, setWorkspaceId } = useWorkspaceStore();
   const [clientId] = useState(() => workspaceId || `OECD_${Math.random().toString(36).slice(2, 7)}`);
 
   React.useEffect(() => {
@@ -49,12 +49,33 @@ export const OECDValidationStudio: React.FC<OECDStudioProps> = ({ onGoHub }) => 
     setActiveTab('upload');
   };
 
+  const handleNext = () => {
+    const idx = TABS.findIndex(t => t.id === activeTab);
+    if (idx !== -1 && idx < TABS.length - 1) {
+      const targetTab = TABS[idx + 1];
+      const isDisabled = !sessionInfo && targetTab.id !== 'upload';
+      if (isDisabled) {
+        toast.error('Please upload a dataset first.');
+        return;
+      }
+      setActiveTab(targetTab.id);
+    }
+  };
+
+  const handlePrev = () => {
+    const idx = TABS.findIndex(t => t.id === activeTab);
+    if (idx !== -1 && idx > 0) {
+      setActiveTab(TABS[idx - 1].id);
+    }
+  };
+
+  const activeStepIndex = TABS.findIndex(t => t.id === activeTab);
+
   const sidebar = (
     <div className="flex flex-col h-full space-y-2">
-      <SidebarSection label="Assessment Workflow" />
-      {TABS.map(tab => {
-        const isPrinciple = tab.id.startsWith('p') && tab.id.length === 2;
-        const isDisabled = tab.id !== 'upload' && !sessionInfo;
+      <SidebarSection label="OECD Principles" />
+      {TABS.map((tab) => {
+        const isDisabled = !sessionInfo && tab.id !== 'upload';
         return (
           <SidebarNavItem
             key={tab.id}
@@ -62,39 +83,38 @@ export const OECDValidationStudio: React.FC<OECDStudioProps> = ({ onGoHub }) => 
             label={tab.label}
             description={tab.description}
             isActive={activeTab === tab.id}
-            isDisabled={isDisabled}
-            onClick={() => setActiveTab(tab.id)}
-            accentClass="text-slate-300"
-            activeBgClass="bg-slate-500/10"
-            activeBorderClass="border-slate-400"
+            onClick={() => {
+              if (isDisabled) {
+                toast.error('Please upload a dataset first.');
+                return;
+              }
+              setActiveTab(tab.id);
+            }}
+            accentClass="text-emerald-450"
+            activeBgClass="bg-emerald-500/10"
+            activeBorderClass="border-emerald-450"
           />
         );
       })}
-
-      {sessionInfo && (
-        <div className="mx-4 mt-4 p-3 rounded-xl bg-slate-500/10 border border-slate-500/20 space-y-1">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Loaded Dataset</div>
-          <div className="text-sm text-slate-300 font-medium truncate">{sessionInfo.filename}</div>
-          <div className="text-xs text-slate-500">
-            {sessionInfo.rows?.toLocaleString()} rows · {sessionInfo.cols} cols
-          </div>
-        </div>
-      )}
     </div>
   );
 
-  const principleNum = activeTab.startsWith('p') && activeTab.length === 2 ? parseInt(activeTab[1]) : null;
+  const principleNum = activeTab.startsWith('p') ? parseInt(activeTab.slice(1)) : null;
 
   return (
     <StudioShell
       studioId="oecd"
       onPauseAndGoHub={onGoHub}
       sidebar={sidebar}
-      onExport={sessionInfo ? () => window.open(`${API}/api/oecd/${clientId}/export-report`, '_blank') : undefined}
+      onExport={sessionInfo ? () => window.open(`${API}/api/oecd-validation/${clientId}/export?format=csv`, '_blank') : undefined}
       onReset={handleReset}
       datasetFilename={sessionInfo?.filename}
       rowCount={sessionInfo?.rows ?? 0}
       activeStep={TABS.find(t => t.id === activeTab)?.label}
+      onNext={handleNext}
+      onPrevious={handlePrev}
+      activeStepIndex={activeStepIndex}
+      totalSteps={TABS.length}
     >
       <div className="h-full overflow-y-auto bg-[#030b18]">
         <AnimatePresence mode="wait">

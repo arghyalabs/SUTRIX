@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE_URL } from '../../config';
+import { LigandStructureVisualizer } from './LigandStructureVisualizer';
 import {
   Search, Loader2, AlertCircle, Database, BarChart3,
   CheckCircle2, FlaskConical, ArrowRight, Table2, Eye,
@@ -133,7 +134,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
   const fullscreenContainerHeight = 550;
   
   // PubChem 2D Structure state
-  const [usePubChem, setUsePubChem] = useState(true);
+  const [usePubChem, setUsePubChem] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -400,6 +401,13 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
       setStructureLoading(false);
     }
   };
+
+  // Automatically generate RDKit 2D structure on mount or compound change
+  useEffect(() => {
+    if (detail && !usePubChem) {
+      handleGenerateStructure();
+    }
+  }, [detail, usePubChem]);
 
   // Copy to clipboard helper
   const copyToClipboard = (text: string, label: string) => {
@@ -881,13 +889,14 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                       </div>
                     </div>
                     
-                    <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-white border border-white/[0.08] rounded-lg mt-2.5 shadow-inner">
+                    <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-slate-950/40 border border-white/[0.06] rounded-lg mt-2.5 shadow-inner">
                       {usePubChem ? (
-                        <div className="w-full h-full flex items-center justify-center bg-white p-2.5 overflow-hidden">
+                        <div className="w-full h-full flex items-center justify-center bg-transparent p-2.5 overflow-hidden">
                           <img
                             src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG?image_size=400x400`}
                             alt={`${detail.name || 'Compound'} 2D Structure`}
-                            className="w-full h-full object-contain transform scale-[1.65] transition-transform duration-300 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                            className="w-full h-full object-contain transform scale-[1.65] transition-transform duration-300"
+                            style={{ filter: 'invert(0.9) hue-rotate(180deg) brightness(1.2) contrast(1.2)', mixBlendMode: 'screen' }}
                             onError={() => {
                               console.warn(`[FLOW-TRACE] PubChem REST PUG image load failed for SMILES. Falling back to local RDKit generator.`);
                               setUsePubChem(false);
@@ -902,7 +911,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                         </div>
                       ) : structureGenerated && structureSvg ? (
                         <div
-                          className="w-full h-full flex items-center justify-center p-2.5 bg-white svg-structure-wrapper transform scale-[1.25] transition-transform duration-300"
+                          className="w-full h-full flex items-center justify-center p-2.5 svg-structure-wrapper transform scale-[1.25] transition-transform duration-300"
                           dangerouslySetInnerHTML={{ __html: structureSvg }}
                         />
                       ) : (
@@ -1550,13 +1559,14 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                       </button>
                     </div>
                   </div>
-                  <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-white border border-white/[0.08] rounded-lg mt-3 shadow-inner">
+                  <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-slate-950/40 border border-white/[0.06] rounded-lg mt-3 shadow-inner">
                     {usePubChem ? (
-                      <div className="w-full h-full flex items-center justify-center bg-white p-3.5 overflow-hidden">
+                      <div className="w-full h-full flex items-center justify-center bg-transparent p-3.5 overflow-hidden">
                         <img
                           src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG?image_size=600x600`}
                           alt={`${detail.name || 'Compound'} 2D Structure`}
-                          className="w-full h-full object-contain transform scale-[1.65] transition-transform duration-300 filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                          className="w-full h-full object-contain transform scale-[1.65] transition-transform duration-300"
+                          style={{ filter: 'invert(0.9) hue-rotate(180deg) brightness(1.2) contrast(1.2)', mixBlendMode: 'screen' }}
                           onError={() => {
                             console.warn(`[FLOW-TRACE] PubChem REST PUG image load failed in fullscreen. Falling back to local RDKit.`);
                             setUsePubChem(false);
@@ -1571,7 +1581,7 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
                       </div>
                     ) : structureGenerated && structureSvg ? (
                       <div
-                        className="w-full h-full flex items-center justify-center p-3.5 bg-white svg-structure-wrapper transform scale-[1.25] transition-transform duration-300"
+                        className="w-full h-full flex items-center justify-center p-3.5 svg-structure-wrapper transform scale-[1.25] transition-transform duration-300"
                         dangerouslySetInnerHTML={{ __html: structureSvg }}
                       />
                     ) : (
@@ -1885,84 +1895,15 @@ export const CompoundExplorer: React.FC<CompoundExplorerProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-[#050816]/98 backdrop-blur-2xl flex flex-col p-6 xl:p-8 overflow-hidden justify-between select-none"
+            className="fixed inset-0 z-[100] bg-[#050816]/98 backdrop-blur-2xl flex flex-col overflow-hidden select-none"
           >
-            {/* Top Close / Minimize Controls */}
-            <div className="flex justify-between items-center border-b border-white/[0.06] pb-4 shrink-0">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-cyan-400 font-mono">
-                  Molecular Structure Zoom Explorer
-                </span>
-                <h2 className="text-xl font-extrabold text-white mt-1">
-                  {detail.name || 'Unnamed Compound'}
-                </h2>
-              </div>
-              
-              <button
-                onClick={() => setIsStructureFullscreen(false)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 font-bold text-xs uppercase tracking-wider transition-all duration-200"
-              >
-                <Minimize2 className="w-4 h-4" />
-                Minimize Zoom
-              </button>
-            </div>
-
-            {/* High-Resolution Structure Viewport */}
-            <div className="flex-1 flex items-center justify-center p-8 bg-white border border-white/[0.08] rounded-2xl my-6 shadow-2xl relative overflow-hidden">
-              {usePubChem ? (
-                <img
-                  src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(detail.smiles)}/PNG?image_size=800x800`}
-                  alt={`${detail.name || 'Compound'} 2D Structure`}
-                  className="w-[85%] h-[85%] object-contain transform scale-110 transition-transform duration-300 filter drop-shadow-[0_4px_20px_rgba(0,0,0,0.12)]"
-                  onError={() => {
-                    setUsePubChem(false);
-                    handleGenerateStructure();
-                  }}
-                />
-              ) : structureLoading ? (
-                <div className="flex flex-col items-center gap-3 text-slate-800 text-sm font-mono">
-                  <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                  Rendering molecular structure in ultra high resolution...
-                </div>
-              ) : structureGenerated && structureSvg ? (
-                <div
-                  className="w-[85%] h-[85%] flex items-center justify-center svg-structure-wrapper transform scale-150 transition-transform duration-300"
-                  dangerouslySetInnerHTML={{ __html: structureSvg }}
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-3 text-slate-800">
-                  <p className="text-sm font-mono text-center px-4">
-                    Structure rendering failed. Generating local RDKit backup...
-                  </p>
-                  <button
-                    onClick={handleGenerateStructure}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-white hover:opacity-90 text-sm font-bold tracking-wider transition-all shadow-lg"
-                  >
-                    Generate Structure
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Status / SMILES readout */}
-            <div className="border-t border-white/[0.06] pt-4 shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest block mb-1">
-                  Canonical SMILES Representation
-                </span>
-                <p className="font-mono text-xs text-cyan-400 break-all select-all leading-normal">
-                  {detail.smiles}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white/[0.03] border border-white/[0.06] text-white/50">
-                  CAS: {detail.cas || 'N/A'}
-                </span>
-                <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white/[0.03] border border-white/[0.06] text-white/50">
-                  MW: {detail.mw.toFixed(2)} g/mol
-                </span>
-              </div>
-            </div>
+            <LigandStructureVisualizer
+              smiles={detail.smiles}
+              compoundName={detail.name || 'Unnamed Compound'}
+              onClose={() => setIsStructureFullscreen(false)}
+              category={detail.metadata?.chemical_name || 'PHARMACEUTICAL LIGAND'}
+              apiBase={API_BASE}
+            />
           </motion.div>
         )}
       </AnimatePresence>

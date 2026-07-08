@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import {
   BarChart2, AlertTriangle, Activity, GitBranch, TrendingUp,
-  Layers, Download, Upload, FileText, UploadCloud, Loader2, Play
+  Layers, UploadCloud, Loader2, FileText
 } from 'lucide-react';
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
 import { ProfilePanel } from './ProfilePanel';
@@ -12,8 +12,9 @@ import { EndpointDiagnosticsPanel } from './EndpointDiagnosticsPanel';
 import { CorrelationPanel } from './CorrelationPanel';
 import { OutlierPanel } from './OutlierPanel';
 import { DistributionPanel } from './DistributionPanel';
+import { StatisticalTestPanel } from './StatisticalTestPanel';
+import { DimensionalityReductionPanel } from './DimensionalityReductionPanel';
 import { useWorkspaceStore } from '../../../store/useWorkspaceStore';
-import { useRef } from 'react';
 import { useStudioInit } from '../../../hooks/useStudioInit';
 import { workspaceApi } from '../../../services/workspaceApi';
 
@@ -23,111 +24,152 @@ const TABS = [
   {
     id: 'profile',
     label: 'Dataset Profile',
-    icon: <Layers className="w-4 h-4" />,
-    description: 'Shape, dtypes & numeric summaries',
+    icon: <FileText className="w-4 h-4" />,
+    description: 'Summary statistics, raw table preview, metadata audit',
   },
   {
-    id: 'missing',
-    label: 'Missing Value Analysis',
+    id: 'missingness',
+    label: 'Missing Data',
     icon: <AlertTriangle className="w-4 h-4" />,
-    description: 'Per-column missingness & patterns',
+    description: 'Null value maps, patterns, column drop utility',
   },
   {
-    id: 'endpoint',
+    id: 'diagnostics',
     label: 'Endpoint Diagnostics',
     icon: <Activity className="w-4 h-4" />,
-    description: 'Distribution & log-normality tests',
+    description: 'Outlier thresholds, leverage points, check flags',
   },
   {
     id: 'correlation',
     label: 'Correlation Matrix',
     icon: <GitBranch className="w-4 h-4" />,
-    description: 'Pearson / Spearman / Kendall heatmap',
+    description: 'Linear/rank correlation, high correlation pruning',
   },
   {
     id: 'outliers',
     label: 'Outlier Detection',
     icon: <TrendingUp className="w-4 h-4" />,
-    description: 'IQR fence & Z-score flagging',
+    description: 'Z-score & Williams plot residual check',
   },
   {
     id: 'distribution',
-    label: 'Distribution Analysis',
-    icon: <BarChart2 className="w-4 h-4" />,
-    description: 'Histogram, Shapiro-Wilk normality',
+    label: 'Data Distribution',
+    icon: <Layers className="w-4 h-4" />,
+    description: 'Shapiro-Wilk normality tests, histograms, Q-Q plots',
+  },
+  {
+    id: 'stats_test',
+    label: 'Statistical Testing',
+    icon: <TrendingUp className="w-4 h-4" />,
+    description: 'T-test, ANOVA, Mann-Whitney hypothesis checks',
+  },
+  {
+    id: 'reduction',
+    label: 'Dimensional Reduction',
+    icon: <Layers className="w-4 h-4" />,
+    description: 'PCA, t-SNE, and UMAP projections',
   },
 ];
 
-const EmptyState: React.FC<{
-  handleUpload: (file: File) => Promise<void>;
+interface EmptyStateProps {
+  handleUpload: (file: File) => void;
   isUploading: boolean;
   onLoadDemo: () => void;
   isDemoLoading: boolean;
-}> = ({ handleUpload, isUploading, onLoadDemo, isDemoLoading }) => {
-  const [dragging, setDragging] = useState(false);
+}
 
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleUpload(file);
-  }, [handleUpload]);
-
+const EmptyState: React.FC<EmptyStateProps> = ({
+  handleUpload,
+  isUploading,
+  onLoadDemo,
+  isDemoLoading,
+}) => {
+  const [dragActive, setDragActive] = useState(false);
   const loading = isUploading || isDemoLoading;
 
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleUpload(e.target.files[0]);
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto py-12 flex flex-col items-center w-full">
-      <div className="text-center mb-12">
-        <h1 className="text-3xl font-bold text-white tracking-tight mb-3">Upload Dataset</h1>
-        <p className="text-secondary text-sm max-w-lg mx-auto">
-          Simple Analysis data ingestion. Upload your dataset to begin profiling and diagnostics.
+    <div className="max-w-2xl mx-auto mt-12">
+      <div className="text-center mb-8">
+        <h2 className="text-xl font-bold text-white mb-2">Initialize Analytics Studio</h2>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">
+          Upload a dataset to generate profiling metrics, check normal distributions, perform statistical tests, and run dimensional reductions.
         </p>
       </div>
 
-      <div className="w-full max-w-2xl space-y-6">
-        <label
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          className={`relative flex flex-col items-center justify-center w-full h-80 rounded-[2rem] border-2 border-dashed cursor-pointer transition-all duration-300 group overflow-hidden
-            ${dragging
-              ? 'border-violet-400 bg-violet-400/[0.03] shadow-[0_0_30px_rgba(139,92,246,0.15)]'
-              : 'border-white/[0.08] glass hover:border-white/[0.2] hover:bg-white/[0.02]'}`}
+      <div className="space-y-4">
+        <div
+          onDragEnter={handleDrag}
+          onDragOver={handleDrag}
+          onDragLeave={handleDrag}
+          onDrop={handleDrop}
+          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-12 transition-all ${
+            dragActive 
+              ? 'border-cyan-400/50 bg-cyan-950/10' 
+              : 'border-white/[0.06] bg-[#070d19]/40 hover:border-white/[0.12]'
+          }`}
         >
-          <input type="file" className="hidden" accept=".csv,.parquet,.xlsx,.xls" onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ''; }} />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.02] pointer-events-none" />
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform duration-500
-            ${dragging ? 'bg-violet-400 text-void scale-110' : 'bg-white/[0.04] text-secondary group-hover:bg-white/[0.08] group-hover:text-white'}`}>
-            {loading ? <Loader2 className="w-8 h-8 text-violet-400 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
+          <input
+            type="file"
+            className="hidden"
+            accept=".csv,.tsv,.parquet,.xlsx,.xls"
+            onChange={handleFileChange}
+            disabled={loading}
+          />
+          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-white/40 mb-4">
+            <UploadCloud className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-semibold text-white mb-2">
-            {loading ? 'Processing…' : dragging ? 'Drop file to upload' : 'Drag & drop or click to browse'}
-          </h3>
-          <div className="flex items-center gap-2 mt-4">
-            {['.CSV', '.XLSX', '.PARQUET'].map(ext => (
-              <span key={ext} className="px-2 py-1 rounded-md bg-white/[0.04] text-[10px] font-mono text-muted uppercase tracking-wider">{ext}</span>
-            ))}
+          <p className="text-sm font-semibold text-white mb-1">Drag and drop file here</p>
+          <p className="text-xs text-slate-500 mb-6">Supports .csv, .tsv, .parquet, .xlsx, .xls up to 200MB</p>
+
+          <button
+            onClick={() => (document.querySelector('input[type="file"]') as HTMLInputElement)?.click()}
+            disabled={loading}
+            className="px-6 py-2.5 rounded-xl bg-white text-[#040815] font-black text-xs hover:bg-[#e2e8f0] transition-all flex items-center gap-2"
+          >
+            {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Browse Local Files
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between p-5 rounded-2xl bg-[#0c1322] border border-white/[0.06]">
+          <div className="text-left">
+            <p className="text-xs font-bold text-white mb-0.5">Explore with Demo Dataset</p>
+            <p className="text-[10px] text-slate-500">Eco-toxicity pipeline profiling dataset</p>
           </div>
-        </label>
-
-        {!loading && (
-          <>
-            <div className="flex items-center justify-center gap-4 text-sm text-secondary pt-2">
-              <span className="w-12 h-px bg-white/[0.1]" />
-              <span>or try it out with</span>
-              <span className="w-12 h-px bg-white/[0.1]" />
-            </div>
-
-            <div className="flex justify-center">
-              <button
-                onClick={onLoadDemo}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white font-medium hover:bg-white/[0.08] transition-colors"
-              >
-                <Play className="w-4 h-4 text-violet-400" />
-                Load Demo Dataset
-              </button>
-            </div>
-          </>
-        )}
+          <button
+            onClick={onLoadDemo}
+            disabled={loading}
+            className="px-5 py-2 rounded-lg border border-white/[0.08] hover:bg-white/[0.04] text-white font-bold text-xs flex items-center gap-2 transition-all"
+          >
+            {isDemoLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Load Demo Data
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -140,7 +182,7 @@ interface AnalyticsStudioProps {
 export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => {
   const [activeTab, setActiveTab] = useState('profile');
   useStudioInit('analytics');
-  const { filename, rowCount, workspaceId, setWorkspaceId, currentStudioId } = useWorkspaceStore();
+  const { filename, rowCount, workspaceId, setWorkspaceId } = useWorkspaceStore();
   const clientId = workspaceId || 'ANALYTICS_demo';
 
   useEffect(() => {
@@ -152,71 +194,71 @@ export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => 
   const [isUploading, setIsUploading] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
 
-  const handleLoadDemo = useCallback(async () => {
+  const handleUpload = async (file: File) => {
+    setIsUploading(true);
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const r = await fetch(`${API}/api/analytics/${clientId}/upload`, { method: 'POST', body: form });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Upload failed');
+      useWorkspaceStore.getState().setDataset(d.filename || file.name, '', d.row_count ?? 0, d.columns ?? [], []);
+      toast.success('Dataset uploaded successfully!');
+    } catch (e: any) {
+      toast.error(`Upload failed: ${e.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleLoadDemo = async () => {
     setIsDemoLoading(true);
     try {
-      const r = await fetch(`${API}/api/analytics/${clientId}/load-demo`, {
-        method: 'POST',
-      });
+      const r = await fetch(`${API}/api/analytics/${clientId}/load-demo`, { method: 'POST' });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.detail);
-      useWorkspaceStore.getState().setDataset(d.filename, '', d.rows, [], []);
-      toast.success('Demo dataset loaded successfully!');
+      if (!r.ok) throw new Error(d.detail || 'Failed to load demo dataset');
+      useWorkspaceStore.getState().setDataset(d.filename || 'analytics_demo_dataset.csv', '', d.row_count ?? 0, d.columns ?? [], []);
+      toast.success('Analytics demo dataset loaded successfully!');
     } catch (e: any) {
       toast.error(`Failed to load demo: ${e.message}`);
     } finally {
       setIsDemoLoading(false);
     }
-  }, [clientId]);
-
-  // V5: Auto-load demo dataset if ?demo=true parameter is present
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('demo') === 'true') {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      handleLoadDemo();
-    }
-  }, [handleLoadDemo]);
-
-  const handleExportReport = () => {
-    window.open(`${API}/api/analytics/${clientId}/export-report`, '_blank');
   };
 
   const handleReset = async () => {
     try {
       await workspaceApi.resetWorkspace(clientId);
       toast.success('Workspace reset successful.');
-    } catch (e: any) {
-      console.error('Failed to reset backend workspace:', e);
+    } catch (e) {
       toast.error('Failed to clear backend workspace state.');
     }
     useWorkspaceStore.getState().resetWorkspace();
-    setActiveTab('profile');
   };
 
-  const handleUpload = async (file: File) => {
-    setIsUploading(true);
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      const r = await fetch(`${API}/api/analytics/${clientId}/upload`, {
-        method: 'POST',
-        body: form
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail);
-      useWorkspaceStore.getState().setDataset(d.filename, '', d.rows, [], []);
-    } catch (e: any) {
-      alert(`Upload failed: ${e.message}`);
-    } finally {
-      setIsUploading(false);
+  const handleExportReport = () => {
+    window.open(`${API}/api/analytics/${clientId}/export?format=csv`, '_blank');
+  };
+
+  const handleNext = () => {
+    const idx = TABS.findIndex(t => t.id === activeTab);
+    if (idx !== -1 && idx < TABS.length - 1) {
+      setActiveTab(TABS[idx + 1].id);
     }
   };
 
-  // Nav items
+  const handlePrev = () => {
+    const idx = TABS.findIndex(t => t.id === activeTab);
+    if (idx !== -1 && idx > 0) {
+      setActiveTab(TABS[idx - 1].id);
+    }
+  };
+
+  const activeStepIndex = TABS.findIndex(t => t.id === activeTab);
+
   const sidebar = (
     <div className="flex flex-col h-full space-y-2">
-      <SidebarSection label="Analysis Panels" />
+      <SidebarSection label="Scientific Profiling" />
       {TABS.map((tab) => (
         <SidebarNavItem
           key={tab.id}
@@ -224,10 +266,11 @@ export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => 
           label={tab.label}
           description={tab.description}
           isActive={activeTab === tab.id}
+          isDisabled={!filename}
           onClick={() => setActiveTab(tab.id)}
-          accentClass="text-violet-400"
-          activeBgClass="bg-violet-500/10"
-          activeBorderClass="border-violet-400"
+          accentClass="text-cyan-400"
+          activeBgClass="bg-cyan-500/10"
+          activeBorderClass="border-cyan-400"
         />
       ))}
     </div>
@@ -237,11 +280,13 @@ export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => 
     const props = { clientId, apiBase: API };
     switch (activeTab) {
       case 'profile':      return <ProfilePanel {...props} />;
-      case 'missing':      return <MissingnessPanel {...props} />;
-      case 'endpoint':     return <EndpointDiagnosticsPanel {...props} />;
+      case 'missingness':  return <MissingnessPanel {...props} />;
+      case 'diagnostics':  return <EndpointDiagnosticsPanel {...props} />;
       case 'correlation':  return <CorrelationPanel {...props} />;
       case 'outliers':     return <OutlierPanel {...props} />;
       case 'distribution': return <DistributionPanel {...props} />;
+      case 'stats_test':   return <StatisticalTestPanel {...props} />;
+      case 'reduction':    return <DimensionalityReductionPanel {...props} />;
       default:             return null;
     }
   };
@@ -251,25 +296,30 @@ export const AnalyticsStudio: React.FC<AnalyticsStudioProps> = ({ onGoHub }) => 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.tsv,.parquet"
         className="hidden"
-        onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
+        accept=".csv,.tsv,.parquet,.xlsx,.xls"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleUpload(file);
+          e.target.value = '';
+        }}
       />
       <StudioShell
         studioId="analytics"
         onPauseAndGoHub={onGoHub}
         sidebar={sidebar}
-        onUpload={() => fileInputRef.current?.click()}
+        onUpload={filename ? () => fileInputRef.current?.click() : undefined}
         onExport={filename ? handleExportReport : undefined}
-        onReset={handleReset}
-        isProcessing={isUploading || isDemoLoading}
+        onReset={filename ? handleReset : undefined}
         datasetFilename={filename}
         rowCount={rowCount}
         activeStep={TABS.find(t => t.id === activeTab)?.label}
+        onNext={handleNext}
+        onPrevious={handlePrev}
+        activeStepIndex={activeStepIndex}
+        totalSteps={TABS.length}
       >
         <div className="h-full overflow-y-auto bg-[#030b18]">
-
-          {/* Panel content */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

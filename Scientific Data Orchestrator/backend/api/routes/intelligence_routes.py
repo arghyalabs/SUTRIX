@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, Form
 from fastapi.responses import Response
 
 logger = logging.getLogger("sdo.api.intelligence")
@@ -49,6 +49,32 @@ def _get_session(client_id: str) -> Dict:
 
 # ─── Upload ───────────────────────────────────────────────────────────────────
 
+def _read_csv_safely(content: bytes) -> pd.DataFrame:
+    last_err = None
+    # 1. Try standard comma sep with common encodings
+    for encoding in ["utf-8", "latin1", "cp1252", "iso-8859-1"]:
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=encoding)
+        except Exception as e:
+            last_err = e
+            continue
+    # 2. Try auto-detect separator with python engine
+    for encoding in ["utf-8", "latin1"]:
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=encoding, sep=None, engine='python')
+        except Exception as e:
+            last_err = e
+            continue
+    # 3. Try skipping bad lines
+    for encoding in ["utf-8", "latin1"]:
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=encoding, on_bad_lines='skip')
+        except Exception as e:
+            last_err = e
+            continue
+    raise last_err or ValueError("Failed to parse CSV content.")
+
+
 @router.post("/{client_id}/upload")
 async def upload(client_id: str, file: UploadFile = File(...)):
     content = await file.read()
@@ -59,9 +85,11 @@ async def upload(client_id: str, file: UploadFile = File(...)):
         elif fname.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(content))
         else:
-            df = pd.read_csv(io.BytesIO(content))
+            df = _read_csv_safely(content)
     except Exception as e:
         raise HTTPException(400, f"Cannot parse file: {e}")
+    # Strip whitespace, BOM chars, and invisible unicode from all column names
+    df.columns = [str(c).strip().lstrip('\ufeff').strip() for c in df.columns]
     _sessions[client_id] = {"df": df, "filename": fname}
     return {"status": "ok", "filename": fname, "rows": len(df), "cols": len(df.columns), "columns": df.columns.tolist()}
 
@@ -194,7 +222,7 @@ async def activity_cliffs(
     """
     Activity cliff detection.
     A cliff pair = high structural similarity + large activity difference.
-    Uses Tanimoto on Morgan fingerprints if RDKit available, else descriptor-distance fallback.
+    Cliff Index = delta_activity / (1 - similarity).
     """
     s = _get_session(client_id)
     df = s["df"]
@@ -240,29 +268,32 @@ async def activity_cliffs(
             mode = "tanimoto_morgan"
 
             for i in range(len(fps)):
-                for j in range(i + 1, min(len(fps), i + 50)):  # limit for perf
+                for j in range(i + 1, min(len(fps), i + 100)):  # limit for perf
                     sim = DataStructs.TanimotoSimilarity(fps[i], fps[j])
                     act_diff = abs(float(act_sub[i]) - float(act_sub[j]))
                     if sim >= 0.7 and act_diff >= threshold:
+                        smi_i = smiles_list[valid_idx[i]]
+                        smi_j = smiles_list[valid_idx[j]]
+                        cliff_idx = act_diff / (1.0 - sim + 1e-4)
                         cliffs.append({
                             "compound_i": int(valid_idx[i]),
                             "compound_j": int(valid_idx[j]),
+                            "smiles_i": smi_i,
+                            "smiles_j": smi_j,
                             "similarity": round(sim, 3),
                             "activity_i": _safe(float(act_sub[i])),
                             "activity_j": _safe(float(act_sub[j])),
                             "activity_diff": round(act_diff, 3),
-                            "cliff_score": round(sim * act_diff, 3),
+                            "cliff_score": round(cliff_idx, 3),
                         })
         except ImportError:
             pass
 
     if mode == "descriptor_distance":
-        # Descriptor-based distance fallback
         num_cols = df_valid.select_dtypes(include=[np.number]).columns.tolist()
         desc_cols = [c for c in num_cols if c != activity_col][:20]
         if desc_cols:
             X = df_valid[desc_cols].apply(pd.to_numeric, errors="coerce").fillna(0).values
-            # Normalise
             std = X.std(axis=0)
             std[std == 0] = 1
             X_n = (X - X.mean(axis=0)) / std
@@ -275,13 +306,20 @@ async def activity_cliffs(
                     sim = 1 / (1 + dist)
                     act_diff = abs(float(activity_valid[i]) - float(activity_valid[j]))
                     if sim >= 0.6 and act_diff >= threshold:
+                        smi_col = smiles_col if smiles_col in df_valid.columns else None
+                        smi_i = str(df_valid.iloc[i][smi_col]) if smi_col else None
+                        smi_j = str(df_valid.iloc[j][smi_col]) if smi_col else None
+                        cliff_idx = act_diff / (1.0 - sim + 1e-4)
                         cliffs.append({
-                            "compound_i": i, "compound_j": j,
+                            "compound_i": i,
+                            "compound_j": j,
+                            "smiles_i": smi_i,
+                            "smiles_j": smi_j,
                             "similarity": round(sim, 3),
                             "activity_i": _safe(float(activity_valid[i])),
                             "activity_j": _safe(float(activity_valid[j])),
                             "activity_diff": round(act_diff, 3),
-                            "cliff_score": round(sim * act_diff, 3),
+                            "cliff_score": round(cliff_idx, 3),
                         })
 
     cliffs.sort(key=lambda x: -x["cliff_score"])
@@ -442,3 +480,157 @@ async def export_dataset(client_id: str, format: str = "csv"):
     df.to_parquet(buf, index=False)
     return Response(buf.getvalue(), media_type="application/octet-stream",
                     headers={"Content-Disposition": f"attachment; filename={fname}_intelligence.parquet"})
+
+
+@router.post("/{client_id}/read-across/predict")
+async def read_across_predict(
+    client_id: str,
+    query_smiles: str = Form(...),
+    k: int = Form(5),
+    smiles_col: Optional[str] = Form(None),
+    activity_col: Optional[str] = Form(None),
+):
+    """
+    Accepts external query SMILES string.
+    Finds nearest structural neighbors in current dataset.
+    Returns weighted activity prediction and local AD warning.
+    """
+    s = _get_session(client_id)
+    df = s["df"]
+    
+    if not smiles_col:
+        smiles_col = next((c for c in df.columns if "smiles" in c.lower()), None)
+    if not activity_col:
+        activity_col = next((c for c in df.columns if any(kw in c.lower() for kw in ["lc50", "ec50", "ic50", "activity", "value", "target"])), None)
+
+    if not smiles_col or smiles_col not in df.columns:
+        raise HTTPException(400, "No SMILES column found in dataset")
+    if not activity_col or activity_col not in df.columns:
+        raise HTTPException(400, "No activity/endpoint column found in dataset")
+
+    # Drop missing values
+    df_valid = df[[smiles_col, activity_col]].dropna().copy()
+    df_valid[activity_col] = pd.to_numeric(df_valid[activity_col], errors="coerce")
+    df_valid = df_valid.dropna()
+
+    if len(df_valid) < 2:
+        raise HTTPException(400, "Not enough valid compounds in dataset for prediction")
+
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem, DataStructs
+
+        # Generate query fingerprint
+        q_mol = Chem.MolFromSmiles(query_smiles)
+        if not q_mol:
+            raise HTTPException(400, f"Invalid query SMILES string: '{query_smiles}'")
+        q_fp = AllChem.GetMorganFingerprintAsBitVect(q_mol, 2, 2048)
+
+        # Generate dataset fingerprints
+        neighbors = []
+        for idx, row in df_valid.iterrows():
+            smi = str(row[smiles_col])
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, 2048)
+                sim = DataStructs.TanimotoSimilarity(q_fp, fp)
+                neighbors.append({
+                    "compound_idx": int(idx),
+                    "smiles": smi,
+                    "activity": _safe(float(row[activity_col])),
+                    "similarity": round(float(sim), 4)
+                })
+
+        # Sort by similarity descending
+        neighbors.sort(key=lambda x: -x["similarity"])
+        top_k = neighbors[:k]
+
+        # Weighted prediction
+        total_weight = 0.0
+        weighted_sum = 0.0
+        for nb in top_k:
+            w = nb["similarity"] + 1e-6
+            weighted_sum += nb["activity"] * w
+            total_weight += w
+
+        pred_activity = weighted_sum / total_weight if total_weight > 0 else None
+        
+        # Local Applicability Domain boundary (Safe if nearest neighbor similarity >= 0.60)
+        max_similarity = top_k[0]["similarity"] if top_k else 0.0
+        in_ad = bool(max_similarity >= 0.60)
+
+        return {
+            "query_smiles": query_smiles,
+            "predicted_activity": _safe(float(pred_activity)) if pred_activity is not None else None,
+            "max_similarity": _safe(float(max_similarity)),
+            "in_applicability_domain": in_ad,
+            "neighbors": top_k,
+            "k": len(top_k)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Read-across prediction failed: {e}", exc_info=True)
+        raise HTTPException(500, str(e))
+
+
+@router.post("/{client_id}/session/save")
+async def save_session(
+    client_id: str,
+    smiles_col: str = Form(...),
+    activity_col: str = Form(...),
+    notes: Optional[str] = Form(None)
+):
+    try:
+        import os
+        s = _get_session(client_id)
+        s["smiles_col"] = smiles_col
+        s["activity_col"] = activity_col
+        s["notes"] = notes
+        
+        os.makedirs("sessions", exist_ok=True)
+        session_file = f"sessions/{client_id}_session.json"
+        
+        payload = {
+            "client_id": client_id,
+            "filename": s["filename"],
+            "smiles_col": smiles_col,
+            "activity_col": activity_col,
+            "notes": notes
+        }
+        with open(session_file, "w") as f:
+            json.dump(payload, f, indent=2)
+            
+        return {"status": "ok", "message": "Session settings saved successfully"}
+    except Exception as e:
+        logger.error(f"Save session failed: {e}", exc_info=True)
+        raise HTTPException(500, str(e))
+
+
+@router.post("/{client_id}/session/load")
+async def load_session(client_id: str):
+    try:
+        import os
+        session_file = f"sessions/{client_id}_session.json"
+        if not os.path.exists(session_file):
+            raise HTTPException(404, f"No saved session settings found for '{client_id}'")
+            
+        with open(session_file, "r") as f:
+            payload = json.load(f)
+            
+        s = _get_session(client_id)
+        s["smiles_col"] = payload.get("smiles_col")
+        s["activity_col"] = payload.get("activity_col")
+        s["notes"] = payload.get("notes")
+        
+        return {
+            "status": "ok",
+            "smiles_col": s["smiles_col"],
+            "activity_col": s["activity_col"],
+            "notes": s["notes"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Load session failed: {e}", exc_info=True)
+        raise HTTPException(500, str(e))

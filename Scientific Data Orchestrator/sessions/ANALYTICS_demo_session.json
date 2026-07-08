@@ -1,0 +1,7 @@
+{
+  "client_id": "ANALYTICS_demo",
+  "filename": "intelligence_demo_dataset.csv",
+  "smiles_col": "SMILES",
+  "activity_col": "Value",
+  "notes": "Saved via Scientific Intelligence Studio Redesign"
+}

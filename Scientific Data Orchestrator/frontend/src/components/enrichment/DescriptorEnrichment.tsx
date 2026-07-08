@@ -207,9 +207,9 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
   };
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* LEFT: Configuration panel */}
-      <div className="w-[450px] shrink-0 border-r border-white/[0.06] bg-[#080f1f] flex flex-col overflow-hidden">
+    <div className="flex h-full overflow-hidden bg-[#080f1f]">
+      {/* LEFT: Configuration panel (Smart Rec, Presets, Run, Telemetry) */}
+      <div className="w-[380px] shrink-0 border-r border-white/[0.06] bg-[#080f1f] flex flex-col overflow-hidden">
         
         {/* Smart Recommendation Module */}
         {preGenSummary && (
@@ -248,263 +248,208 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
           </p>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Modes Presets & Custom Selection Header (Sticky/Shrink-0) */}
-          <div className="shrink-0">
-            {/* Modes Presets */}
-            <div className="p-5 border-b border-white/[0.06]">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-3">
-                Compute Presets
-              </p>
-              <div className="space-y-2">
-                {modes.map(mode => {
-                  const Icon = mode.icon;
-                  const isActive = enrichmentMode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      onClick={() => handleModeSelect(mode.id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all ${
-                        isActive
-                          ? `bg-gradient-to-br ${mode.color} ring-1 ring-inset ${mode.color.includes('cyan') ? 'ring-cyan-500/20' : mode.color.includes('violet') ? 'ring-violet-500/20' : 'ring-rose-500/20'}`
-                          : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icon className={`w-4 h-4 ${isActive ? mode.activeText : 'text-white/30'}`} />
-                        <div>
-                          <span className={`text-sm font-bold block ${isActive ? mode.activeText : 'text-white/60'}`}>
-                            {mode.label}
-                          </span>
-                          <span className="text-[10px] text-white/40">{mode.desc}</span>
-                        </div>
-                        {isActive && (
-                          <span className={`ml-auto shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                            mode.accent === 'cyan' ? 'bg-cyan-500/20 text-cyan-300' :
-                            mode.accent === 'violet' ? 'bg-violet-500/20 text-violet-300' :
-                            'bg-rose-500/20 text-rose-300'
-                          }`}>
-                            ACTIVE
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        {/* Run button & Small Job Telemetry (Relocated to Top) */}
+        <div className="px-5 py-4 border-b border-white/[0.06] bg-[#0a142c]/30 shrink-0">
+          {!isRunning && !isCompleted ? (
+            <button
+              onClick={handleRunEnrichment}
+              disabled={selectedDescriptors.length === 0}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              Run ({selectedDescriptors.length} descriptors)
+            </button>
+          ) : isRunning ? (
+            <button
+              onClick={handleCancelJob}
+              className="w-full flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl
+                bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-sm
+                hover:bg-rose-500/20 transition-all"
+            >
+              <Ban className="w-4 h-4" />
+              Cancel Job
+            </button>
+          ) : isCompleted ? (
+            <button
+              onClick={handleFetchEnrichmentResults}
+              className="w-full flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl
+                bg-emerald-500 text-void font-bold text-sm
+                shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:bg-emerald-400 transition-all"
+            >
+              Next Step <ChevronRight className="w-4 h-4" />
+            </button>
+          ) : null}
 
-            {/* Run button */}
-            <div className="p-5 border-b border-white/[0.06] shrink-0 bg-[#080f1f]/80 backdrop-blur-md">
-              {!isRunning && !isCompleted ? (
-                <button
-                  onClick={handleRunEnrichment}
-                  disabled={selectedDescriptors.length === 0}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-black font-bold text-sm shadow-[0_4px_14px_rgba(255,255,255,0.15)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.25)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  Run ({selectedDescriptors.length} descriptors)
-                </button>
-              ) : isRunning ? (
-                <button
-                  onClick={handleCancelJob}
-                  className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl
-                    bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-sm
-                    hover:bg-rose-500/20 transition-all"
-                >
-                  <Ban className="w-4 h-4" />
-                  Cancel Job
-                </button>
-              ) : isCompleted ? (
-                <button
-                  onClick={handleFetchEnrichmentResults}
-                  className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl
-                    bg-emerald-500 text-void font-bold text-sm
-                    shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:bg-emerald-400 transition-all"
-                >
-                  Next Step <ChevronRight className="w-4 h-4" />
-                </button>
-              ) : null}
-            </div>
-
-            {/* Custom Selection Header, Search, and Action Buttons (Sticky/Shrink-0) */}
-            <div className="p-5 pb-2 border-b border-white/[0.06] bg-[#080f1f]">
-              <div className="flex items-center gap-2 mb-3">
-                <ListFilter className="w-4 h-4 text-white/30" />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-white/30">
-                  Custom Selection
-                </p>
-                <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.length} total selected</span>
-              </div>
-              
-              <div className="relative mb-3">
-                <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search keywords (e.g. 'log', 'ring')..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                />
-              </div>
-
-              <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
-                <button onClick={selectAllRdkit} className="whitespace-nowrap px-3 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 text-[11px] font-semibold hover:bg-cyan-500/20 transition-colors">
-                  + All RDKit
-                </button>
-                <button onClick={selectAllMordred} className="whitespace-nowrap px-3 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-[11px] font-semibold hover:bg-violet-500/20 transition-colors">
-                  + All Mordred
-                </button>
-                <button onClick={clearAll} className="whitespace-nowrap px-3 py-1 rounded-lg bg-white/5 text-white/60 text-[11px] font-semibold hover:bg-white/10 hover:text-white transition-colors">
-                  Clear All
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom section: Scrollable Checklist Grid (Flex-1) */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-5 pt-3">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-14">
-                <LogoLoader size="w-16 h-16" label="Loading Descriptor Library..." />
-              </div>
-            ) : (
-              <div className="space-y-6 pb-4">
-                
-                {/* RDKIT SECTION */}
-                {(rdkitRecommended.length > 0 || rdkitOther.length > 0) && (
-                  <div>
-                    <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 mb-3">
-                      <Zap className="w-4 h-4 text-cyan-400" />
-                      <h3 className="text-sm font-bold text-white">RDKit Descriptors</h3>
-                      <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.filter(d => rdkitAvailable.includes(d)).length} selected</span>
-                    </div>
-                    {renderDescriptorGrid('★ Recommended', rdkitRecommended, 'text-amber-400/70')}
-                    {renderDescriptorGrid('All RDKit Properties', rdkitOther, 'text-cyan-400/70')}
-                  </div>
+          {/* Job Telemetry */}
+          {(isRunning || isCompleted) && (
+            <div className="mt-4 p-3.5 border border-white/[0.05] rounded-xl space-y-3 bg-[#060b18]/40">
+              <div className="flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5 text-violet-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Job Telemetry</span>
+                {isRunning && (
+                  <span className="ml-auto flex items-center gap-1 text-[9px] text-emerald-400 font-medium">
+                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                    Running
+                  </span>
                 )}
-
-                {/* MORDRED SECTION */}
-                {(mordredRecommended.length > 0 || mordredOther.length > 0) && (
-                  <div className="mt-8">
-                    <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 mb-3">
-                      <Beaker className="w-4 h-4 text-violet-400" />
-                      <h3 className="text-sm font-bold text-white">Mordred Engine</h3>
-                      <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.filter(d => mordredAvailable.includes(d)).length} selected</span>
-                    </div>
-                    {renderDescriptorGrid('★ Recommended', mordredRecommended, 'text-amber-400/70')}
-                    {renderDescriptorGrid('All Mordred Properties', mordredOther, 'text-violet-400/70')}
-                  </div>
+                {isCompleted && (
+                  <span className="ml-auto text-[9px] text-cyan-400 font-bold">Completed</span>
                 )}
               </div>
-            )}
+
+              {/* Progress and phase */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-white/40 truncate max-w-[200px]" title={socket.phase || 'Processing...'}>
+                    {socket.phase || 'Initializing...'}
+                  </span>
+                  <span className="text-cyan-400 font-bold">{socket.progress}%</span>
+                </div>
+                <Progress.Root className="h-1 w-full bg-white/[0.04] rounded-full overflow-hidden" value={socket.progress}>
+                  <Progress.Indicator
+                    className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all duration-500"
+                    style={{ width: `${socket.progress}%` }}
+                  />
+                </Progress.Root>
+              </div>
+
+              {/* Telemetry info cards */}
+              <div className="grid grid-cols-2 gap-2 text-[9px]">
+                <div className="p-2 rounded-lg bg-white/[0.01] border border-white/[0.04]">
+                  <p className="text-white/30 uppercase tracking-wider font-semibold mb-0.5">Enriched</p>
+                  <p className="text-white font-bold">
+                    {Math.round((socket.progress / 100) * (preGenSummary?.dataset_size || 90))} / {preGenSummary?.dataset_size || 90}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-white/[0.01] border border-white/[0.04]">
+                  <p className="text-white/30 uppercase tracking-wider font-semibold mb-0.5">Speed / ETA</p>
+                  <p className="text-cyan-400 font-bold">
+                    {isRunning ? `${socket.speed || 0} cmp/s • ${socket.eta || 0}s` : 'Done ✓'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modes Presets - Scrollable in config panel */}
+        <div className="p-5 overflow-y-auto flex-1 custom-scrollbar">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-3">
+            Compute Presets
+          </p>
+          <div className="space-y-2">
+            {modes.map(mode => {
+              const Icon = mode.icon;
+              const isActive = enrichmentMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => handleModeSelect(mode.id)}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${
+                    isActive
+                      ? `bg-gradient-to-br ${mode.color} ring-1 ring-inset ${mode.color.includes('cyan') ? 'ring-cyan-500/20' : mode.color.includes('violet') ? 'ring-violet-500/20' : 'ring-rose-500/20'}`
+                      : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 ${isActive ? mode.activeText : 'text-white/30'}`} />
+                    <div>
+                      <span className={`text-sm font-bold block ${isActive ? mode.activeText : 'text-white/60'}`}>
+                        {mode.label}
+                      </span>
+                      <span className="text-[10px] text-white/40">{mode.desc}</span>
+                    </div>
+                    {isActive && (
+                      <span className={`ml-auto shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                        mode.accent === 'cyan' ? 'bg-cyan-500/20 text-cyan-300' :
+                        mode.accent === 'violet' ? 'bg-violet-500/20 text-violet-300' :
+                        'bg-rose-500/20 text-rose-300'
+                      }`}>
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* RIGHT: Live job telemetry */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="px-6 py-5 border-b border-white/[0.06] flex items-center gap-3">
-          <Activity className="w-4 h-4 text-violet-400" />
-          <h3 className="text-white font-bold text-sm">Job Telemetry</h3>
-          {isRunning && (
-            <span className="ml-auto flex items-center gap-2 text-xs text-emerald-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Running
-            </span>
-          )}
-          {isCompleted && (
-            <span className="ml-auto text-xs text-cyan-400 font-bold">Completed ✓</span>
-          )}
+      {/* RIGHT: Checklist selection grid (takes the rest of the screen, full-width) */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#060b18]/10">
+        {/* Custom Selection Header, Search, and Action Buttons (Sticky/Shrink-0) */}
+        <div className="p-5 pb-3 border-b border-white/[0.06] bg-[#080f1f]">
+          <div className="flex items-center gap-2 mb-3">
+            <ListFilter className="w-4 h-4 text-white/30" />
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/30">
+              Custom Selection
+            </p>
+            <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.length} total selected</span>
+          </div>
+          
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search keywords (e.g. 'log', 'ring')..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50 transition-colors"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={selectAllRdkit} className="whitespace-nowrap px-3 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 text-xs font-semibold hover:bg-cyan-500/20 transition-colors">
+                + All RDKit
+              </button>
+              <button onClick={selectAllMordred} className="whitespace-nowrap px-3 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs font-semibold hover:bg-violet-500/20 transition-colors">
+                + All Mordred
+              </button>
+              <button onClick={clearAll} className="whitespace-nowrap px-3 py-1 rounded-lg bg-white/5 text-white/60 text-xs font-semibold hover:bg-white/10 hover:text-white transition-colors">
+                Clear All
+              </button>
+            </div>
+          </div>
         </div>
 
+        {/* Scrollable Checklist Grid (Flex-1) */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-          <AnimatePresence>
-            {(isRunning || isCompleted) ? (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
-              >
-                {/* Progress */}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <LogoLoader size="w-16 h-16" label="Loading Descriptor Library..." />
+            </div>
+          ) : (
+            <div className="space-y-8 pb-6">
+              
+              {/* RDKIT SECTION */}
+              {(rdkitRecommended.length > 0 || rdkitOther.length > 0) && (
                 <div>
-                  <div className="flex items-center justify-between text-xs mb-3">
-                    <span className="text-white/50 font-medium">Overall Progress</span>
-                    <span className="text-cyan-400 font-bold text-base">{socket.progress}%</span>
+                  <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 mb-4">
+                    <Zap className="w-4 h-4 text-cyan-400" />
+                    <h3 className="text-sm font-bold text-white">RDKit Descriptors</h3>
+                    <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.filter(d => rdkitAvailable.includes(d)).length} selected</span>
                   </div>
-                  <Progress.Root className="h-2.5 w-full bg-white/[0.04] rounded-full overflow-hidden" value={socket.progress}>
-                    <Progress.Indicator
-                      className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all duration-500"
-                      style={{ width: `${socket.progress}%` }}
-                    />
-                  </Progress.Root>
+                  {renderDescriptorGrid('★ Recommended', rdkitRecommended, 'text-amber-400/70')}
+                  {renderDescriptorGrid('All RDKit Properties', rdkitOther, 'text-cyan-400/70')}
                 </div>
+              )}
 
-                {/* Stats grid */}
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: 'Active Phase', value: socket.phase || 'Initializing...', accent: 'text-white' },
-                    { label: 'Processing Rate', value: `${socket.speed || 0} cmp/s`, accent: 'text-cyan-400' },
-                    { label: 'ETA', value: `${socket.eta || 0}s`, accent: 'text-violet-400' },
-                  ].map(s => (
-                    <div key={s.label} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                      <p className="text-[10px] uppercase tracking-wider text-white/30 font-bold mb-1.5">{s.label}</p>
-                      <p className={`text-sm font-bold ${s.accent} truncate`}>{s.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Log console */}
+              {/* MORDRED SECTION */}
+              {(mordredRecommended.length > 0 || mordredOther.length > 0) && (
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Terminal className="w-3.5 h-3.5 text-white/30" />
-                    <p className="text-[10px] uppercase tracking-wider text-white/30 font-bold">Worker Log</p>
+                  <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 mb-4">
+                    <Beaker className="w-4 h-4 text-violet-400" />
+                    <h3 className="text-sm font-bold text-white">Mordred Engine</h3>
+                    <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.filter(d => mordredAvailable.includes(d)).length} selected</span>
                   </div>
-                  <div className="bg-[#040810] rounded-xl p-4 font-mono text-[11px] text-white/40
-                    max-h-96 overflow-y-auto custom-scrollbar space-y-1.5 border border-white/[0.04]">
-                    {socket.logs.length > 0 ? (
-                      socket.logs.map((log: string, idx: number) => (
-                        <div key={idx} className="hover:text-white/60 transition-colors leading-relaxed">
-                          <span className="text-cyan-500/40 mr-2 select-none">›</span>{log}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-white/20 italic">Awaiting worker initialization...</div>
-                    )}
-                  </div>
+                  {renderDescriptorGrid('★ Recommended', mordredRecommended, 'text-amber-400/70')}
+                  {renderDescriptorGrid('All Mordred Properties', mordredOther, 'text-violet-400/70')}
                 </div>
-
-                {isCompleted && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                    <div className="p-5 rounded-2xl bg-emerald-500/[0.08] border border-emerald-500/20">
-                      <p className="text-emerald-400 font-bold text-sm mb-1">✓ Job Complete</p>
-                      <p className="text-white/40 text-xs mb-4">
-                        The descriptor calculation is done, you can download the enriched data from the export section.
-                      </p>
-                      <button
-                        onClick={handleFetchEnrichmentResults}
-                        className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl
-                          bg-emerald-500 text-void font-bold text-sm
-                          hover:bg-emerald-400 transition-all"
-                      >
-                        Next Step <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center py-24">
-                <div className="w-20 h-20 rounded-3xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center mb-5">
-                  <Cpu className="w-10 h-10 text-white/10" />
-                </div>
-                <p className="text-white/30 text-sm font-medium">Ready</p>
-                <p className="text-white/20 text-xs mt-1 max-w-xs">
-                  Select your desired descriptors on the left and click Run to start generating features.
-                </p>
-              </div>
-            )}
-          </AnimatePresence>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

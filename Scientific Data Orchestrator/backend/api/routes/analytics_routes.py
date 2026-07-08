@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 
 from backend.core.workspace_registry import registry
@@ -61,6 +61,33 @@ def _sanitize_dict(d: Dict) -> Dict:
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
+def _read_csv_safely(content: bytes) -> pd.DataFrame:
+    import io
+    last_err = None
+    # 1. Try standard comma sep with common encodings
+    for encoding in ["utf-8", "latin1", "cp1252", "iso-8859-1"]:
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=encoding)
+        except Exception as e:
+            last_err = e
+            continue
+    # 2. Try auto-detect separator with python engine
+    for encoding in ["utf-8", "latin1"]:
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=encoding, sep=None, engine='python')
+        except Exception as e:
+            last_err = e
+            continue
+    # 3. Try skipping bad lines
+    for encoding in ["utf-8", "latin1"]:
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=encoding, on_bad_lines='skip')
+        except Exception as e:
+            last_err = e
+            continue
+    raise last_err or ValueError("Failed to parse CSV content.")
+
+
 @router.post("/{client_id}/upload")
 async def upload_dataset_test(client_id: str, file: UploadFile = File(...)):
     """Synchronous upload specifically for V6 testing/standalone studio flow."""
@@ -73,7 +100,7 @@ async def upload_dataset_test(client_id: str, file: UploadFile = File(...)):
         elif fname.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(content))
         else:
-            df = pd.read_csv(io.BytesIO(content))
+            df = _read_csv_safely(content)
     except Exception as e:
         raise HTTPException(400, f"Cannot parse file: {e}")
     context = registry.get_context(client_id)
@@ -86,8 +113,14 @@ async def upload_dataset_test(client_id: str, file: UploadFile = File(...)):
     context.dataframe_cache = df
     context.reset_subgroup_state()
     context.add_trace("ingest")
-    context.touch(save_to_disk=True)
-    return {"status": "ok", "filename": fname, "rows": len(df), "cols": len(df.columns)}
+    return {
+        "status": "ok",
+        "filename": fname,
+        "rows": len(df),
+        "cols": len(df.columns),
+        "row_count": len(df),
+        "columns": df.columns.tolist()
+    }
 
 
 @router.post("/{client_id}/load-demo")
@@ -121,9 +154,14 @@ async def load_demo(client_id: str):
     context.parquet_path = parquet_path
     context.dataframe_cache = df
     context.reset_subgroup_state()
-    context.touch(save_to_disk=True)
-
-    return {"status": "ok", "filename": "qsar_demo_dataset.csv", "rows": len(df), "cols": len(df.columns)}
+    return {
+        "status": "ok",
+        "filename": "qsar_demo_dataset.csv",
+        "rows": len(df),
+        "cols": len(df.columns),
+        "row_count": len(df),
+        "columns": df.columns.tolist()
+    }
 
 
 @router.get("/{client_id}/profile")
@@ -193,8 +231,9 @@ async def dataset_profile(client_id: str):
 
 @router.get("/{client_id}/missing-analysis")
 async def missing_analysis(client_id: str):
-    """Per-column missing value analysis with patterns."""
+    """Per-column missing value analysis with systematic patterns and MCAR/MAR diagnostics."""
     try:
+        from scipy.stats import pearsonr
         df, _ = _load_df(client_id)
         results = []
         for col in df.columns:
@@ -215,36 +254,81 @@ async def missing_analysis(client_id: str):
 
         results.sort(key=lambda x: -x["missing_pct"])
 
-        # MCAR pattern: check if missingness is correlated with other columns
-        numeric_df = df.select_dtypes(include=[np.number])
-        miss_corr = []
-        if len(numeric_df.columns) >= 2:
-            miss_flags = df.isna().astype(int)
-            for col_a in miss_flags.columns[:10]:  # limit for performance
-                for col_b in numeric_df.columns[:10]:
-                    if col_a != col_b and miss_flags[col_a].sum() > 0:
-                        try:
-                            corr = float(miss_flags[col_a].corr(numeric_df[col_b]))
-                            if not math.isnan(corr) and abs(corr) > 0.2:
-                                miss_corr.append({
-                                    "missing_col": col_a,
-                                    "correlated_with": col_b,
-                                    "correlation": round(corr, 3),
+        # MCAR vs MAR classification per column
+        column_classification = {}
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for r in results:
+            col = r["column"]
+            if r["missing_count"] == 0:
+                continue
+            
+            miss_flag = df[col].isna().astype(int)
+            correlations = []
+            
+            for nc in numeric_cols[:20]:
+                if nc == col:
+                    continue
+                # Align indicators and check pearsonr
+                valid_indices = df[nc].dropna().index
+                if len(valid_indices) > 10:
+                    try:
+                        flag_series = miss_flag.loc[valid_indices]
+                        val_series = df[nc].loc[valid_indices]
+                        # Check variance
+                        if flag_series.std() > 0 and val_series.std() > 0:
+                            r_val, p_val = pearsonr(flag_series, val_series)
+                            if abs(r_val) > 0.2 and p_val < 0.05:
+                                correlations.append({
+                                    "corr_col": nc,
+                                    "r": _safe(float(r_val)),
+                                    "p": _safe(float(p_val))
                                 })
-                        except Exception:
-                            pass
+                    except Exception:
+                        pass
+            
+            if correlations:
+                # Sort by absolute correlation strength
+                correlations.sort(key=lambda x: -abs(x["r"]))
+                classification = "MAR"
+                reason = f"Missingness correlates with {correlations[0]['corr_col']} (r={correlations[0]['r']:.2f}, p={correlations[0]['p']:.4f})"
+            else:
+                classification = "MCAR"
+                reason = "No significant correlation with other variables detected (Missing Completely at Random)"
+                
+            column_classification[col] = {
+                "type": classification,
+                "reason": reason,
+                "correlations": correlations[:3]
+            }
+
+        # Pattern matrix (sampled 100 rows x columns with any missing values)
+        missing_cols = [r["column"] for r in results if r["missing_count"] > 0][:30]
+        sample_idx = df.sample(min(100, len(df)), random_state=42).index
+        pattern_matrix = []
+        for idx in sample_idx:
+            pattern_matrix.append({
+                "row": int(idx),
+                "pattern": [int(not pd.isna(df.loc[idx, c])) for c in missing_cols]
+            })
+
+        mar_column_count = sum(1 for v in column_classification.values() if v["type"] == "MAR")
 
         return {
             "columns": results,
             "total_missing": sum(r["missing_count"] for r in results),
             "columns_with_missing": sum(1 for r in results if r["missing_count"] > 0),
-            "missingness_correlations": miss_corr[:10],
+            "mar_column_count": mar_column_count,
+            "column_classification": column_classification,
+            "pattern_matrix_cols": missing_cols,
+            "pattern_matrix": pattern_matrix,
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Missing analysis failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/{client_id}/endpoint-analysis")
@@ -378,8 +462,9 @@ async def endpoint_analysis(client_id: str, col: Optional[str] = None):
 
 @router.get("/{client_id}/correlation")
 async def correlation_matrix(client_id: str, method: str = "pearson", max_cols: int = 30):
-    """Compute correlation matrix for all numeric columns. method: pearson|spearman|kendall."""
+    """Compute correlation matrix for all numeric columns including p-values and VIF analysis."""
     try:
+        import scipy.stats as sp_stats
         df, _ = _load_df(client_id)
         numeric_df = df.select_dtypes(include=[np.number])
 
@@ -395,17 +480,34 @@ async def correlation_matrix(client_id: str, method: str = "pearson", max_cols: 
 
         corr = numeric_df.corr(method=method)
 
-        # Build matrix for heatmap
+        # Build matrix for heatmap with p-values
         matrix = []
         for i, col_a in enumerate(cols):
             for j, col_b in enumerate(cols):
                 val = corr.loc[col_a, col_b]
+                p_val = 1.0
+                if col_a == col_b:
+                    p_val = 0.0
+                else:
+                    valid = df[[col_a, col_b]].dropna()
+                    if len(valid) > 3:
+                        try:
+                            if method == "pearson":
+                                _, p = sp_stats.pearsonr(valid[col_a], valid[col_b])
+                            elif method == "spearman":
+                                _, p = sp_stats.spearmanr(valid[col_a], valid[col_b])
+                            elif method == "kendall":
+                                _, p = sp_stats.kendalltau(valid[col_a], valid[col_b])
+                            p_val = float(p)
+                        except Exception:
+                            pass
                 matrix.append({
                     "col_a": col_a,
                     "col_b": col_b,
                     "i": i,
                     "j": j,
                     "value": _safe(val),
+                    "p_value": _safe(p_val),
                 })
 
         # Find strong correlations (|r| > 0.7, excluding diagonal)
@@ -423,14 +525,50 @@ async def correlation_matrix(client_id: str, method: str = "pearson", max_cols: 
                         "strength": "very_strong" if abs(val) > 0.9 else "strong",
                         "direction": "positive" if val > 0 else "negative",
                     })
-        strong.sort(key=lambda x: -abs(x["correlation"]))
+        # VIF calculation using scikit-learn
+        vif_data = []
+        try:
+            from sklearn.linear_model import LinearRegression
+            vif_df = numeric_df.copy()
+            # Filter out columns with zero variance (constant values) or all nulls
+            valid_vif_cols = [c for c in cols if vif_df[c].notna().any() and vif_df[c].nunique() > 1]
+            
+            # Impute missing values with mean
+            for c in valid_vif_cols:
+                c_mean = vif_df[c].mean()
+                vif_df[c] = vif_df[c].fillna(0.0 if pd.isna(c_mean) else c_mean)
+                
+            if len(valid_vif_cols) > 1 and vif_df.shape[0] > len(valid_vif_cols) + 2:
+                for col in cols:
+                    if col not in valid_vif_cols:
+                        vif_data.append({"feature": col, "vif": None})
+                        continue
+                    try:
+                        other_cols = [c for c in valid_vif_cols if c != col]
+                        X = vif_df[other_cols].values
+                        y = vif_df[col].values
+                        lr = LinearRegression()
+                        lr.fit(X, y)
+                        r2 = lr.score(X, y)
+                        if r2 >= 1.0:
+                            v = 999999.0
+                        else:
+                            v = float(1.0 / (1.0 - r2))
+                        vif_data.append({"feature": col, "vif": _safe(v)})
+                    except Exception:
+                        vif_data.append({"feature": col, "vif": None})
+                vif_data.sort(key=lambda x: (x["vif"] or 0), reverse=True)
+        except Exception as e:
+            logger.error(f"VIF failed in analytics: {e}")
 
+        strong.sort(key=lambda x: -abs(x["correlation"]))
         return {
             "columns": cols,
             "method": method,
             "matrix": matrix,
             "strong_correlations": strong,
             "col_count": len(cols),
+            "vif": vif_data,
         }
     except HTTPException:
         raise
@@ -511,7 +649,7 @@ async def outlier_detection(client_id: str, method: str = "iqr"):
 
 @router.get("/{client_id}/distribution")
 async def distribution_analysis(client_id: str, col: str, bins: int = 30):
-    """Full distribution analysis for a single column: histogram, KDE, normality tests."""
+    """Full distribution analysis for a single column: histogram, KDE, QQ-plot, normality tests."""
     try:
         df, _ = _load_df(client_id)
         if col not in df.columns:
@@ -555,6 +693,37 @@ async def distribution_analysis(client_id: str, col: str, bins: int = 30):
         except Exception:
             pass
 
+        # KDE data
+        kde_data = []
+        try:
+            from scipy.stats import gaussian_kde
+            kde_vals = s.values
+            if len(kde_vals) > 1:
+                kde = gaussian_kde(kde_vals)
+                x_range = np.linspace(float(kde_vals.min()), float(kde_vals.max()), 100)
+                kde_data = [{"x": _safe(float(x)), "y": _safe(float(kde(x)[0]))} for x in x_range]
+        except Exception:
+            pass
+
+        # QQ-plot data
+        qq_data = []
+        try:
+            from scipy import stats as sp_stats
+            (osm, osr), _ = sp_stats.probplot(s, dist="norm")
+            qq_data = [{"theoretical": _safe(float(osm[i])), "sample": _safe(float(osr[i]))} for i in range(len(osm))]
+        except Exception:
+            pass
+
+        # Box-Cox lambda
+        boxcox_lambda = None
+        if len(pos) >= 8:
+            try:
+                from scipy import stats as sp_stats
+                _, lam = sp_stats.boxcox(pos)
+                boxcox_lambda = _safe(float(lam))
+            except Exception:
+                pass
+
         # Percentiles
         percentiles = {str(p): _safe(float(s.quantile(p / 100)))
                        for p in [1, 5, 10, 25, 50, 75, 90, 95, 99]}
@@ -570,12 +739,70 @@ async def distribution_analysis(client_id: str, col: str, bins: int = 30):
             "log_histogram": log_histogram,
             "normality": normality,
             "percentiles": percentiles,
+            "kde_data": kde_data,
+            "qq_data": qq_data,
+            "boxcox_lambda": boxcox_lambda,
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Distribution failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{client_id}/distribution-batch")
+async def distribution_batch(client_id: str):
+    """
+    Analyze ALL numeric columns at once.
+    Returns normality scores and recommended transformations for each column.
+    """
+    try:
+        from scipy import stats as sp_stats
+        df, _ = _load_df(client_id)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        results = []
+        for col in numeric_cols[:50]:  # limit to 50 columns
+            series = pd.to_numeric(df[col], errors='coerce').dropna()
+            if len(series) < 5:
+                continue
+            skew = float(series.skew())
+            kurt = float(series.kurtosis())
+            sample = series.sample(min(5000, len(series)), random_state=42)
+            w, p = sp_stats.shapiro(sample)
+            is_normal = bool(p > 0.05)
+
+            # Check log-normality (positive values only)
+            pos = series[series > 0]
+            log_is_normal = False
+            if len(pos) >= 5:
+                try:
+                    log_sample = np.log10(pos).sample(min(5000, len(pos)), random_state=42)
+                    _, lp = sp_stats.shapiro(log_sample)
+                    log_is_normal = bool(lp > 0.05)
+                except Exception:
+                    pass
+
+            recommended = "log10" if (not is_normal and log_is_normal) else "none"
+
+            results.append({
+                "column": col,
+                "n": len(series),
+                "skewness": _safe(skew),
+                "kurtosis": _safe(kurt),
+                "is_normal": is_normal,
+                "shapiro_w": _safe(float(w)),
+                "shapiro_p": _safe(float(p)),
+                "log_is_normal": log_is_normal,
+                "recommended_transform": recommended,
+            })
+
+        return {"columns": results, "total_analyzed": len(results)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch distribution failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/{client_id}/export-report")
@@ -625,3 +852,317 @@ async def export_analytics_report(client_id: str):
     except Exception as e:
         logger.error(f"Export report failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{client_id}/column-intelligence")
+async def column_intelligence(client_id: str):
+    """
+    Classify every column into a scientific role.
+    Roles: SMILES | ENDPOINT | DESCRIPTOR | IDENTIFIER | CATEGORICAL | DATETIME | UNKNOWN
+    Also returns a data health score per column.
+    """
+    try:
+        df, context = _load_df(client_id)
+
+        SMILES_HINTS = {"smiles", "smi", "structure", "canonical_smiles", "isomeric_smiles"}
+        ENDPOINT_HINTS = {"lc50","ec50","ic50","noec","loec","activity","value","target","endpoint",
+                          "ki","kd","plc","pec","pic","logbcf","logkoc","inhibition","potency"}
+        IDENTIFIER_HINTS = {"cas","casrn","id","name","compound","chemical","substance","inchikey",
+                            "inchi","formula","iupac","dtxsid","chembl","pubchem"}
+
+        columns_info = []
+        for col in df.columns:
+            col_lower = col.lower().replace(" ", "_").replace("-", "_")
+            dtype = str(df[col].dtype)
+            is_numeric = pd.api.types.is_numeric_dtype(df[col])
+            is_datetime = pd.api.types.is_datetime64_any_dtype(df[col])
+
+            # Determine role
+            if any(h in col_lower for h in SMILES_HINTS):
+                role = "SMILES"
+            elif any(h in col_lower for h in ENDPOINT_HINTS):
+                role = "ENDPOINT"
+            elif any(h in col_lower for h in IDENTIFIER_HINTS):
+                role = "IDENTIFIER"
+            elif is_datetime:
+                role = "DATETIME"
+            elif not is_numeric and df[col].nunique() / max(len(df), 1) < 0.05:
+                role = "CATEGORICAL"
+            elif is_numeric:
+                role = "DESCRIPTOR"
+            else:
+                role = "UNKNOWN"
+
+            # Health score (0-100): penalize missing, low variance, all-zeros
+            missing_pct = float(df[col].isna().mean() * 100)
+            health = 100
+            if missing_pct > 50:
+                health -= 50
+            elif missing_pct > 20:
+                health -= 30
+            elif missing_pct > 5:
+                health -= 10
+            
+            if is_numeric:
+                std_val = df[col].std()
+                if pd.isna(std_val) or std_val == 0:
+                    health -= 40  # zero variance
+            
+            health = max(0, health)
+
+            # Histogram data (20 bins) for numeric columns
+            histogram = None
+            if is_numeric:
+                vals = pd.to_numeric(df[col], errors='coerce').dropna()
+                if len(vals) > 1:
+                    counts, edges = np.histogram(vals, bins=min(20, len(vals.unique())))
+                    histogram = [{"x": _safe(float(edges[i])), "count": int(counts[i])}
+                                 for i in range(len(counts))]
+
+            # Top values for categorical
+            top_values = None
+            if not is_numeric:
+                top_values = df[col].value_counts().head(5).to_dict()
+                top_values = {str(k): int(v) for k, v in top_values.items()}
+
+            columns_info.append({
+                "name": col, "dtype": dtype, "role": role, "health_score": health,
+                "missing_pct": _safe(missing_pct),
+                "unique_count": int(df[col].nunique()),
+                "histogram": histogram, "top_values": top_values,
+            })
+
+        role_counts = {}
+        for ci in columns_info:
+            role_counts[ci["role"]] = role_counts.get(ci["role"], 0) + 1
+
+        return {"columns": columns_info, "role_counts": role_counts, "total_cols": len(df.columns)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Column intelligence failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{client_id}/statistical-test")
+async def statistical_test(
+    client_id: str,
+    numeric_col: str = Form(...),
+    group_col: str = Form(...),
+):
+    """
+    Compare numeric values across groups defined by group_col.
+    Auto-selects t-test, Mann-Whitney, ANOVA, or Kruskal-Wallis.
+    """
+    try:
+        from scipy import stats as sp_stats
+        df, _ = _load_df(client_id)
+
+        if numeric_col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Numeric column '{numeric_col}' not found")
+        if group_col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Group column '{group_col}' not found")
+
+        # Drop rows with missing values in either column
+        sub = df[[numeric_col, group_col]].dropna()
+        sub[numeric_col] = pd.to_numeric(sub[numeric_col], errors="coerce")
+        sub = sub.dropna()
+
+        groups = sub[group_col].unique().tolist()
+        if len(groups) < 2:
+            raise HTTPException(status_code=400, detail="Need at least 2 distinct groups to perform test")
+
+        group_data = []
+        all_normally_distributed = True
+        
+        # Collect stats per group
+        for gp in groups[:10]:  # limit to top 10 groups
+            data_pts = sub[sub[group_col] == gp][numeric_col].values
+            if len(data_pts) < 3:
+                continue
+            
+            # Normality check
+            w_stat, p_val = sp_stats.shapiro(data_pts) if len(data_pts) <= 5000 else (0.0, 1.0)
+            is_normal = bool(p_val > 0.05) if len(data_pts) <= 5000 else True
+            if not is_normal:
+                all_normally_distributed = False
+                
+            group_data.append({
+                "group_name": str(gp),
+                "n": len(data_pts),
+                "mean": _safe(float(np.mean(data_pts))),
+                "median": _safe(float(np.median(data_pts))),
+                "std": _safe(float(np.std(data_pts))),
+                "is_normal": is_normal,
+                "values": [_safe(float(x)) for x in data_pts[:100]],  # sample for jitter plot
+                "raw_values": data_pts
+            })
+
+        if len(group_data) < 2:
+            raise HTTPException(status_code=400, detail="Insufficient group sizes (minimum 3 samples per group)")
+
+        # Determine and execute appropriate test
+        test_name = ""
+        stat = 0.0
+        p = 1.0
+        
+        if len(group_data) == 2:
+            # 2 groups
+            g1 = group_data[0]["raw_values"]
+            g2 = group_data[1]["raw_values"]
+            if all_normally_distributed:
+                test_name = "Welch's t-test (parametric)"
+                t_stat, p_val = sp_stats.ttest_ind(g1, g2, equal_var=False)
+                stat, p = float(t_stat), float(p_val)
+            else:
+                test_name = "Mann-Whitney U test (non-parametric)"
+                u_stat, p_val = sp_stats.mannwhitneyu(g1, g2, alternative="two-sided")
+                stat, p = float(u_stat), float(p_val)
+        else:
+            # > 2 groups
+            arrs = [gp["raw_values"] for gp in group_data]
+            if all_normally_distributed:
+                test_name = "One-way ANOVA (parametric)"
+                f_stat, p_val = sp_stats.f_oneway(*arrs)
+                stat, p = float(f_stat), float(p_val)
+            else:
+                test_name = "Kruskal-Wallis H-test (non-parametric)"
+                h_stat, p_val = sp_stats.kruskal(*arrs)
+                stat, p = float(h_stat), float(p_val)
+
+        # Cleanup raw numpy arrays from return payload
+        for gd in group_data:
+            del gd["raw_values"]
+
+        sig = "significant" if p < 0.05 else "not_significant"
+        interpretation = (
+            f"Statistically {sig} difference detected (p={p:.4e}) using {test_name}."
+            if p < 0.05 else
+            f"No statistically significant difference detected (p={p:.4f}) using {test_name}."
+        )
+
+        return {
+            "test_name": test_name,
+            "statistic": _safe(stat),
+            "p_value": _safe(p),
+            "significance": sig,
+            "interpretation": interpretation,
+            "groups": group_data
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Statistical test failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{client_id}/dimensionality-reduction")
+async def dimensionality_reduction(
+    client_id: str,
+    method: str = Form("pca"),
+    features: str = Form(...),  # comma-separated feature names
+    target_col: Optional[str] = Form(None),
+    n_clusters: Optional[int] = Form(None),
+):
+    """Run PCA, t-SNE, or UMAP on selected numeric features."""
+    try:
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.cluster import KMeans
+        
+        df, _ = _load_df(client_id)
+        feat_cols = [x.strip() for x in features.split(",") if x.strip() in df.columns]
+        
+        if len(feat_cols) < 2:
+            raise HTTPException(status_code=400, detail="Select at least 2 features for dimensionality reduction")
+
+        # dropna across feature space
+        sub_df = df[feat_cols].dropna()
+        if len(sub_df) < 5:
+            raise HTTPException(status_code=400, detail="Too few rows (less than 5) without missing values in selected features")
+
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(sub_df.values)
+
+        x_coords = []
+        y_coords = []
+        explained_var = []
+        loadings = []
+
+        if method == "pca":
+            pca = PCA(n_components=2)
+            coords = pca.fit_transform(X_scaled)
+            x_coords = coords[:, 0].tolist()
+            y_coords = coords[:, 1].tolist()
+            explained_var = [float(x) for x in pca.explained_variance_ratio_]
+            
+            # loadings: feature weights on PCA dimensions
+            for idx, f_name in enumerate(feat_cols):
+                loadings.append({
+                    "feature": f_name,
+                    "pc1": _safe(float(pca.components_[0, idx])),
+                    "pc2": _safe(float(pca.components_[1, idx])),
+                })
+        elif method == "tsne":
+            from sklearn.manifold import TSNE
+            # Use perplexity min of 5 or (len(X_scaled) - 1) / 3
+            perp = min(30, max(5, (len(X_scaled) - 1) // 3))
+            tsne = TSNE(n_components=2, perplexity=perp, random_state=42)
+            coords = tsne.fit_transform(X_scaled)
+            x_coords = coords[:, 0].tolist()
+            y_coords = coords[:, 1].tolist()
+        elif method == "umap":
+            try:
+                import umap
+                reducer = umap.UMAP(n_components=2, random_state=42)
+                coords = reducer.fit_transform(X_scaled)
+                x_coords = coords[:, 0].tolist()
+                y_coords = coords[:, 1].tolist()
+            except ImportError:
+                # Fallback to PCA if UMAP is not installed
+                pca = PCA(n_components=2)
+                coords = pca.fit_transform(X_scaled)
+                x_coords = coords[:, 0].tolist()
+                y_coords = coords[:, 1].tolist()
+                explained_var = [float(x) for x in pca.explained_variance_ratio_]
+                method = "pca (UMAP not available)"
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported method '{method}'")
+
+        # Optional KMeans clustering
+        cluster_labels = []
+        if n_clusters and n_clusters > 1:
+            km = KMeans(n_clusters=min(n_clusters, len(X_scaled)), random_state=42)
+            cluster_labels = km.fit_predict(X_scaled).tolist()
+
+        # Build coordinates payload
+        points = []
+        for i, idx in enumerate(sub_df.index):
+            lbl = None
+            if target_col and target_col in df.columns:
+                lbl = _safe(df.loc[idx, target_col])
+            elif cluster_labels:
+                lbl = f"Cluster {cluster_labels[i]}"
+            else:
+                lbl = "Data"
+                
+            points.append({
+                "row_idx": int(idx),
+                "x": _safe(x_coords[i]),
+                "y": _safe(y_coords[i]),
+                "label": str(lbl)
+            })
+
+        return {
+            "method": method,
+            "points": points,
+            "explained_variance": explained_var,
+            "loadings": loadings,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dimensionality reduction failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+

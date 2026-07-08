@@ -20,6 +20,8 @@ import { uploadApi } from '../../../services/uploadApi';
 import { enrichmentApi } from '../../../services/enrichmentApi';
 import { modelingApi } from '../../../services/modelingApi';
 import { workspaceApi } from '../../../services/workspaceApi';
+import { StudioNavigationProvider, useStudioNavigation } from '../navigation/StudioNavigationProvider';
+import type { NavigationStep } from '../navigation/StudioNavigationProvider';
 
 // Legacy panels
 import { UploadWorkspace } from '../../upload/UploadWorkspace';
@@ -31,20 +33,69 @@ import { QSARReadinessWorkspace } from '../../readiness/QSARReadinessWorkspace';
 import { ReportsExport } from '../../reports/ReportsExport';
 import { SubgroupSelectionHub } from '../../analysis/SubgroupSelectionHub';
 
-const STEPS = [
-  { id: 'ingest',            label: 'Upload Dataset',         icon: <Upload className="w-4 h-4" />,       desc: 'Load a dataset with SMILES column' },
-  { id: 'enrichment',        label: 'Descriptor Enrichment',  icon: <Cpu className="w-4 h-4" />,          desc: 'RDKit / Mordred descriptor calc', needsData: true },
-  { id: 'compound-explorer', label: 'Compound Explorer',      icon: <Search className="w-4 h-4" />,       desc: 'Browse structures & similarity search', needsData: true },
-  { id: 'reports',           label: 'Reports & Export',       icon: <FileText className="w-4 h-4" />,     desc: 'Generate & download reports', needsData: true },
+const stepsConfig: NavigationStep[] = [
+  {
+    id: 'ingest',
+    label: 'Upload Dataset',
+    icon: <Upload className="w-4 h-4" />,
+    desc: 'Load a dataset with SMILES column',
+    nextLabel: 'Continue to Enrichment',
+    nextStep: 'enrichment',
+    validation: (store: any) => {
+      if (!store.filename) return 'Please upload a dataset or load the demo dataset first.';
+      return true;
+    }
+  },
+  {
+    id: 'enrichment',
+    label: 'Descriptor Enrichment',
+    icon: <Cpu className="w-4 h-4" />,
+    desc: 'RDKit / Mordred descriptor calc',
+    nextLabel: 'Go to Explorer',
+    nextStep: 'compound-explorer',
+    prevLabel: 'Back to Upload',
+    previousStep: 'ingest',
+    isBlocked: (store: any) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      return false;
+    }
+  },
+  {
+    id: 'compound-explorer',
+    label: 'Compound Explorer',
+    icon: <Search className="w-4 h-4" />,
+    desc: 'Browse structures & similarity search',
+    nextLabel: 'Proceed to Reports',
+    nextStep: 'reports',
+    prevLabel: 'Back to Enrichment',
+    previousStep: 'enrichment',
+    isBlocked: (store: any) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      return false;
+    }
+  },
+  {
+    id: 'reports',
+    label: 'Reports & Export',
+    icon: <FileText className="w-4 h-4" />,
+    desc: 'Generate & download reports',
+    prevLabel: 'Back to Explorer',
+    previousStep: 'compound-explorer',
+    isBlocked: (store: any) => {
+      if (!store.filename) return 'Upload a dataset first.';
+      return false;
+    }
+  }
 ];
 
 interface CompoundStudioProps { onGoHub: () => void; }
 
-export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
+const CompoundStudioInner: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
   useStudioInit('compound');
 
+  const { activeTab, setActiveTab } = useStudioNavigation();
+
   const {
-    activeTab: storeTab, setActiveTab,
     filename, rowCount, columns, preview, setDataset,
     enrichmentMode, setEnrichmentMode,
     includeMordred, setIncludeMordred,
@@ -55,8 +106,6 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
     setWorkspaceId,
     currentStudioId,
   } = useWorkspaceStore();
-
-  const activeTab = storeTab || 'ingest';
 
   const genId = useRef(`CMPD_${Math.random().toString(36).substring(2, 9)}`).current;
   const storeId = useWorkspaceStore(s => s.workspaceId);
@@ -214,14 +263,14 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
   const sidebar = (
     <div className="flex flex-col h-full space-y-2">
       <SidebarSection label="Studio Steps" />
-      {STEPS.map(step => (
+      {stepsConfig.map(step => (
         <SidebarNavItem
           key={step.id}
           icon={step.icon}
           label={step.label}
           description={step.desc}
           isActive={activeTab === step.id}
-          isDisabled={(step as any).needsData && !hasData}
+          isDisabled={step.id !== 'ingest' && !hasData}
           onClick={() => setActiveTab(step.id)}
           accentClass="text-emerald-400"
           activeBgClass="bg-emerald-500/10"
@@ -231,7 +280,7 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
     </div>
   );
 
-  const activeStep = STEPS.find(s => s.id === activeTab);
+  const activeStep = stepsConfig.find(s => s.id === activeTab);
 
   const renderPanel = () => {
     switch (activeTab) {
@@ -270,7 +319,7 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
 
   return (
     <>
-      <input ref={fileInputRef} type="file" accept=".csv,.tsv,.parquet,.xlsx"
+      <input ref={fileInputRef} type="file" accept=".csv,.tsv,.parquet,.xlsx,.xls"
         className="hidden" onChange={handleIngestFile}
       />
       <StudioShell
@@ -296,5 +345,30 @@ export const CompoundStudio: React.FC<CompoundStudioProps> = ({ onGoHub }) => {
         </div>
       </StudioShell>
     </>
+  );
+};
+
+export const CompoundStudio: React.FC<CompoundStudioProps> = (props) => {
+  const handleResetWorkspaceWrapper = async () => {
+    const store = useWorkspaceStore.getState();
+    const clientId = store.workspaceId || 'COMP_temp';
+    try {
+      await workspaceApi.resetWorkspace(clientId);
+      toast.success('Backend session workspace deleted.');
+    } catch {
+      toast.error('Failed to purge backend workspace.');
+    }
+    store.resetWorkspace();
+    window.location.href = '/hub';
+  };
+
+  return (
+    <StudioNavigationProvider
+      steps={stepsConfig}
+      studioId="compound"
+      onReset={handleResetWorkspaceWrapper}
+    >
+      <CompoundStudioInner {...props} />
+    </StudioNavigationProvider>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Hexagon, Activity, Leaf, Users, Download } from 'lucide-react';
+import { Upload, Hexagon, Activity, Leaf, Users } from 'lucide-react';
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
 import { IntelligenceUploadPanel } from './IntelligenceUploadPanel';
 import { ScaffoldPanel } from './ScaffoldPanel';
@@ -28,7 +28,7 @@ export const IntelligenceStudio: React.FC<Props> = ({ onGoHub }) => {
   const [tab, setTab] = useState('upload');
   useStudioInit('intelligence');
   const [session, setSession] = useState<any>(null);
-  const { workspaceId, setWorkspaceId, currentStudioId } = useWorkspaceStore();
+  const { workspaceId, setWorkspaceId } = useWorkspaceStore();
   const [clientId] = useState(() => workspaceId || `INT_${Math.random().toString(36).slice(2, 7)}`);
 
   React.useEffect(() => {
@@ -49,11 +49,65 @@ export const IntelligenceStudio: React.FC<Props> = ({ onGoHub }) => {
     setTab('upload');
   };
 
+  const handleSaveSession = async () => {
+    try {
+      const smilesCol = session?.columns?.find((c: string) => c.toLowerCase().includes('smiles')) || '';
+      const activityCol = session?.columns?.find((c: string) =>
+        ['lc50', 'ec50', 'ic50', 'activity', 'value', 'target'].some(kw => c.toLowerCase().includes(kw))
+      ) || '';
+
+      const form = new FormData();
+      form.append('smiles_col', smilesCol);
+      form.append('activity_col', activityCol);
+      form.append('notes', 'Saved from studio dashboard');
+      
+      const r = await fetch(`${API}/api/intelligence/${clientId}/session/save`, { method: 'POST', body: form });
+      if (!r.ok) throw new Error();
+      toast.success('Session settings persisted to disk.');
+    } catch {
+      toast.error('Failed to save session state.');
+    }
+  };
+
+  const handleLoadSession = async () => {
+    try {
+      const r = await fetch(`${API}/api/intelligence/${clientId}/session/load`);
+      if (!r.ok) throw new Error();
+      const info = await r.json();
+      setSession(info);
+      toast.success('Persisted session settings loaded.');
+    } catch {
+      toast.error('No saved session found on disk.');
+    }
+  };
+
+  const handleNext = () => {
+    const idx = TABS.findIndex(t => t.id === tab);
+    if (idx !== -1 && idx < TABS.length - 1) {
+      const targetTab = TABS[idx + 1];
+      const isDisabled = !session && targetTab.id !== 'upload';
+      if (isDisabled) {
+        toast.error('Please upload a dataset first.');
+        return;
+      }
+      setTab(targetTab.id);
+    }
+  };
+
+  const handlePrev = () => {
+    const idx = TABS.findIndex(t => t.id === tab);
+    if (idx !== -1 && idx > 0) {
+      setTab(TABS[idx - 1].id);
+    }
+  };
+
+  const activeStepIndex = TABS.findIndex(t => t.id === tab);
+
   const sidebar = (
     <div className="flex flex-col h-full space-y-2">
-      <SidebarSection label="Analysis Modules" />
-      {TABS.map(t => {
-        const disabled = t.id !== 'upload' && !session;
+      <SidebarSection label="Intelligence Panels" />
+      {TABS.map((t) => {
+        const isDisabled = !session && t.id !== 'upload';
         return (
           <SidebarNavItem
             key={t.id}
@@ -61,21 +115,47 @@ export const IntelligenceStudio: React.FC<Props> = ({ onGoHub }) => {
             label={t.label}
             description={t.desc}
             isActive={tab === t.id}
-            isDisabled={disabled}
-            onClick={() => setTab(t.id)}
-            accentClass="text-rose-400"
+            onClick={() => {
+              if (isDisabled) {
+                toast.error('Please upload a dataset first.');
+                return;
+              }
+              setTab(t.id);
+            }}
+            accentClass="text-rose-450"
             activeBgClass="bg-rose-500/10"
-            activeBorderClass="border-rose-400"
+            activeBorderClass="border-rose-450"
           />
         );
       })}
-
+      
       {session && (
-        <div className="mx-4 mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 space-y-1">
-          <div className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Active Dataset</div>
-          <div className="text-sm text-slate-300 font-medium truncate">{session.filename}</div>
-          <div className="text-xs text-slate-500">
-            {session.rows?.toLocaleString()} rows · {session.cols} cols
+        <div className="pt-4 border-t border-white/[0.04] mt-auto space-y-3 px-3 pb-3">
+          <div className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
+            Active Dataset
+          </div>
+          <div className="p-2.5 rounded-xl border border-white/[0.06] bg-white/[0.01]">
+            <div className="text-[10px] font-mono text-white font-semibold truncate max-w-[200px]" title={session.filename}>
+              {session.filename}
+            </div>
+            <div className="text-xs text-slate-500">
+              {session.rows?.toLocaleString()} rows · {session.cols} cols
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveSession}
+              className="flex-1 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
+            >
+              Save Session
+            </button>
+            <button
+              onClick={handleLoadSession}
+              className="flex-1 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
+            >
+              Load Session
+            </button>
           </div>
         </div>
       )}
@@ -94,6 +174,10 @@ export const IntelligenceStudio: React.FC<Props> = ({ onGoHub }) => {
       datasetFilename={session?.filename}
       rowCount={session?.rows ?? 0}
       activeStep={TABS.find(t => t.id === tab)?.label}
+      onNext={handleNext}
+      onPrevious={handlePrev}
+      activeStepIndex={activeStepIndex}
+      totalSteps={TABS.length}
     >
       <div className="h-full overflow-y-auto bg-[#030b18]">
         <AnimatePresence mode="wait">

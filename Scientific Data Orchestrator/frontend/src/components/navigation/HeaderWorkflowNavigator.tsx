@@ -7,6 +7,10 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 interface HeaderWorkflowNavigatorProps {
   studioId: string;
   isProcessing?: boolean;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  activeStepIndex?: number;
+  totalSteps?: number;
 }
 
 const STUDIO_NAMES: Record<string, string> = {
@@ -22,6 +26,10 @@ const STUDIO_NAMES: Record<string, string> = {
 export const HeaderWorkflowNavigator: React.FC<HeaderWorkflowNavigatorProps> = ({
   studioId,
   isProcessing = false,
+  onNext,
+  onPrevious,
+  activeStepIndex,
+  totalSteps,
 }) => {
   const store = useWorkspaceStore();
   const nav = useStudioNavigation();
@@ -32,19 +40,32 @@ export const HeaderWorkflowNavigator: React.FC<HeaderWorkflowNavigatorProps> = (
   const prunedCount = rawCount > 0 && rowCount > 0 ? rawCount - rowCount : 0;
   const hasPruning = prunedCount > 0;
 
+  // Determine if direct manual steps are passed
+  const hasManualSteps = activeStepIndex !== undefined && totalSteps !== undefined;
+
   // Retrieve steps config and active step
   const steps = nav.steps || [];
   const activeTab = nav.activeTab || '';
-  const currentIndex = steps.findIndex(s => s.id === activeTab);
-  const totalSteps = steps.length;
+  
+  const currentIndex = hasManualSteps ? activeStepIndex! : steps.findIndex(s => s.id === activeTab);
+  const stepsCount = hasManualSteps ? totalSteps! : steps.length;
 
-  const currentStep = currentIndex !== -1 ? steps[currentIndex] : null;
-  const prevStep = currentIndex > 0 ? steps[currentIndex - 1] : null;
-  const nextStep = currentIndex !== -1 && currentIndex < totalSteps - 1 ? steps[currentIndex + 1] : null;
+  const currentStep = !hasManualSteps && currentIndex !== -1 ? steps[currentIndex] : null;
+  const prevStep = hasManualSteps 
+    ? (activeStepIndex! > 0 ? { label: 'Previous' } : null) 
+    : (currentIndex > 0 ? steps[currentIndex - 1] : null);
+  const nextStep = hasManualSteps 
+    ? (activeStepIndex! < totalSteps! - 1 ? { label: 'Next' } : null) 
+    : (currentIndex !== -1 && currentIndex < stepsCount - 1 ? steps[currentIndex + 1] : null);
 
   // Render visual progress percentage if active steps exist
   const completedCount = steps.filter(s => nav.getStepStatus(s.id) === 'completed' || s.id === activeTab).length;
-  const pct = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
+  const pct = stepsCount > 0 
+    ? (hasManualSteps 
+        ? Math.round(((activeStepIndex! + 1) / stepsCount) * 100)
+        : Math.round((completedCount / stepsCount) * 100)
+      ) 
+    : 0;
 
   const chips: React.ReactNode[] = [];
   if (rowCount > 0) {
@@ -126,7 +147,12 @@ export const HeaderWorkflowNavigator: React.FC<HeaderWorkflowNavigatorProps> = (
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 truncate whitespace-nowrap">
             <span>{STUDIO_NAMES[studioId] || 'SUTRIX Studio'}</span>
             <span className="text-slate-600 font-semibold">/</span>
-            <span className="text-white font-extrabold">{currentStep?.label || activeTab || 'Overview'}</span>
+            <span className="text-white font-extrabold">
+              {hasManualSteps 
+                ? (activeStepIndex === 0 ? 'Data Ingest' : activeStepIndex === 1 ? 'Diagnostics' : activeStepIndex === 2 ? 'Modelling' : activeStepIndex === 3 ? 'AI Engineering' : 'Applicability')
+                : (currentStep?.label || activeTab || 'Overview')
+              }
+            </span>
           </div>
           
           {isProcessing && (
@@ -145,19 +171,25 @@ export const HeaderWorkflowNavigator: React.FC<HeaderWorkflowNavigatorProps> = (
               <Tooltip.Trigger asChild>
                 <button
                   disabled={!prevStep}
-                  onClick={() => prevStep && nav.handlePrevious()}
+                  onClick={() => {
+                    if (onPrevious) {
+                      onPrevious();
+                    } else if (prevStep && nav.handlePrevious) {
+                      nav.handlePrevious();
+                    }
+                  }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all
                     ${prevStep
                       ? 'border-white/[0.08] bg-transparent text-slate-300 hover:text-white hover:border-cyan-500/30 hover:bg-cyan-500/5 active:bg-cyan-500/10'
                       : 'border-white/[0.03] bg-transparent text-slate-650 opacity-40 cursor-not-allowed'
                     }`}
-                  aria-label={prevStep ? `Go to previous workflow step: ${prevStep.label}` : 'No previous step available'}
+                  aria-label={prevStep ? `Go to previous workflow step` : 'No previous step available'}
                 >
                   <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
                   {prevStep ? (
                     <>
                       <span className="hidden sm:inline truncate max-w-[120px] md:max-w-[180px] lg:max-w-[240px]">
-                        {prevStep.label}
+                        {hasManualSteps ? 'Previous' : prevStep.label}
                       </span>
                       <span className="sm:hidden">Previous</span>
                     </>
@@ -180,10 +212,10 @@ export const HeaderWorkflowNavigator: React.FC<HeaderWorkflowNavigatorProps> = (
 
           {/* Center: Step Indicator */}
           <div className="flex flex-col items-center justify-center text-center">
-            {totalSteps > 0 ? (
+            {stepsCount > 0 ? (
               <span className="text-xs font-bold text-slate-400 tracking-wider">
-                <span className="hidden sm:inline">Step {currentIndex + 1} of {totalSteps}</span>
-                <span className="sm:hidden">Step {currentIndex + 1}/{totalSteps}</span>
+                <span className="hidden sm:inline">Step {currentIndex + 1} of {stepsCount}</span>
+                <span className="sm:hidden">Step {currentIndex + 1}/{stepsCount}</span>
                 <span className="text-slate-500 font-normal ml-1.5 text-[10px] hidden md:inline">
                   • {pct}% Complete
                 </span>
@@ -201,18 +233,24 @@ export const HeaderWorkflowNavigator: React.FC<HeaderWorkflowNavigatorProps> = (
               <Tooltip.Trigger asChild>
                 <button
                   disabled={!nextStep}
-                  onClick={() => nextStep && nav.handleNext()}
+                  onClick={() => {
+                    if (onNext) {
+                      onNext();
+                    } else if (nextStep && nav.handleNext) {
+                      nav.handleNext();
+                    }
+                  }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all
                     ${nextStep
                       ? 'border-white/[0.08] bg-transparent text-slate-300 hover:text-white hover:border-cyan-500/30 hover:bg-cyan-500/5 active:bg-cyan-500/10'
                       : 'border-white/[0.03] bg-transparent text-slate-650 opacity-40 cursor-not-allowed'
                     }`}
-                  aria-label={nextStep ? `Go to next workflow step: ${nextStep.label}` : 'No further steps'}
+                  aria-label={nextStep ? `Go to next workflow step` : 'No further steps'}
                 >
                   {nextStep ? (
                     <>
                       <span className="hidden sm:inline truncate max-w-[120px] md:max-w-[180px] lg:max-w-[240px]">
-                        {nextStep.label}
+                        {hasManualSteps ? 'Next' : nextStep.label}
                       </span>
                       <span className="sm:hidden">Next</span>
                     </>

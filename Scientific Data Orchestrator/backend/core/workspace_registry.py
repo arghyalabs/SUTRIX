@@ -214,6 +214,43 @@ class WorkspaceRegistry:
         self._last_mtime_check: Dict[str, float] = {}
         self._MTIME_CHECK_INTERVAL = 5.0  # seconds
 
+    def create_workspace(self, workspace_id: str) -> PipelineContext:
+        """Creates a new workspace and registers it with shared stores."""
+        from backend.shared.state_manager import state_manager as sm
+
+        ctx = PipelineContext(workspace_id=workspace_id)
+        self.workspaces[workspace_id] = ctx
+        sm.create_workspace(workspace_id)
+        logger.info(f"Workspace created: {workspace_id}")
+        return ctx
+
+    def list_workspaces(self) -> list:
+        """Returns metadata for all known workspaces."""
+        from backend.shared.metadata_store import metadata_store
+        return metadata_store.get_all_workspaces()
+
+    def destroy_workspace(self, workspace_id: str):
+        """Completely removes a workspace and all its state."""
+        from backend.shared.state_manager import state_manager as sm
+        from backend.core.session_state_manager import session_manager
+        import shutil
+
+        ctx = self.workspaces.pop(workspace_id, None)
+        if ctx:
+            ctx.flush_memory()
+
+        session_manager.delete_session(workspace_id)
+        sm.delete_workspace(workspace_id)
+
+        workspace_dir = os.path.join("workspaces", workspace_id)
+        if os.path.exists(workspace_dir):
+            try:
+                shutil.rmtree(workspace_dir)
+            except Exception as e:
+                logger.error(f"Failed to delete workspace directory {workspace_dir}: {e}")
+
+        logger.info(f"Workspace destroyed: {workspace_id}")
+
     def get_context(self, workspace_id: str) -> PipelineContext:
         from backend.core.session_state_manager import session_manager, PIPELINE_VERSION
 

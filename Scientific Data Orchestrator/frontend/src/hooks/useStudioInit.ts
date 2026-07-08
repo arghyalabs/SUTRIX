@@ -45,7 +45,12 @@ export function useStudioInit(studioId: StudioId) {
     // Fresh open -> wipe global store
     if (snap.status === 'empty') {
       store.resetWorkspace();
-      useWorkspaceStore.getState().setCurrentStudioId(studioId);
+      const activeWsId = workspaceManager.getWorkspaceId();
+      const state = useWorkspaceStore.getState();
+      state.setCurrentStudioId(studioId);
+      if (activeWsId) {
+        state.setWorkspaceId(activeWsId);
+      }
     } else if (store.currentStudioId && store.currentStudioId !== studioId) {
       // Navigating from a different studio -> restore the target studio's snapshot state
       store.resetWorkspace();
@@ -72,6 +77,10 @@ export function useStudioInit(studioId: StudioId) {
       }
     } else if (!store.currentStudioId) {
       store.setCurrentStudioId(studioId);
+      const activeWsId = workspaceManager.getWorkspaceId();
+      if (activeWsId) {
+        store.setWorkspaceId(activeWsId);
+      }
     }
 
     if (snap.status !== 'empty' && snap.workspaceId) {

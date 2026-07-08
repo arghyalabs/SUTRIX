@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Loader2, AlertCircle, Crosshair, RefreshCw, Info } from 'lucide-react';
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
+import { Loader2, AlertCircle, Crosshair, Info } from 'lucide-react';
+import { SciPanel } from '../../../components/charts/SciPanel';
+import { SciScatter } from '../../../components/charts/SciScatter';
+import type { ScatterSeries } from '../../../components/charts/SciScatter';
 
 interface Props { clientId: string; apiBase: string; sessionInfo: any; onSessionLoaded: (i: any) => void; }
 
@@ -8,29 +10,6 @@ interface ADPoint {
   idx: number; leverage: number; std_residual: number;
   endpoint: number; predicted: number; in_ad: boolean;
 }
-
-const CustomDot = (props: any) => {
-  const { cx, cy, payload } = props;
-  const color = payload.in_ad ? '#3b82f6' : '#f43f5e';
-  return <circle cx={cx} cy={cy} r={4} fill={color} fillOpacity={0.75} stroke="none" />;
-};
-
-const CustomTooltip = ({ active, payload }: any) => {
-  if (!active || !payload?.length) return null;
-  const d: ADPoint = payload[0]?.payload;
-  return (
-    <div className="bg-[#0d1a2e] border border-white/[0.08] rounded-lg px-3 py-2 text-xs shadow-xl space-y-0.5">
-      <div className="text-slate-400">Row #{d.idx}</div>
-      <div className="text-white">Leverage: <span className="font-mono text-blue-300">{d.leverage?.toFixed(4)}</span></div>
-      <div className="text-white">Std Residual: <span className="font-mono text-blue-300">{d.std_residual?.toFixed(3)}</span></div>
-      <div className="text-white">Actual: <span className="font-mono">{d.endpoint?.toFixed(3)}</span></div>
-      <div className="text-white">Predicted: <span className="font-mono">{d.predicted?.toFixed(3)}</span></div>
-      <div className={d.in_ad ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-        {d.in_ad ? '✓ Inside AD' : '✗ Outside AD'}
-      </div>
-    </div>
-  );
-};
 
 export const ApplicabilityDomainPanel: React.FC<Props> = ({ clientId, apiBase, sessionInfo }) => {
   const [data, setData] = useState<any>(null);
@@ -59,6 +38,30 @@ export const ApplicabilityDomainPanel: React.FC<Props> = ({ clientId, apiBase, s
 
   const subgroups: string[] = Array.isArray(sessionInfo?.subgroups) ? sessionInfo.subgroups : [];
 
+  // SciScatter series
+  const scatterSeries: ScatterSeries[] = [
+    {
+      name: 'Inside AD',
+      color: '#34D399',
+      data: inAD.map(p => ({
+        x: p.leverage,
+        y: p.std_residual,
+        label: `Row #${p.idx}`,
+        opacity: 0.8,
+      })),
+    },
+    {
+      name: 'Outside AD',
+      color: '#F43F5E',
+      data: outAD.map(p => ({
+        x: p.leverage,
+        y: p.std_residual,
+        label: `Row #${p.idx}`,
+        opacity: 0.9,
+      })),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Info */}
@@ -76,87 +79,87 @@ export const ApplicabilityDomainPanel: React.FC<Props> = ({ clientId, apiBase, s
           <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Endpoint Column</label>
           <input value={epCol} onChange={e => setEpCol(e.target.value)}
             placeholder="leave blank for auto-detect"
-            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs font-mono focus:outline-none focus:border-blue-500/40" />
+            className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05] text-slate-300 text-xs font-mono focus:outline-none focus:border-cyan-400/30" />
         </div>
         {subgroups.length > 1 && (
           <div className="w-40">
             <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Subgroup</label>
             <select value={subgroup} onChange={e => setSubgroup(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-blue-500/40">
+              className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05] text-slate-300 text-xs focus:outline-none focus:border-cyan-400/30">
               <option value="">All</option>
               {subgroups.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         )}
         <button onClick={run} disabled={loading}
-          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm font-bold hover:bg-blue-500/20 transition-all disabled:opacity-40">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crosshair className="w-4 h-4" />}
+          className="flex items-center gap-2 px-5 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold hover:bg-cyan-500/20 transition-all disabled:opacity-40">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin text-cyan-400" /> : <Crosshair className="w-4 h-4" />}
           Compute AD
         </button>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/[0.08] border border-rose-500/20 text-rose-300 text-xs">
           <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
         </div>
       )}
 
       {data && (
         <>
-          {/* Stats row */}
-          <div className="grid grid-cols-4 gap-3">
+          {/* Inline mono stat strip */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', padding: '4px 0', fontFamily: "'Geist Mono', monospace", fontSize: 11 }}>
             {[
-              { label: 'Compounds', value: data.n },
-              { label: 'Descriptors', value: data.k },
-              { label: 'Inside AD', value: `${inAD.length} (${data.in_ad_pct}%)`, color: 'text-blue-400' },
-              { label: 'h* threshold', value: data.h_star, color: 'text-amber-400' },
-            ].map(s => (
-              <div key={s.label} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center">
-                <div className={`text-xl font-black ${(s as any).color || 'text-slate-300'}`}>{s.value}</div>
-                <div className="text-[10px] text-slate-600">{s.label}</div>
-              </div>
+              { label: 'N', value: data.n },
+              { label: 'k', value: data.k },
+              { label: 'h*', value: typeof data.h_star === 'number' ? data.h_star.toFixed(4) : data.h_star, accent: '#FACC15' },
+              { label: 'In-AD', value: `${inAD.length} (${data.in_ad_pct}%)`, accent: '#34D399' },
+              { label: 'Out-AD', value: outAD.length, accent: '#F43F5E' },
+              data.r2 !== null && { label: 'R²', value: data.r2?.toFixed(4) },
+            ].filter(Boolean).map((s: any) => (
+              <span key={s.label}>
+                <span style={{ color: '#64748B' }}>{s.label} </span>
+                <span style={{ color: s.accent || '#22D3EE', fontWeight: 600 }}>{s.value}</span>
+              </span>
             ))}
           </div>
 
-          {/* R² */}
-          {data.r2 !== null && (
-            <div className="text-xs text-slate-500">
-              Linear regression R²: <span className="text-blue-300 font-bold">{data.r2?.toFixed(4)}</span>
-              <span className="text-slate-600 ml-2">(used for residual calculation)</span>
-            </div>
-          )}
-
-          {/* Williams plot */}
-          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Williams Plot</div>
-              <div className="flex items-center gap-3 text-[10px]">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> Inside AD ({inAD.length})</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Outside AD ({outAD.length})</span>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={320}>
-              <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 20 }}>
-                <XAxis type="number" dataKey="leverage" name="Leverage (h)"
-                  label={{ value: 'Leverage (h)', position: 'insideBottom', offset: -10, fontSize: 10, fill: '#475569' }}
-                  tick={{ fontSize: 9, fill: '#475569' }} />
-                <YAxis type="number" dataKey="std_residual" name="Std Residual"
-                  label={{ value: 'Standardized Residual', angle: -90, position: 'insideLeft', offset: 10, fontSize: 10, fill: '#475569' }}
-                  tick={{ fontSize: 9, fill: '#475569' }} />
-                <Tooltip content={<CustomTooltip />} />
-                {/* h* vertical line */}
-                <ReferenceLine x={data.h_star} stroke="#f59e0b" strokeDasharray="4 2"
-                  label={{ value: `h*=${data.h_star}`, fill: '#f59e0b', fontSize: 9, position: 'top' }} />
-                {/* ±3 SD horizontal lines */}
-                <ReferenceLine y={3} stroke="#f43f5e" strokeDasharray="4 2"
-                  label={{ value: '+3σ', fill: '#f43f5e', fontSize: 9 }} />
-                <ReferenceLine y={-3} stroke="#f43f5e" strokeDasharray="4 2"
-                  label={{ value: '-3σ', fill: '#f43f5e', fontSize: 9 }} />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
-                <Scatter data={points} shape={<CustomDot />} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
+          {/* Williams plot via SciScatter */}
+          <SciPanel
+            title="WILLIAMS PLOT"
+            subtitle="Standardized residuals vs leverage (hat value)"
+            height={330}
+          >
+            <SciScatter
+              series={scatterSeries}
+              height={290}
+              xLabel="Leverage (h)"
+              yLabel="Standardized Residual"
+              hLines={[
+                { y: 3, dashed: true, color: '#F43F5E', label: '+3σ' },
+                { y: -3, dashed: true, color: '#F43F5E', label: '-3σ' },
+                { y: 0, dashed: false, color: 'rgba(255,255,255,0.1)' },
+              ]}
+              vLines={data.h_star ? [{ x: data.h_star, dashed: true, color: '#FACC15', label: `h*=${data.h_star}` }] : []}
+              tooltipFormatter={(point, seriesName) => (
+                <div style={{ fontFamily: "'Geist Mono', monospace", fontSize: 11, color: '#F1F5F9' }}>
+                  <div style={{ color: '#64748B', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
+                    {point.label}
+                  </div>
+                  <div>
+                    <span style={{ color: '#94A3B8' }}>leverage </span>
+                    <span style={{ color: '#22D3EE', fontWeight: 600 }}>{point.x?.toFixed(4)}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#94A3B8' }}>std residual </span>
+                    <span style={{ color: seriesName === 'Outside AD' ? '#F43F5E' : '#34D399', fontWeight: 600 }}>{point.y?.toFixed(3)}</span>
+                  </div>
+                  <div style={{ color: seriesName === 'Outside AD' ? '#F43F5E' : '#34D399', fontWeight: 600, marginTop: 2 }}>
+                    {seriesName === 'Outside AD' ? '✗ Outside AD' : '✓ Inside AD'}
+                  </div>
+                </div>
+              )}
+            />
+          </SciPanel>
 
           {/* Outside AD table */}
           {outAD.length > 0 && (

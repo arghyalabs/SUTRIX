@@ -94,6 +94,10 @@ export interface StudioShellProps {
   datasetFilename?: string;
   rowCount?: number;
   activeStep?: string;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  activeStepIndex?: number;
+  totalSteps?: number;
 }
 
 export const StudioShellContext = createContext({ collapsed: true });
@@ -110,6 +114,10 @@ export const StudioShell: React.FC<StudioShellProps> = ({
   datasetFilename = '',
   rowCount = 0,
   activeStep = '',
+  onNext,
+  onPrevious,
+  activeStepIndex,
+  totalSteps,
 }) => {
   const meta = STUDIO_META[studioId];
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -355,7 +363,14 @@ export const StudioShell: React.FC<StudioShellProps> = ({
       <main className="flex-1 flex flex-col min-w-0 relative h-full overflow-hidden">
         {/* Top toolbar bar */}
         <header className="flex-shrink-0 flex flex-col justify-center px-6 py-3 bg-[#050d1a]/80 backdrop-blur-md border-b border-white/[0.04] z-10 min-h-[72px]">
-          <HeaderWorkflowNavigator studioId={studioId} isProcessing={isProcessing} />
+          <HeaderWorkflowNavigator
+            studioId={studioId}
+            isProcessing={isProcessing}
+            onNext={onNext}
+            onPrevious={onPrevious}
+            activeStepIndex={activeStepIndex}
+            totalSteps={totalSteps}
+          />
         </header>
 
         {/* Content */}
