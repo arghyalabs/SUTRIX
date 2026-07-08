@@ -243,7 +243,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
 
   // States
   const [nodesList, setNodesList] = useState<HierarchyNodeMeta[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string>('root');
+  const [selectedNodeId, setSelectedNodeId] = useState<string>('');
   const [branchDetail, setBranchDetail] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -251,7 +251,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
   const [activeFullscreenChart, setActiveFullscreenChart] = useState<string | null>(null);
   const [nodeDetail, setNodeDetail] = useState<any | null>(null);
   const [loadingNode, setLoadingNode] = useState<boolean>(false);
-  const [explorerTab, setExplorerTab] = useState<'overview' | 'advanced' | 'inspector'>('advanced');
+  const [explorerTab, setExplorerTab] = useState<'overview' | 'advanced' | 'inspector'>('overview');
 
   // Fetch Tree structure
   const fetchTree = async () => {
@@ -690,16 +690,16 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
         {/* Tab switcher */}
         <div className="flex bg-white/[0.02] border-b border-white/[0.05] shrink-0">
           <button
-            onClick={() => setExplorerTab('advanced')}
+            onClick={() => setExplorerTab('overview')}
             className={`flex-1 py-2.5 text-center text-[10px] font-bold uppercase transition-all border-b-2
-              ${explorerTab === 'advanced' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
+              ${explorerTab === 'overview' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
           >
             Overview
           </button>
           <button
-            onClick={() => setExplorerTab('overview')}
+            onClick={() => setExplorerTab('advanced')}
             className={`flex-1 py-2.5 text-center text-[10px] font-bold uppercase transition-all border-b-2
-              ${explorerTab === 'overview' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
+              ${explorerTab === 'advanced' ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5' : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/[0.02]'}`}
           >
             Advanced Analytics
           </button>
