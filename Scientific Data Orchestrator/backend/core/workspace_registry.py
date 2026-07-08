@@ -178,11 +178,31 @@ class PipelineContext:
         self.descriptor_dataframe_path = None
         self.dataframe_cache = None
 
+    def _ensure_parquet_source(self):
+        """Ensures self.parquet_path is set to a valid parquet file, auto-healing if necessary."""
+        if self.parquet_path and os.path.exists(self.parquet_path):
+            return
+
+        import glob
+        # Try to auto-heal by looking for any ingested parquet file in uploads/parquet/
+        candidates = glob.glob("uploads/parquet/ingested_*.parquet")
+        if not candidates:
+            # Also try workspaces/*/uploads/dataset.parquet
+            candidates = glob.glob("workspaces/*/uploads/dataset.parquet")
+        
+        if candidates:
+            # Sort by modification time (most recent first)
+            candidates.sort(key=os.path.getmtime, reverse=True)
+            recovered_path = candidates[0]
+            logger.warning(f"[AUTO-HEAL] Workspace {self.workspace_id} had no source of truth. Restoring from most recent parquet: {recovered_path}")
+            self.parquet_path = recovered_path
+
     def load_slice(self) -> pd.DataFrame:
         """Loads dataframe from parquet source of truth."""
         self.touch()
         if self.dataframe_cache is not None:
             return self.dataframe_cache
+        self._ensure_parquet_source()
         if not self.parquet_path or not os.path.exists(self.parquet_path):
             raise ValueError(f"No source of truth parquet found for workspace {self.workspace_id}")
         self.dataframe_cache = pd.read_parquet(self.parquet_path)
@@ -192,6 +212,7 @@ class PipelineContext:
         """V5: Single source of truth for all post-step-5 operations.
         Priority: recovered_subgroup_path > active_subgroup_path > parquet_path.
         """
+        self._ensure_parquet_source()
         if self.recovered_subgroup_path and os.path.exists(self.recovered_subgroup_path):
             self.touch()
             return pd.read_parquet(self.recovered_subgroup_path)
