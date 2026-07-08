@@ -173,16 +173,23 @@ export const HierarchyStudioInner: React.FC<HierarchyStudioProps> = ({ onGoHub }
     currentStudioId,
   } = useWorkspaceStore();
 
-  const generatedId = useRef(`HIER_${Math.random().toString(36).substring(2, 9)}`).current;
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   const storeId = useWorkspaceStore(s => s.workspaceId);
-  const clientId = storeId || generatedId;
+  const [generatedId] = useState(() => `HIER_${Math.random().toString(36).substring(2, 9)}`);
+  const clientId = hydrated ? (storeId || generatedId) : '';
 
   const socket = useWebSocket(clientId);
 
-  // Ensure the workspaceId is persisted in the store
+  // Ensure the workspaceId is persisted in the store only after hydration is complete and it's a new ID
   useEffect(() => {
-    if (clientId) setWorkspaceId(clientId);
-  }, [clientId, setWorkspaceId]);
+    if (hydrated && clientId && storeId !== clientId) {
+      setWorkspaceId(clientId);
+    }
+  }, [hydrated, clientId, storeId, setWorkspaceId]);
 
   // ── Upload state ────────────────────────────────────────────────
   const [isUploadProcessing, setIsUploadProcessing] = useState(false);

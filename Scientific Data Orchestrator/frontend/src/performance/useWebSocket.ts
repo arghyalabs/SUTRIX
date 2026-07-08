@@ -117,6 +117,7 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
   }, [disconnect]);
 
   const connect = useCallback((jobId: string) => {
+    if (!clientId) return;
     disconnect();
     activeJobIdRef.current = jobId;
     
@@ -240,6 +241,7 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
 
   // Auto-connect WebSocket on mount so we receive upload events immediately
   useEffect(() => {
+    if (!clientId) return;
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
       ? '127.0.0.1:8000'
