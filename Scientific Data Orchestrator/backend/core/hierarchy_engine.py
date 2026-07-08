@@ -388,9 +388,17 @@ class HierarchyEngine:
         next_col = remaining_cols[0] if remaining_cols else None
 
         try:
-            unique_vals = sorted(
-                df[current_col].dropna().astype(str).unique().tolist()
-            )
+            series_str = df[current_col].astype(str)
+            series_clean = series_str.fillna("Not Reported").replace({
+                "nan": "Not Reported",
+                "<NA>": "Not Reported",
+                "None": "Not Reported",
+                "NoneType": "Not Reported",
+                "nat": "Not Reported",
+                "NaT": "Not Reported"
+            })
+            series_clean = series_clean.replace(r'^\s*$', 'Not Reported', regex=True)
+            unique_vals = sorted(series_clean.unique().tolist())
         except Exception as e:
             logger.warning(f"[{self.workspace_id}] Cannot enumerate column '{current_col}': {e}")
             if parent_id in self.nodes:
@@ -407,11 +415,7 @@ class HierarchyEngine:
             return
 
         # ── KEY OPTIMISATION: pre-convert column to str ONCE per level ──────
-        try:
-            col_str_series = df[current_col].astype(str)
-        except Exception as e:
-            logger.warning(f"[{self.workspace_id}] Cannot stringify column '{current_col}': {e}")
-            return
+        col_str_series = series_clean
 
         for val in unique_vals:
             try:
@@ -533,7 +537,17 @@ class HierarchyEngine:
                 comp_col = cat_cols[0]
 
         if comp_col and comp_col in df.columns:
-            col_str = df[comp_col].astype(str)
+            series_str = df[comp_col].astype(str)
+            series_clean = series_str.fillna("Not Reported").replace({
+                "nan": "Not Reported",
+                "<NA>": "Not Reported",
+                "None": "Not Reported",
+                "NoneType": "Not Reported",
+                "nat": "Not Reported",
+                "NaT": "Not Reported"
+            })
+            series_clean = series_clean.replace(r'^\s*$', 'Not Reported', regex=True)
+            col_str = series_clean
             vc = col_str.value_counts()
             labels = vc.index.tolist()
             values = vc.values.tolist()
