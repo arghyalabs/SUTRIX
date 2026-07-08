@@ -184,11 +184,15 @@ class PipelineContext:
             return
 
         import glob
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        
         # Try to auto-heal by looking for any ingested parquet file in uploads/parquet/
-        candidates = glob.glob("uploads/parquet/ingested_*.parquet")
+        pattern1 = os.path.join(project_root, "uploads", "parquet", "ingested_*.parquet")
+        candidates = glob.glob(pattern1)
         if not candidates:
             # Also try workspaces/*/uploads/dataset.parquet
-            candidates = glob.glob("workspaces/*/uploads/dataset.parquet")
+            pattern2 = os.path.join(project_root, "workspaces", "*", "uploads", "dataset.parquet")
+            candidates = glob.glob(pattern2)
         
         if candidates:
             # Sort by modification time (most recent first)
