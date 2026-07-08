@@ -527,14 +527,18 @@ class HierarchyEngine:
     ) -> dict:
         charts: dict = {}
 
-        # Choose composition column
+        # Choose composition column (excluding chemical identifiers)
         comp_col: Optional[str] = None
         if next_col and next_col in df.columns:
-            comp_col = next_col
-        else:
+            if not self._is_chemical_identifier_column(next_col, self.mappings.get(next_col)):
+                comp_col = next_col
+        
+        if not comp_col:
             cat_cols = df.select_dtypes(exclude=[np.number]).columns.tolist()
-            if cat_cols:
-                comp_col = cat_cols[0]
+            for col in cat_cols:
+                if not self._is_chemical_identifier_column(col, self.mappings.get(col)):
+                    comp_col = col
+                    break
 
         if comp_col and comp_col in df.columns:
             series_str = df[comp_col].astype(str)
@@ -547,6 +551,13 @@ class HierarchyEngine:
                 "NaT": "Not Reported"
             })
             series_clean = series_clean.replace(r'^\s*$', 'Not Reported', regex=True)
+            
+            # Capping: if there are more than 15 unique categories, group the rest into "Other"
+            vc_raw = series_clean.value_counts()
+            if len(vc_raw) > 15:
+                top_14_labels = set(vc_raw.iloc[:14].index)
+                series_clean = series_clean.apply(lambda x: x if x in top_14_labels else "Other")
+                
             col_str = series_clean
             vc = col_str.value_counts()
             labels = vc.index.tolist()
