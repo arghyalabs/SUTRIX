@@ -265,7 +265,10 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
 
       if (lineage?.nodes?.length) {
         setNodesList(lineage.nodes);
-        setSelectedNodeId(lineage.root_id || lineage.nodes[0].id);
+        const nodeExists = lineage.nodes.some((n: any) => n.id === selectedNodeId);
+        if (!selectedNodeId || !nodeExists) {
+          setSelectedNodeId(lineage.root_id || lineage.nodes[0].id);
+        }
         return;
       }
 
@@ -274,7 +277,10 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
       const treeData = await hierarchyApi.getTree(workspaceId);
       if (treeData && treeData.nodes?.length) {
         setNodesList(treeData.nodes);
-        setSelectedNodeId(treeData.root_id || treeData.nodes[0].id);
+        const nodeExists = treeData.nodes.some((n: any) => n.id === selectedNodeId);
+        if (!selectedNodeId || !nodeExists) {
+          setSelectedNodeId(treeData.root_id || treeData.nodes[0].id);
+        }
       }
     } catch (err: any) {
       console.error(err);
