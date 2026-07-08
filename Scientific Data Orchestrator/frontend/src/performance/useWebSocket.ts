@@ -56,7 +56,11 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
 
     if ((msg.type === 'PROGRESS' || msg.type === 'PROGRESS_UPDATE') && msg.data) {
       const data: JobTelemetry = msg.data;
-      setProgress(data.progress_pct);
+      const progressVal = typeof data.progress_pct === 'number'
+        ? data.progress_pct
+        : (typeof (data as any).progress === 'number' ? (data as any).progress : 0);
+      
+      setProgress(prev => Math.max(prev, progressVal));
       setEta(data.eta_seconds);
       setSpeed(data.compounds_per_sec || data.items_per_sec || 0);
       
@@ -120,6 +124,11 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
     if (!clientId) return;
     disconnect();
     activeJobIdRef.current = jobId;
+    setProgress(0);
+    setEta(0);
+    setSpeed(0);
+    setPhase('Starting...');
+    setError(null);
     
     // HTTP Fallback Polling — runs immediately and independently of WS connection
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
@@ -140,8 +149,8 @@ export function useWebSocket(clientId: string): UseWebSocketReturn {
           const status = data.status;
 
           if (status === 'RUNNING' || status === 'QUEUED') {
-            if (typeof data.progress === 'number') setProgress(data.progress);
-            if (typeof data.progress_pct === 'number') setProgress(data.progress_pct);
+            if (typeof data.progress === 'number') setProgress(prev => Math.max(prev, data.progress));
+            if (typeof data.progress_pct === 'number') setProgress(prev => Math.max(prev, data.progress_pct));
             if (data.speed != null) setSpeed(data.speed);
             if (data.eta != null) setEta(data.eta);
             if (data.phase) setPhase(data.phase);
