@@ -255,7 +255,28 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set({ activeTab: tab });
       },
       setDataset: (filename, parquetPath, rowCount, columns, preview) =>
-        set({ filename, parquetPath, rowCount, columns, preview }),
+        set((state) => {
+          const isNewWorkspace = state.parquetPath !== parquetPath || state.filename !== filename;
+          if (isNewWorkspace) {
+            return {
+              filename,
+              parquetPath,
+              rowCount,
+              columns,
+              preview,
+              segStats: {},
+              segregationExecuted: false,
+              activeSegregationResult: null,
+              activeLineage: null,
+              activeNodeId: '',
+              activeNodeDetail: null,
+              filterNodes: [],
+              activeJobId: '',
+              activeJobType: null,
+            };
+          }
+          return { filename, parquetPath, rowCount, columns, preview };
+        }),
       setMappings: (mappings) => set({ mappings }),
       setMappingIntelligence: (intel) => set({ mappingIntelligence: intel }),
       setSegregation: (stats, executed) => set({ segStats: stats, segregationExecuted: executed }),
@@ -384,6 +405,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     { 
       name: 'sdo-workspace-storage-v5',
       version: 5,
+      partialize: (state) => {
+        const {
+          activeSegregationResult,
+          activeLineage,
+          activeNodeDetail,
+          segStats,
+          preview,
+          modelingAnalysis,
+          ...rest
+        } = state;
+        return rest;
+      },
       migrate: (_persistedState: any, _version: number) => {
         // Hard wipe on any version upgrade — forces fresh defaults
         if (_version < 5) {
