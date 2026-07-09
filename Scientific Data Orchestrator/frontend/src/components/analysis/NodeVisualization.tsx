@@ -1,13 +1,18 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Line, ComposedChart, Cell, LabelList, Legend
+  Line, ComposedChart, Cell, LabelList
 } from 'recharts';
-import { Download, Layers, ShieldAlert, Activity, CheckCircle, Info, Maximize2, X } from 'lucide-react';
+import { Download, Layers, ShieldAlert, Activity, CheckCircle, Info, Maximize2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { LogoLoader } from '../ui/SUTRIXLogo';
 import { hierarchyApi } from '../../services/hierarchyApi';
+
+// Import New Standardized Fullscreen Modals
+import { FullscreenHomogeneityModal } from './FullscreenHomogeneityModal';
+import { FullscreenNormalityModal } from './FullscreenNormalityModal';
+import { FullscreenSparsityModal } from './FullscreenSparsityModal';
+import { FullscreenAttritionModal } from './FullscreenAttritionModal';
 
 interface NodeDetail {
   id: string;
@@ -79,39 +84,6 @@ const ChartCard: React.FC<{
     </div>
   </div>
 );
-
-// Fullscreen Modal Layout Wrapper
-const FullscreenModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}> = ({ isOpen, onClose, title, subtitle, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
-      <div className="bg-[#080f1f] border border-white/[0.08] rounded-3xl w-full max-w-5xl p-8 relative flex flex-col h-[85vh] shadow-[0_0_50px_rgba(34,211,238,0.15)]">
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/50 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all"
-        >
-          <X className="w-4 h-4" />
-        </button>
-        <div className="mb-6 shrink-0">
-          <h3 className="text-lg font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-            <Activity className="w-5 h-5 text-cyan-400" />
-            {title}
-          </h3>
-          {subtitle && <p className="text-xs text-white/40 mt-1 font-mono">{subtitle}</p>}
-        </div>
-        <div className="flex-1 min-h-0 w-full">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail, isLoading, workspaceId }) => {
   const [advancedData, setAdvancedData] = useState<any>(null);
@@ -413,7 +385,6 @@ export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail
                   {attrition_waterfall.map((entry: any, index: number) => {
                     const isLast = index === attrition_waterfall.length - 1;
                     const isFirst = index === 0;
-                    // Colors: emerald for first & last, pink for intermediate drops
                     const color = isFirst || isLast ? '#34d399' : '#f43f5e';
                     return <Cell key={`cell-${index}`} fill={color} fillOpacity={0.7} />;
                   })}
@@ -445,242 +416,35 @@ export const NodeVisualization: React.FC<NodeVisualizationProps> = ({ nodeDetail
 
       </div>
 
-      {/* FULLSCREEN MODAL IMPLEMENTATIONS */}
-      
-      {/* 1. Homogeneity Path Fullscreen */}
-      <FullscreenModal
+      {/* FULLSCREEN MODAL PORTALS */}
+      <FullscreenHomogeneityModal
         isOpen={fullscreenChart === 'homogeneity'}
         onClose={() => setFullscreenChart(null)}
+        data={homogeneity_path}
         title="Homogeneity Path Trajectory"
-        subtitle={`Detailed Information Entropy values evaluated for trajectory to: ${nodeDetail.metadata?.node_name || 'selected node'}`}
-      >
-        <div className="flex flex-col h-full justify-between">
-          <div className="flex-1 w-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={homogeneity_path} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis 
-                  dataKey="label" 
-                  stroke="rgba(255,255,255,0.6)" 
-                  tick={{ fontSize: 11, fontWeight: 'bold' }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  yAxisId="left" 
-                  stroke="#8b5cf6" 
-                  tick={{ fontSize: 10, fontWeight: 'bold' }}
-                  axisLine={false}
-                  tickLine={false}
-                  label={{ value: 'Subgroup Size', angle: -90, position: 'insideLeft', fill: '#8b5cf6', style: { textAnchor: 'middle', fontSize: 11, fontWeight: 'bold' } }}
-                />
-                <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  stroke="#22d3ee" 
-                  tick={{ fontSize: 10, fontWeight: 'bold' }}
-                  axisLine={false}
-                  tickLine={false}
-                  label={{ value: 'Shannon Information Entropy', angle: 90, position: 'insideRight', fill: '#22d3ee', style: { textAnchor: 'middle', fontSize: 11, fontWeight: 'bold' } }}
-                />
-                <Tooltip {...customTooltipStyle as any} />
-                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, fontFamily: 'monospace' }} />
-                <Bar yAxisId="left" dataKey="size" name="Subgroup Size" fill="#8b5cf6" fillOpacity={0.2} radius={[4, 4, 0, 0]} barSize={40} />
-                <Line yAxisId="right" type="monotone" dataKey="entropy" name="Shannon Entropy" stroke="#22d3ee" strokeWidth={4} dot={{ r: 6, stroke: '#22d3ee', strokeWidth: 3, fill: '#080f1f' }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-4 p-4 rounded-2xl bg-white/[0.01] border border-white/[0.04] text-[11px] font-mono text-white/50 leading-relaxed">
-            <span className="text-cyan-400 font-bold uppercase tracking-wider">Scientific Insight:</span> As you descend from the Root dataset, the Shannon Information Entropy value decreases. This contraction mathematically confirms that each filtration step successfully segregates heterogeneous categories into more homogeneous, modeling-ready cohorts.
-          </div>
-        </div>
-      </FullscreenModal>
+      />
 
-      {/* 2. Normality Fit Fullscreen */}
-      <FullscreenModal
+      <FullscreenNormalityModal
         isOpen={fullscreenChart === 'normality'}
         onClose={() => setFullscreenChart(null)}
-        title="Endpoint Distribution & Gaussian Fit Diagnostics"
-        subtitle={`Normality fit plot & Shapiro-Wilk verification metrics for subgroup potency`}
-      >
-        <div className="flex flex-col h-full justify-between">
-          <div className="flex-1 w-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={normality_fit.histogram} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis 
-                  dataKey="bin_label" 
-                  stroke="rgba(255,255,255,0.6)" 
-                  tick={{ fontSize: 11, fontWeight: 'bold' }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  stroke="rgba(255,255,255,0.5)" 
-                  tick={{ fontSize: 10, fontWeight: 'bold' }}
-                  axisLine={false}
-                  tickLine={false}
-                  label={{ value: 'Observations Count', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)', style: { textAnchor: 'middle', fontSize: 11, fontWeight: 'bold' } }}
-                />
-                <Tooltip {...customTooltipStyle as any} />
-                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 11, fontFamily: 'monospace' }} />
-                <Bar dataKey="actual_count" name="Observed Bin Count" fill="#22d3ee" fillOpacity={0.7} radius={[4, 4, 0, 0]} />
-                <Line type="monotone" dataKey="normal_count" name="Theoretical Normal Curve" stroke="#f43f5e" strokeWidth={3} dot={false} strokeDasharray="5 5" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono text-xs bg-white/[0.02] border border-white/[0.04] p-4 rounded-2xl mt-4 select-none">
-            <div className="flex flex-col gap-1">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Mean (μ)</span>
-              <span className="text-cyan-300 font-extrabold text-sm">{normality_fit.mean?.toFixed(4)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Std Dev (σ)</span>
-              <span className="text-cyan-300 font-extrabold text-sm">{normality_fit.std?.toFixed(4)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Shapiro W statistic</span>
-              <span className="text-cyan-300 font-extrabold text-sm">{normality_fit.shapiro_w?.toFixed(5)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Normality Verdict</span>
-              <span className={`font-extrabold text-sm flex items-center gap-1
-                ${normality_fit.verdict === 'Normal' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {normality_fit.verdict === 'Normal' ? <CheckCircle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
-                {normality_fit.verdict} (p={normality_fit.shapiro_p?.toFixed(5)})
-              </span>
-            </div>
-          </div>
-        </div>
-      </FullscreenModal>
+        data={normality_fit}
+        title="Potency Distribution & Gaussian Fit"
+      />
 
-      {/* 3. Sparsity & Scaffold Diversity Fullscreen */}
-      <FullscreenModal
+      <FullscreenSparsityModal
         isOpen={fullscreenChart === 'sparsity'}
         onClose={() => setFullscreenChart(null)}
-        title="Structural Scaffold & Sparsity Audit"
-        subtitle={`Dataset missingness density and structural fingerprint distributions`}
-      >
-        <div className="flex flex-col md:flex-row h-full gap-8 items-center justify-center">
-          {/* Large Sparsity Grid Map */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="grid grid-cols-10 gap-1 border border-white/[0.08] p-2 bg-white/[0.01] rounded-2xl shadow-[0_0_20px_rgba(52,211,153,0.1)]">
-              {sparsity.grid.map((cell: number, idx: number) => (
-                <div
-                  key={idx}
-                  className={`w-6 h-6 rounded-md transition-all duration-300 hover:scale-110 cursor-help
-                    ${cell === 1 ? 'bg-emerald-400/90 shadow-[0_0_8px_rgba(52,211,153,0.4)]' : 'bg-white/[0.04]'}`}
-                  title={cell === 1 ? 'Present Cell' : 'Missing/Null Cell'}
-                />
-              ))}
-            </div>
-            <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">Sparsity Density Map (10x10 Sample Grid)</span>
-          </div>
+        sparsity={sparsity}
+        chemical_diversity={chemical_diversity}
+        title="Sparsity Map & Chemical Scaffold Diversity"
+      />
 
-          {/* Expanded Stats details */}
-          <div className="flex-1 flex flex-col justify-center font-mono text-xs space-y-4 border-l border-white/[0.06] pl-8 max-w-lg select-none">
-            <div className="flex items-center justify-between border-b border-white/[0.02] pb-2.5">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Bemis-Murcko Scaffolds count:</span>
-              <span className="text-cyan-300 font-extrabold text-sm">{chemical_diversity.supported ? chemical_diversity.scaffold_count : 0} unique rings</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/[0.02] pb-2.5">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Mean Pairwise Tanimoto:</span>
-              <span className="text-cyan-300 font-extrabold text-sm">
-                {chemical_diversity.supported ? `μ = ${chemical_diversity.tanimoto_mean.toFixed(4)}` : 'N/A'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/[0.02] pb-2.5">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Tanimoto Standard Deviation:</span>
-              <span className="text-cyan-300 font-extrabold text-sm">
-                {chemical_diversity.supported ? `σ = ${chemical_diversity.tanimoto_std.toFixed(4)}` : 'N/A'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/[0.02] pb-2.5">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Parsed Unique Compounds:</span>
-              <span className="text-cyan-300 font-extrabold text-sm">{chemical_diversity.supported ? chemical_diversity.unique_compounds : 0} structures</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-white/[0.02] pb-2.5">
-              <span className="text-white/40 uppercase tracking-widest text-[9px]">Cell Sparsity Percentage:</span>
-              <span className="text-cyan-300 font-extrabold text-sm">{sparsity.sparsity_pct.toFixed(2)}% missing</span>
-            </div>
-            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04] text-[10px] text-white/40 leading-relaxed font-sans mt-2">
-              <span className="text-cyan-400 font-bold font-mono">QSAR Guideline Note:</span> A mean Tanimoto similarity between 0.40 and 0.75 represents a structurally balanced subgroup suitable for modeling. Scaffolds count provides the structural representation diversity count.
-            </div>
-          </div>
-        </div>
-      </FullscreenModal>
-
-      {/* 4. Attrition Funnel Fullscreen */}
-      <FullscreenModal
+      <FullscreenAttritionModal
         isOpen={fullscreenChart === 'attrition'}
         onClose={() => setFullscreenChart(null)}
-        title="Cleansing Attrition Funnel Cascades"
-        subtitle={`Detailed retention funnel showing rows consolidation drops per processing step`}
-      >
-        <div className="flex flex-col h-full justify-between">
-          <div className="flex-1 w-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={attrition_waterfall} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis 
-                  dataKey="step" 
-                  stroke="rgba(255,255,255,0.6)" 
-                  tick={{ fontSize: 11, fontWeight: 'bold' }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  stroke="rgba(255,255,255,0.5)" 
-                  tick={{ fontSize: 10, fontWeight: 'bold' }}
-                  axisLine={false}
-                  tickLine={false}
-                  label={{ value: 'Retained Records Count', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)', style: { textAnchor: 'middle', fontSize: 11, fontWeight: 'bold' } }}
-                />
-                <Tooltip 
-                  {...customTooltipStyle as any}
-                  formatter={(value: any, name: any, props: any) => {
-                    const change = props.payload.change;
-                    const changeLabel = change !== 0 ? ` (${change > 0 ? '+' : ''}${change.toLocaleString()} rows)` : '';
-                    return [`${value.toLocaleString()}${changeLabel}`, name];
-                  }}
-                />
-                <Bar dataKey="count" name="Retained Records Count" radius={[4, 4, 0, 0]} barSize={50}>
-                  {attrition_waterfall.map((entry: any, index: number) => {
-                    const isLast = index === attrition_waterfall.length - 1;
-                    const isFirst = index === 0;
-                    const color = isFirst || isLast ? '#34d399' : '#f43f5e';
-                    return <Cell key={`cell-${index}`} fill={color} fillOpacity={0.7} />;
-                  })}
-                  <LabelList 
-                    dataKey="count" 
-                    position="top"
-                    content={(props: any) => {
-                      const { x, y, width, value } = props;
-                      return (
-                        <text
-                          x={x + width / 2}
-                          y={y - 10}
-                          fill="rgba(255,255,255,0.85)"
-                          fontSize={11}
-                          fontWeight="bold"
-                          textAnchor="middle"
-                          className="font-mono"
-                        >
-                          {value.toLocaleString()}
-                        </text>
-                      );
-                    }}
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-4 p-4 rounded-2xl bg-white/[0.01] border border-white/[0.04] text-[11px] font-mono text-white/50 leading-relaxed">
-            <span className="text-emerald-400 font-bold uppercase tracking-wider">OECD Principle 5 Compliance:</span> This funnel charts the data pruning lineage. Invalid entries and duplicate compounds are consolidated first, followed by subgroup partition splits. The final count represents the mathematically clean data slice ready for modeling.
-          </div>
-        </div>
-      </FullscreenModal>
+        data={attrition_waterfall}
+        title="Consolidation & Attrition funnel"
+      />
 
     </div>
   );
