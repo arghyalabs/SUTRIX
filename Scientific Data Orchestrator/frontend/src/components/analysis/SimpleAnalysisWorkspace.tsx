@@ -1163,7 +1163,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           </div>
         ) : explorerTab === 'advanced' ? (
           <div className="bg-[#080f1f]/50 border border-white/[0.04] p-4 rounded-3xl backdrop-blur-md min-h-[500px]">
-            <NodeVisualization nodeDetail={nodeDetail} isLoading={loadingNode} />
+            <NodeVisualization nodeDetail={nodeDetail} isLoading={loadingNode} workspaceId={workspaceId} />
           </div>
         ) : (
           <div className="bg-[#080f1f]/50 border border-white/[0.04] p-4 rounded-3xl backdrop-blur-md min-h-[500px]">

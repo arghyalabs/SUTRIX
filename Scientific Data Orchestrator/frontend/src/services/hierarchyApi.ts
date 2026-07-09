@@ -11,6 +11,10 @@ export const hierarchyApi = {
     const res = await axios.get(`${BASE_URL}/api/hierarchy/${clientId}/node/${nodeId}`);
     return res.data;
   },
+  getAdvancedBranchDetail: async (clientId: string, nodeId: string) => {
+    const res = await axios.get(`${BASE_URL}/api/analysis/branch/${nodeId}/advanced?client_id=${clientId}`);
+    return res.data;
+  },
   exportNode: (clientId: string, nodeId: string, format: string) => {
     window.open(`${BASE_URL}/api/hierarchy/${clientId}/export/${nodeId}?format=${format}`, '_blank');
   },
