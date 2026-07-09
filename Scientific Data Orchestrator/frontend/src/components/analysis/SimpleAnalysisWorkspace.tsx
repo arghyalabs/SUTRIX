@@ -171,7 +171,7 @@ const BranchTreeNode: React.FC<{
             ? 'bg-cyan-500/10 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
             : 'hover:bg-white/[0.03] border border-transparent'
           }`}
-        style={{ paddingLeft: `${12 + depth * 12}px` }}
+        style={{ paddingLeft: depth === 0 ? '8px' : '4px' }}
       >
         {hasChildren ? (
           <button
@@ -212,8 +212,8 @@ const BranchTreeNode: React.FC<{
 
       <AnimatePresence>
         {hasChildren && expanded && (
-          <div className="relative ml-3">
-            <div className="absolute left-2 top-0 bottom-2 w-px bg-white/[0.05]" />
+          <div className="relative ml-2.5">
+            <div className="absolute left-1.5 top-0 bottom-2 w-px bg-white/[0.05]" />
             {node.children.map(childId => {
               const childNode = nodeMap[childId];
               if (!childNode) return null;
@@ -639,7 +639,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
     <div className="flex h-full overflow-hidden bg-[#060c18] text-left">
       
       {/* LEFT PANEL: Searchable Branch Tree Navigator */}
-      <div className="w-[280px] shrink-0 flex flex-col h-full border-r border-white/[0.05] bg-[#060c18]">
+      <div className="w-[320px] shrink-0 flex flex-col h-full border-r border-white/[0.05] bg-[#060c18]">
         
         <div className="px-3 py-4 flex flex-col h-full overflow-hidden">
           
@@ -670,7 +670,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
           </div>
 
           {/* Collapsible Node Tree/Search Results */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
+          <div className="flex-1 overflow-auto custom-scrollbar pr-1">
             {searchQuery.trim() ? (
               <div className="flex flex-col gap-2">
                 <span className="text-[10px] font-extrabold text-cyan-400 uppercase tracking-wider block mb-1">
@@ -701,7 +701,7 @@ export const SimpleAnalysisWorkspace: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="w-full">
+              <div className="min-w-max pb-4 pr-4">
                 {rootNode ? (
                   <BranchTreeNode
                     node={rootNode}
