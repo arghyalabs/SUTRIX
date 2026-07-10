@@ -108,6 +108,17 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Hide scrollbar visually while keeping scroll functionality */
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.scrollbar-none {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
 /* Hide scrollbars during high-res PNG export */
 .downloading-png .custom-scrollbar::-webkit-scrollbar,
 .downloading-png *::-webkit-scrollbar {

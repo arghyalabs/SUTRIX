@@ -218,7 +218,7 @@ export const WorkspaceSelectionHub: React.FC<{
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 w-full max-w-[1700px] mx-auto items-stretch lg:min-h-0 lg:overflow-hidden">
         
         {/* COLUMN 1: LEFT SIDEBAR (Personas & Guides) -> Span 3 */}
-        <aside className="lg:col-span-3 border-r border-white/[0.04] p-6 space-y-8 flex flex-col justify-between bg-slate-950/20 lg:h-full lg:overflow-y-auto scrollbar-thin">
+        <aside className="lg:col-span-3 border-r border-white/[0.04] p-6 space-y-8 flex flex-col justify-between bg-slate-950/20 lg:h-full lg:overflow-y-auto scrollbar-none">
           <div className="space-y-6">
             <div>
               <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-3">Scientific Personas</div>
@@ -276,7 +276,7 @@ export const WorkspaceSelectionHub: React.FC<{
         </aside>
 
         {/* COLUMN 2: CENTER MISSION CONTROL (Grid of cards) -> Span 6 */}
-        <main className="lg:col-span-6 p-6 space-y-6 lg:h-full lg:overflow-y-auto scrollbar-thin">
+        <main className="lg:col-span-6 p-6 space-y-6 lg:h-full lg:overflow-y-auto scrollbar-none">
           <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
             <div>
               <h2 className="text-xl font-black text-white leading-none">Studio Mission Control</h2>
@@ -398,7 +398,7 @@ export const WorkspaceSelectionHub: React.FC<{
         </main>
 
         {/* COLUMN 3: RIGHT SIDEBAR (Active Sessions) -> Span 3 */}
-        <aside className="lg:col-span-3 border-l border-white/[0.04] p-6 space-y-6 bg-slate-950/20 lg:h-full lg:overflow-y-auto scrollbar-thin">
+        <aside className="lg:col-span-3 border-l border-white/[0.04] p-6 space-y-6 bg-slate-950/20 lg:h-full lg:overflow-y-auto scrollbar-none">
           <div>
             <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-4 flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
