@@ -167,7 +167,7 @@ export const WorkspaceSelectionHub: React.FC<{
   const activeManual = learnStudioId ? MANUAL_DETAILS[learnStudioId] : null;
 
   return (
-    <div className="min-h-screen bg-[#030b18] text-white font-sans overflow-x-hidden flex flex-col">
+    <div className="h-auto lg:h-screen bg-[#030b18] text-white font-sans overflow-y-auto lg:overflow-hidden flex flex-col">
       
       {/* ── Top Navigation Bar ───────────────────────────────────────── */}
       <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 bg-[#030b18]/90 backdrop-blur-md border-b border-white/[0.05]">
@@ -215,10 +215,10 @@ export const WorkspaceSelectionHub: React.FC<{
       </header>
 
       {/* ── Main Dashboard Layout (3 Columns) ────────────────────────── */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 w-full max-w-[1700px] mx-auto items-stretch">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 w-full max-w-[1700px] mx-auto items-stretch lg:min-h-0 lg:overflow-hidden">
         
         {/* COLUMN 1: LEFT SIDEBAR (Personas & Guides) -> Span 3 */}
-        <aside className="lg:col-span-3 border-r border-white/[0.04] p-6 space-y-8 flex flex-col justify-between bg-slate-950/20">
+        <aside className="lg:col-span-3 border-r border-white/[0.04] p-6 space-y-8 flex flex-col justify-between bg-slate-950/20 lg:h-full lg:overflow-y-auto scrollbar-thin">
           <div className="space-y-6">
             <div>
               <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-3">Scientific Personas</div>
@@ -276,7 +276,7 @@ export const WorkspaceSelectionHub: React.FC<{
         </aside>
 
         {/* COLUMN 2: CENTER MISSION CONTROL (Grid of cards) -> Span 6 */}
-        <main className="lg:col-span-6 p-6 space-y-6">
+        <main className="lg:col-span-6 p-6 space-y-6 lg:h-full lg:overflow-y-auto scrollbar-thin">
           <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
             <div>
               <h2 className="text-xl font-black text-white leading-none">Studio Mission Control</h2>
@@ -398,7 +398,7 @@ export const WorkspaceSelectionHub: React.FC<{
         </main>
 
         {/* COLUMN 3: RIGHT SIDEBAR (Active Sessions) -> Span 3 */}
-        <aside className="lg:col-span-3 border-l border-white/[0.04] p-6 space-y-6 bg-slate-950/20">
+        <aside className="lg:col-span-3 border-l border-white/[0.04] p-6 space-y-6 bg-slate-950/20 lg:h-full lg:overflow-y-auto scrollbar-thin">
           <div>
             <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-4 flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
