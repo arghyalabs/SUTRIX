@@ -57,9 +57,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onLaunch }) => {
         >
           <LogoLoader size="w-14 h-14" compact />
           <div className="flex flex-col leading-none pt-1">
-            <span className="font-extrabold tracking-[0.2em] text-2xl text-white">SUTRIX</span>
-            <span className="text-[10px] font-semibold tracking-[0.15em] text-white/50 uppercase mt-1">
-              Scientific Data Engineering
+            <span className="font-extrabold tracking-[0.15em] text-2xl text-white">SUTRIX</span>
+            <span className="text-[9px] font-bold tracking-[0.1em] text-white/50 uppercase mt-1">
+              Scientific Data Orchestrator
             </span>
           </div>
         </motion.div>

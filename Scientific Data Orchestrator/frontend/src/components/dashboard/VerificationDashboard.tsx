@@ -230,10 +230,10 @@ export const VerificationDashboard: React.FC<{ onGoBack: () => void }> = ({ onGo
           <div className="flex items-center gap-3">
             <SUTRIXLogo className="w-8 h-8 text-rose-500" />
             <div className="flex flex-col text-left leading-none">
-              <span className="text-xl font-extrabold tracking-tight text-white">
+              <span className="text-xl font-extrabold tracking-[0.15em] text-white">
                 SUTRIX SQAF
               </span>
-              <span className="text-[9px] font-bold text-rose-400 uppercase tracking-widest mt-0.5">Verification Dashboard</span>
+              <span className="text-[9px] font-bold tracking-[0.1em] text-rose-400 uppercase mt-0.5">Verification Dashboard</span>
             </div>
           </div>
         </div>

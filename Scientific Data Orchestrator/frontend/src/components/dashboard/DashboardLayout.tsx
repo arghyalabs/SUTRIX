@@ -164,10 +164,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    className="whitespace-nowrap min-w-0"
+                    className="whitespace-nowrap min-w-0 flex flex-col leading-none"
                   >
-                    <div className="text-xl font-extrabold tracking-[0.2em] leading-none text-white">SUTRIX</div>
-                    <div className="text-[10px] text-slate-500 font-medium tracking-wider uppercase mt-1">SDO Platform</div>
+                    <div className="text-xl font-extrabold tracking-[0.15em] text-white">SUTRIX</div>
+                    <div className="text-[9px] font-bold tracking-[0.1em] text-white/40 uppercase mt-1">
+                      Scientific Data Orchestrator
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -174,10 +174,12 @@ export const WorkspaceSelectionHub: React.FC<{
         <button onClick={onGoLanding} className="flex items-center gap-3 group">
           <SUTRIXLogo className="w-8 h-8" />
           <div className="flex flex-col text-left leading-none">
-            <span className="text-xl font-extrabold tracking-tight text-white group-hover:text-cyan-400 transition-colors">
+            <span className="text-xl font-extrabold tracking-[0.15em] text-white group-hover:text-cyan-400 transition-colors">
               SUTRIX
             </span>
-            <span className="text-[9px] font-bold text-white/35 uppercase tracking-widest mt-0.5">Mission Control</span>
+            <span className="text-[9px] font-bold tracking-[0.1em] text-white/35 uppercase mt-0.5">
+              Scientific Data Orchestrator
+            </span>
           </div>
         </button>
 
