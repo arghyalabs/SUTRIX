@@ -763,7 +763,7 @@ async def get_branch_advanced_details(node_id: str, client_id: Optional[str] = N
         
     # 7. Chemical Scaffold & Fingerprint Diversity (RDKit)
     # Find SMILES column
-    smiles_cols = [c for c, role in context.mappings.items() if role.lower() in {"smiles", "smile", "chemical_name"} and c in df_slice.columns]
+    smiles_cols = [c for c, role in context.mappings.items() if role.lower() in {"smiles", "smile", "canonical_smiles", "structure"} and c in df_slice.columns]
     if not smiles_cols:
         smiles_cols = [c for c in df_slice.columns if c.lower() in {"smiles", "smile", "smiles_string"}]
         

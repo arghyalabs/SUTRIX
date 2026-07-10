@@ -79,6 +79,13 @@ const STUDIO_META: Record<StudioId, StudioMeta> = {
     bgClass: 'bg-slate-500/10',   borderClass: 'border-slate-400/30',
     textClass: 'text-slate-300',  badgeBg: 'bg-slate-500/15',
   },
+  enrichment:    {
+    id: 'enrichment',    letter: '8', name: 'SMILES & Notation Enrichment Studio',
+    shortName: 'Enrichment Studio', tagline: 'High-speed molecular identifier enrichment',
+    color: 'cyan',       accentHex: '#22d3ee',
+    bgClass: 'bg-cyan-500/10',    borderClass: 'border-cyan-500/30',
+    textClass: 'text-cyan-400',   badgeBg: 'bg-cyan-500/15',
+  },
 };
 
 export interface StudioShellProps {

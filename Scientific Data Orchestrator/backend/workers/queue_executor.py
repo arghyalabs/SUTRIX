@@ -798,6 +798,8 @@ async def process_structure_recovery_v2_task(job_id: str, payload: Dict[str, Any
     tracker.log(f"⚡ Starting structure recovery V2 for {total_to_resolve} unique inputs (total unique = {total_unique}, cached = {len(cached_map)})...")
 
     from backend.normalization.identifier_service import ChemicalIdentifierService
+    from rdkit import Chem
+    from rdkit.Chem import rdMolDescriptors
     resolver = ChemicalIdentifierService()
     
     recovered_map = {}
@@ -805,7 +807,23 @@ async def process_structure_recovery_v2_task(job_id: str, payload: Dict[str, Any
     for val, row in cached_map.items():
         original_cased_key = next((v for v in unique_vals if v.lower() == val.lower()), None)
         if original_cased_key and row.get("smiles"):
-            recovered_map[original_cased_key] = row["smiles"]
+            # Ensure full details are present/generated
+            mol = None
+            try:
+                mol = Chem.MolFromSmiles(row["smiles"])
+            except Exception:
+                pass
+            inchi = row.get("inchi") or (Chem.MolToInchi(mol) if mol else "")
+            formula = row.get("formula") or (rdMolDescriptors.CalcMolFormula(mol) if mol else "")
+            inchikey = row.get("inchikey") or (Chem.InchiToInchiKey(inchi) if inchi else "")
+            
+            recovered_map[original_cased_key] = {
+                "smiles": row["smiles"],
+                "inchikey": inchikey,
+                "inchi": inchi,
+                "formula": formula,
+                "cid": row.get("cid") or ""
+            }
 
     unresolved = []
     completed = 0
@@ -823,10 +841,38 @@ async def process_structure_recovery_v2_task(job_id: str, payload: Dict[str, Any
                 res = resolver.resolve(val, skip_online=False)
                 if res.get("canonical_smiles"):
                     smiles_val = res["canonical_smiles"]
-                    recovered_map[val] = smiles_val
+                    inchi_val = res.get("inchi", "")
+                    inchikey_val = res.get("inchikey", "")
+                    formula_val = res.get("molecular_formula", "")
+                    cid_val = str(res.get("cid", ""))
+                    
+                    # Fallback generation using RDKit if missing
+                    if not inchi_val or not formula_val or not inchikey_val:
+                        try:
+                            mol = Chem.MolFromSmiles(smiles_val)
+                            if mol:
+                                if not inchi_val:
+                                    inchi_val = Chem.MolToInchi(mol)
+                                if not inchikey_val:
+                                    inchikey_val = Chem.InchiToInchiKey(inchi_val) if inchi_val else ""
+                                if not formula_val:
+                                    formula_val = rdMolDescriptors.CalcMolFormula(mol)
+                        except Exception:
+                            pass
+                    
+                    recovered_map[val] = {
+                        "smiles": smiles_val,
+                        "inchikey": inchikey_val,
+                        "inchi": inchi_val,
+                        "formula": formula_val,
+                        "cid": cid_val
+                    }
                     global_cache.put(val, {
                         "smiles": smiles_val,
-                        "inchikey": res.get("inchikey", ""),
+                        "inchikey": inchikey_val,
+                        "inchi": inchi_val,
+                        "formula": formula_val,
+                        "cid": cid_val,
                         "molecular_weight": None,
                         "source": res.get("source", "pubchem"),
                         "confidence": 0.95
@@ -879,21 +925,46 @@ async def process_structure_recovery_v2_task(job_id: str, payload: Dict[str, Any
         return candidates[0]
 
     smiles_col = get_best_col(["canonical_smiles", "isomeric_smiles", "smiles"], r"(smile|struct)")
+    inchikey_col = get_best_col(["inchikey", "inchi_key"], r"(inchikey|inchi_key)")
+    inchi_col = get_best_col(["inchi"], r"^inchi$")
+    formula_col = get_best_col(["molecular_formula", "formula"], r"(formula)")
+    cid_col = get_best_col(["pubchem_cid", "cid"], r"(cid|pubchem)")
     
+    # Ensure columns exist in df and mapping registry
     if not smiles_col:
-        if 'canonical_smiles' not in df.columns:
-            df['canonical_smiles'] = None
+        df['canonical_smiles'] = None
+        smiles_col = 'canonical_smiles'
         if not context.mappings:
             context.mappings = {}
-        context.mappings['canonical_smiles'] = 'canonical_smiles'
-        smiles_col = 'canonical_smiles'
+        context.mappings[smiles_col] = 'canonical_smiles'
+    if not inchikey_col:
+        df['inchi_key'] = None
+        inchikey_col = 'inchi_key'
+        context.mappings[inchikey_col] = 'inchi_key'
+    if not inchi_col:
+        df['inchi'] = None
+        inchi_col = 'inchi'
+        context.mappings[inchi_col] = 'inchi'
+    if not formula_col:
+        df['molecular_formula'] = None
+        formula_col = 'molecular_formula'
+        context.mappings[formula_col] = 'molecular_formula'
+    if not cid_col:
+        df['pubchem_cid'] = None
+        cid_col = 'pubchem_cid'
+        context.mappings[cid_col] = 'pubchem_cid'
 
     filled_count = 0
     for idx, row in df.iterrows():
         name_val = str(row[column_to_resolve]).strip() if pd.notna(row[column_to_resolve]) else ""
         current_smiles = str(row[smiles_col]).strip() if pd.notna(row[smiles_col]) else ""
         if (not current_smiles or current_smiles == 'nan') and name_val in recovered_map:
-            df.at[idx, smiles_col] = recovered_map[name_val]
+            details = recovered_map[name_val]
+            df.at[idx, smiles_col] = details["smiles"]
+            df.at[idx, inchikey_col] = details["inchikey"]
+            df.at[idx, inchi_col] = details["inchi"]
+            df.at[idx, formula_col] = details["formula"]
+            df.at[idx, cid_col] = details["cid"]
             filled_count += 1
 
     from backend.storage.parquet_engine import ParquetEngine
@@ -906,7 +977,7 @@ async def process_structure_recovery_v2_task(job_id: str, payload: Dict[str, Any
 
     pct_coverage = (len(recovered_map) / total_unique * 100.0) if total_unique > 0 else 0.0
     job_registry.update_job(job_id, status="COMPLETED", progress=100, result_path=res_path)
-    tracker.log(f"✓ V2 Structure recovery finished: {len(recovered_map)} successfully resolved ({pct_coverage:.1f}% coverage). Propagated {filled_count} SMILES to dataframe.")
+    tracker.log(f"✓ V2 Structure recovery finished: {len(recovered_map)} successfully resolved ({pct_coverage:.1f}% coverage). Propagated {filled_count} SMILES, InChI, InChIKeys to dataframe.")
 
     await ws_broadcaster.broadcast({
         "job_id": job_id,

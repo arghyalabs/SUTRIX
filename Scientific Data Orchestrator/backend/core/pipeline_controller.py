@@ -60,7 +60,13 @@ class ScientificPipelineController:
         """Deterministic stage ordering validation."""
         required_stages = ScientificPipelineController.VALID_TRANSITIONS.get(requested_stage, [])
         ws_id = context.workspace_id or ""
-        if ws_id.startswith("CMPD_") or ws_id.startswith("QSAR_") or ws_id.startswith("SDO_CORE_"):
+        if (
+            ws_id.startswith("CMPD_")
+            or ws_id.startswith("QSAR_")
+            or ws_id.startswith("SDO_CORE_")
+            or ws_id.startswith("ENRICH_")
+            or ws_id.startswith("ANALYTICS_")
+        ):
             if requested_stage == "enrich":
                 required_stages = ["ingest"]
             elif requested_stage == "readiness":

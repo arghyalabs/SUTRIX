@@ -25,6 +25,7 @@ import { OECDValidationStudio } from './components/studio/oecd/OECDValidationStu
 import { IntelligenceStudio } from './components/studio/intelligence/IntelligenceStudio';
 import { HierarchyStudio } from './components/studio/hierarchy/HierarchyStudio';
 import { CompoundStudio } from './components/studio/compound/CompoundStudio';
+import { StructureEnrichmentStudio } from './components/studio/enrichment/StructureEnrichmentStudio';
 import { VerificationDashboard } from './components/dashboard/VerificationDashboard';
 import type { StudioId } from './services/workspaceManagerService';
 import { workspaceManager } from './services/workspaceManagerService';
@@ -177,7 +178,7 @@ const App: React.FC = () => {
   const getView = () => {
     if (location.pathname === '/hub') return 'hub';
     if (location.pathname === '/verification-dashboard') return 'verification';
-    const studioPaths = ['/hierarchy', '/analytics', '/compound', '/normalization', '/qsar', '/intelligence', '/oecd'];
+    const studioPaths = ['/hierarchy', '/analytics', '/compound', '/normalization', '/qsar', '/intelligence', '/oecd', '/enrichment'];
     if (studioPaths.some(p => location.pathname.startsWith(p))) return 'studio';
     return 'landing';
   };
@@ -191,6 +192,7 @@ const App: React.FC = () => {
       '/qsar': 'qsar',
       '/intelligence': 'intelligence',
       '/oecd': 'oecd',
+      '/enrichment': 'enrichment',
     };
     for (const [path, id] of Object.entries(map)) {
       if (location.pathname.startsWith(path)) return id;
@@ -300,6 +302,16 @@ const App: React.FC = () => {
         <>
           <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
           <IntelligenceStudio onGoHub={goHub} />
+        </>
+      );
+    }
+
+    // Studio 8: Structure & SMILES Enrichment Studio
+    if (currentStudio === 'enrichment') {
+      return (
+        <>
+          <Toaster position="bottom-center" containerStyle={{ bottom: 24 }} toastOptions={{ duration: 2500, style: { background: '#0d1425', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '11px', padding: '8px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)', maxWidth: '320px', lineHeight: '1.4' } }} />
+          <StructureEnrichmentStudio onGoHub={goHub} />
         </>
       );
     }

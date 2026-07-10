@@ -97,7 +97,8 @@ export const CommandPalette: React.FC = () => {
       { id: 'normalization', name: 'Unit Harmonization & Normalization' },
       { id: 'qsar', name: 'QSAR & AI Engineering' },
       { id: 'intelligence', name: 'Scientific Intelligence' },
-      { id: 'oecd', name: 'OECD Validation' }
+      { id: 'oecd', name: 'OECD Validation' },
+      { id: 'enrichment', name: 'Structure & SMILES Enrichment' }
     ];
 
     studios.forEach((studio) => {

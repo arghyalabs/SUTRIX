@@ -68,3 +68,10 @@ thesis_compiler/
 *.jpeg
 *.jpg
 *.gif
+
+# Thesis Workspace
+thesis_workspace/
+
+# Architecture Document
+SDO_COMPLETE_ARCHITECTURE.md
+

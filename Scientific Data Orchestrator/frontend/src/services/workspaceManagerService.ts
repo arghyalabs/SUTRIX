@@ -12,7 +12,8 @@ export type StudioId =
   | 'normalization'
   | 'qsar'
   | 'intelligence'
-  | 'oecd';
+  | 'oecd'
+  | 'enrichment';
 
 export type SessionStatus = 'active' | 'paused' | 'empty';
 

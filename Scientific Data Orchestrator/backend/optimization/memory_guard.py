@@ -57,9 +57,9 @@ class MemoryGuard:
         is_locked = usage_pct >= self.emergency_limit_pct
 
         if is_locked:
-            logger.critical(f"⚠️ EMERGENCY MEMORY SHIELD TRIGGERED: Host RAM usage is at {usage_pct:.1f}%! Available RAM: {available_ram:.2f} GB.")
+            logger.critical(f"[EMERGENCY] MEMORY SHIELD TRIGGERED: Host RAM usage is at {usage_pct:.1f}%! Available RAM: {available_ram:.2f} GB.")
         elif is_critical:
-            logger.warning(f"⚠️ HIGH SYSTEM MEMORY SPIKE DETECTED: System RAM at {usage_pct:.1f}%. Starting aggressive caching sweeps.")
+            logger.warning(f"[WARNING] HIGH SYSTEM MEMORY SPIKE DETECTED: System RAM at {usage_pct:.1f}%. Starting aggressive caching sweeps.")
 
         return {
             "total_ram_gb": round(total_ram, 2),

@@ -21,10 +21,10 @@ interface PersonaDef {
 }
 
 const PERSONAS: PersonaDef[] = [
-  { id: 'ecotox', name: 'Ecotoxicologist', emoji: '🧪', color: 'cyan', studios: ['hierarchy', 'qsar', 'oecd'], desc: 'Filter taxons, resolve SMILES structures, and audit REACH compliance.' },
-  { id: 'drug', name: 'Drug Discovery', emoji: '💊', color: 'violet', studios: ['qsar', 'compound', 'intelligence'], desc: 'Generate descriptors, view scaffolds, and detect activity cliffs.' },
+  { id: 'ecotox', name: 'Ecotoxicologist', emoji: '🧪', color: 'cyan', studios: ['hierarchy', 'qsar', 'oecd', 'enrichment'], desc: 'Filter taxons, resolve SMILES structures, and audit REACH compliance.' },
+  { id: 'drug', name: 'Drug Discovery', emoji: '💊', color: 'violet', studios: ['qsar', 'compound', 'intelligence', 'enrichment'], desc: 'Generate descriptors, view scaffolds, and detect activity cliffs.' },
   { id: 'env', name: 'Environmental Scientist', emoji: '🌱', color: 'emerald', studios: ['hierarchy', 'analytics', 'normalization'], desc: 'Standardize heterogeneous units and analyze sample variances.' },
-  { id: 'ai', name: 'AI Researcher', emoji: '🤖', color: 'blue', studios: ['analytics', 'normalization', 'qsar'], desc: 'Explore feature correlations, run PCA, and format ML vectors.' },
+  { id: 'ai', name: 'AI Researcher', emoji: '🤖', color: 'blue', studios: ['analytics', 'normalization', 'qsar', 'enrichment'], desc: 'Explore feature correlations, run PCA, and format ML vectors.' },
   { id: 'reg', name: 'Regulatory Auditor', emoji: '📋', color: 'rose', studios: ['normalization', 'oecd'], desc: 'Verify endpoints, map applicability domains, and log compliance.' },
 ];
 
@@ -102,6 +102,14 @@ readiness_report.json`,
     output: `OECD_Validation_Report.pdf`,
     demoName: 'Model Results',
   },
+  enrichment: {
+    title: 'Structure & SMILES Enrichment Studio',
+    solve: 'Resolving and downloading molecular structures (SMILES, InChI, InChIKey) from CAS numbers or chemical names.',
+    when: ['Your dataset lacks chemical structures.', 'You want to retrieve structural identifiers for offline descriptor tools.'],
+    workflow: ['Ingest dataset', 'Select identifier column', 'Run parallel PubChem/cache enrichment', 'Review coverage log', 'Download enriched CSV/Excel'],
+    output: `sutrix_enriched_dataset.csv`,
+    demoName: 'Identifier Dataset',
+  },
 };
 
 interface StudioDef {
@@ -122,6 +130,7 @@ const STUDIOS: StudioDef[] = [
   { id: 'qsar', letter: '5', name: 'QSAR Engineering Studio', subtitle: 'SMILES recovery & descriptor calculations', icon: <FlaskConical className="w-5 h-5" />, color: 'violet', features: ['Synonym resolving', '5000+ descriptors', 'OECD audits'] },
   { id: 'intelligence', letter: '6', name: 'Scientific Intelligence', subtitle: 'Murcko scaffolds & SAR activity cliffs', icon: <Brain className="w-5 h-5" />, color: 'violet', features: ['Scaffold groupings', 'Cliff identification', 'k-NN read-across'] },
   { id: 'oecd', letter: '7', name: 'OECD Validation Studio', subtitle: 'Regulatory validation compliance checks', icon: <CheckSquare className="w-5 h-5" />, color: 'rose', features: ['5 OECD Guidelines', 'Applicability domain', 'PDF report export'] },
+  { id: 'enrichment', letter: '8', name: 'Structure Enrichment Studio', subtitle: 'SMILES/InChI resolution & download', icon: <Zap className="w-5 h-5" />, color: 'cyan', features: ['SMILES & InChI resolution', 'Parallel fetching engine', 'Download CSV/XLSX'] },
 ];
 
 export const WorkspaceSelectionHub: React.FC<{

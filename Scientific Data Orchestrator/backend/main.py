@@ -35,6 +35,7 @@ from backend.api.routes.descriptor_routes import router as descriptor_router
 from backend.api.routes.modeling_routes import router as modeling_router
 from backend.api.routes.explorer_routes import router as explorer_router
 from backend.api.routes.structure_recovery_routes import router as recovery_router
+from backend.api.routes.structure_export_routes import router as structure_export_router
 from backend.api.routes.simple_analysis_routes import router as simple_analysis_router
 from backend.api.routes.readiness_routes import router as readiness_router
 from backend.api.routes.structure_assessment_routes import router as assessment_router
@@ -69,6 +70,7 @@ app.include_router(descriptor_router)
 app.include_router(modeling_router)
 app.include_router(explorer_router)
 app.include_router(recovery_router)
+app.include_router(structure_export_router)
 app.include_router(simple_analysis_router)
 app.include_router(readiness_router)
 app.include_router(assessment_router)

@@ -257,6 +257,13 @@ export const ChemicalStructureRecovery: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Enriched File Exporter
+  const downloadEnrichedFile = (format: 'csv' | 'xlsx') => {
+    if (!workspaceId) return;
+    const downloadUrl = `${API_BASE_URL}/api/structure-recovery/${workspaceId}/export-file?format=${format}`;
+    window.open(downloadUrl, '_blank');
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 py-32">
@@ -446,13 +453,27 @@ export const ChemicalStructureRecovery: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 w-full justify-center">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 w-full justify-center flex-wrap">
+                  <button
+                    onClick={() => downloadEnrichedFile('csv')}
+                    className="px-5 py-3 rounded-xl border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Enriched CSV
+                  </button>
+                  <button
+                    onClick={() => downloadEnrichedFile('xlsx')}
+                    className="px-5 py-3 rounded-xl border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Enriched Excel
+                  </button>
                   <button
                     onClick={downloadReport}
                     className="px-5 py-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all"
                   >
                     <Download className="w-4 h-4" />
-                    Download Recovery Report (.csv)
+                    Download Recovery Log
                   </button>
                   <button
                     onClick={() => setActiveTab('enrichment')}
