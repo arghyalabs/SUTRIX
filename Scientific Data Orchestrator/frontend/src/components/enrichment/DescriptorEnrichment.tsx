@@ -131,6 +131,10 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
   const filteredRdkit = useMemo(() => filterList(rdkitAvailable), [rdkitAvailable, searchQuery]);
   const filteredMordred = useMemo(() => filterList(mordredAvailable), [mordredAvailable, searchQuery]);
 
+  // O(1) Set lookups instead of O(n) Array.includes() on every render — critical for 2251 descriptors
+  const selectedSet = useMemo(() => new Set(selectedDescriptors), [selectedDescriptors]);
+  const rdkitSet = useMemo(() => new Set(rdkitAvailable), [rdkitAvailable]);
+
   const rdkitRecommended = useMemo(() => filteredRdkit.filter(d => RECOMMENDED_RDKIT.includes(d)), [filteredRdkit]);
   const rdkitOther = useMemo(() => filteredRdkit.filter(d => !RECOMMENDED_RDKIT.includes(d)), [filteredRdkit]);
 
@@ -184,8 +188,8 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
         </div>
         <div className="grid grid-cols-2 gap-2">
           {list.map(desc => {
-            const isSelected = selectedDescriptors.includes(desc);
-            const isRdkit = rdkitAvailable.includes(desc);
+            const isSelected = selectedSet.has(desc);   // O(1) Set lookup
+            const isRdkit = rdkitSet.has(desc);         // O(1) Set lookup
             const activeColorBg = isRdkit ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-violet-500/10 border-violet-500/30';
             const activeTextColor = isRdkit ? 'text-cyan-400' : 'text-violet-400';
             const activeTextLightColor = isRdkit ? 'text-cyan-100' : 'text-violet-100';
@@ -429,7 +433,10 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
                   <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 mb-4">
                     <Zap className="w-4 h-4 text-cyan-400" />
                     <h3 className="text-sm font-bold text-white">RDKit Descriptors</h3>
-                    <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.filter(d => rdkitAvailable.includes(d)).length} selected</span>
+                    <span className="ml-auto text-[10px] text-white/30">
+                      {/* O(1): count by intersecting two sets */}
+                      {selectedDescriptors.filter(d => rdkitSet.has(d)).length} selected
+                    </span>
                   </div>
                   {renderDescriptorGrid('★ Recommended', rdkitRecommended, 'text-amber-400/70')}
                   {renderDescriptorGrid('All RDKit Properties', rdkitOther, 'text-cyan-400/70')}
@@ -442,7 +449,10 @@ export const DescriptorEnrichment: React.FC<DescriptorEnrichmentProps> = ({
                   <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 mb-4">
                     <Beaker className="w-4 h-4 text-violet-400" />
                     <h3 className="text-sm font-bold text-white">Mordred Engine</h3>
-                    <span className="ml-auto text-[10px] text-white/30">{selectedDescriptors.filter(d => mordredAvailable.includes(d)).length} selected</span>
+                    <span className="ml-auto text-[10px] text-white/30">
+                      {/* O(1): count by filtering against rdkitSet (not present in RDKit = Mordred) */}
+                      {selectedDescriptors.filter(d => !rdkitSet.has(d)).length} selected
+                    </span>
                   </div>
                   {renderDescriptorGrid('★ Recommended', mordredRecommended, 'text-amber-400/70')}
                   {renderDescriptorGrid('All Mordred Properties', mordredOther, 'text-violet-400/70')}

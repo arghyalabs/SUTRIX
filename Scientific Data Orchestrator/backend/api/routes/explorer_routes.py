@@ -439,22 +439,20 @@ async def search_compounds(
             if not search_cols:
                 search_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
             
-            index_records = []
-            for idx, row in df.iterrows():
-                search_str = " ".join([str(row[col]).strip().lower() for col in search_cols if pd.notnull(row[col])])
-                index_records.append({
-                    "search_str": search_str,
-                    "row_idx": idx
-                })
-            context.search_index = index_records
+            # Vectorized index build — no iterrows() — join all string cols with a space separator
+            search_series = df[search_cols].fillna('').astype(str).agg(' '.join, axis=1).str.lower()
+            
+            context.search_index = {
+                "search_series": search_series,
+                "index": search_series.index
+            }
             context.touch()
 
-        # Perform fast search using list comprehension on the in-memory index
-        matched_indices = [
-            item["row_idx"]
-            for item in context.search_index
-            if query_lower in item["search_str"]
-        ]
+
+        # Perform fast search using vectorized pandas str.contains (no Python loop)
+        search_series = context.search_index["search_series"]
+        mask = search_series.str.contains(query_lower, regex=False, na=False)
+        matched_indices = search_series.index[mask]
         filtered = df.loc[matched_indices]
     else:
         filtered = df

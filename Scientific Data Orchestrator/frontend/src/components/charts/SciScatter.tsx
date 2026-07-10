@@ -21,6 +21,7 @@ export interface ScatterPoint {
   color?: string;
   /** Opacity override (0–1) */
   opacity?: number;
+  smiles?: string;
 }
 
 export interface ScatterSeries {
@@ -43,6 +44,12 @@ interface SciScatterProps {
   vLines?: Array<{ x: number; label?: string; color?: string; dashed?: boolean }>;
   /** Custom horizontal reference lines */
   hLines?: Array<{ y: number; label?: string; color?: string; dashed?: boolean }>;
+  /** Custom regression fit line segment */
+  regressionLine?: {
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+    color?: string;
+  };
   /** Domain for X axis */
   xDomain?: [number | string, number | string];
   /** Domain for Y axis */
@@ -108,6 +115,7 @@ export const SciScatter: React.FC<SciScatterProps> = ({
   zeroLines = false,
   vLines = [],
   hLines = [],
+  regressionLine,
   xDomain,
   yDomain,
   dotRadius = 3,
@@ -225,6 +233,15 @@ export const SciScatter: React.FC<SciScatterProps> = ({
             stroke="rgba(255,255,255,0.18)"
             strokeDasharray="4 3"
             strokeWidth={1}
+          />
+        )}
+
+        {regressionLine && (
+          <ReferenceLine
+            segment={[regressionLine.start, regressionLine.end]}
+            stroke={regressionLine.color || '#22D3EE'}
+            strokeWidth={1.5}
+            strokeDasharray="5 3"
           />
         )}
 

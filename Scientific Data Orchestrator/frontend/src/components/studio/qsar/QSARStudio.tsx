@@ -1,17 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import {
   Upload, ShieldCheck, Cpu, Target, Layers
 } from 'lucide-react';
 import { StudioShell, SidebarNavItem, SidebarSection } from '../StudioShell';
-import { QSARUploadPanel } from './QSARUploadPanel';
-import { DescriptorGeneratorPanel } from './DescriptorGeneratorPanel';
 import { QSARReadinessPanel } from './QSARReadinessPanel';
 import { MLBenchmarkPanel } from './MLBenchmarkPanel';
 import { ApplicabilityDomainPanel } from './ApplicabilityDomainPanel';
+import { UploadWorkspace } from '../../upload/UploadWorkspace';
+import { DescriptorEnrichment } from '../../enrichment/DescriptorEnrichment';
 import { useWorkspaceStore } from '../../../store/useWorkspaceStore';
 import { useStudioInit } from '../../../hooks/useStudioInit';
+import { useWebSocket } from '../../../performance/useWebSocket';
+import { uploadApi } from '../../../services/uploadApi';
+import { enrichmentApi } from '../../../services/enrichmentApi';
 import { workspaceApi } from '../../../services/workspaceApi';
 
 const API = 'http://127.0.0.1:8000';
@@ -32,12 +35,197 @@ export const QSARStudio: React.FC<QSARStudioProps> = ({ onGoHub }) => {
   const [activeTab, setActiveTab] = useState('upload');
   const [sessionInfo, setSessionInfo] = useState<any>(null);
   useStudioInit('qsar');
-  const { filename, rowCount, workspaceId, setWorkspaceId } = useWorkspaceStore();
-  const clientId = workspaceId || 'qsar_temp';
 
+  const {
+    filename, rowCount, columns, preview, setDataset,
+    workspaceId, setWorkspaceId, enrichmentMode, setEnrichmentMode,
+    includeMordred, setIncludeMordred, setActiveJobId, setActiveJobType, activeJobId, activeJobType
+  } = useWorkspaceStore();
+
+  const genId = useRef(`QSAR_${Math.random().toString(36).substring(2, 9)}`).current;
+  const storeId = useWorkspaceStore(s => s.workspaceId);
+  const clientId = storeId || genId;
+
+  const socket = useWebSocket(clientId);
+
+  // Persist workspaceId to store
   useEffect(() => {
     if (clientId) setWorkspaceId(clientId);
   }, [clientId, setWorkspaceId]);
+
+  // ── Upload state ─────────────────────────────────────────────────
+  const [isUploadProcessing, setIsUploadProcessing] = useState(false);
+  const [uploadJobId, setUploadJobId] = useState<string | null>(null);
+  const uploadJobIdRef = useRef<string | null>(null);
+  const [uploadStage, setUploadStage] = useState('');
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadEta, setUploadEta] = useState(0);
+  const [uploadItemsPerSec, setUploadItemsPerSec] = useState(0);
+  const [uploadLogs, setUploadLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    const wsState = socket as any;
+    const rawMsg = wsState?.lastMessage;
+    if (!rawMsg || !uploadJobIdRef.current) return;
+    try {
+      const msg = typeof rawMsg === 'string' ? JSON.parse(rawMsg) : rawMsg;
+      if (msg.job_id !== uploadJobIdRef.current && msg.workspace_id !== clientId) return;
+      if (msg.type === 'STAGE_CHANGE') {
+        setUploadStage(msg.stage || '');
+        setUploadMessage(msg.description || '');
+      }
+      if (msg.type === 'PROGRESS_UPDATE') {
+        setUploadProgress(msg.progress || 0);
+        setUploadEta(msg.eta_seconds || 0);
+        setUploadItemsPerSec(msg.items_per_sec || 0);
+        setUploadStage(msg.stage || uploadStage);
+        setUploadMessage(msg.message || '');
+        if (msg.logs?.length) setUploadLogs(msg.logs);
+      }
+      if (msg.type === 'JOB_COMPLETED') {
+        const d = msg.result || {};
+        if (d.filename || d.row_count) {
+          setDataset(d.filename, d.parquet_path, d.row_count, d.columns, d.preview);
+        }
+        setIsUploadProcessing(false);
+        setUploadProgress(100);
+        toast.success('Dataset loaded!');
+      }
+      if (msg.type === 'JOB_FAILED') {
+        setIsUploadProcessing(false);
+        toast.error(`Upload failed: ${msg.error}`);
+      }
+    } catch { /* ignore */ }
+  }, [(socket as any)?.lastMessage, uploadJobId, clientId, setDataset, uploadStage]);
+
+  const handleIngestFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    setIsUploadProcessing(true);
+    setUploadProgress(0);
+    setUploadStage('UPLOADING');
+    setUploadMessage(`Uploading ${file.name}...`);
+    setUploadLogs([]);
+    try {
+      const res = await uploadApi.ingestFile(file, clientId);
+      if (res.job_id) {
+        uploadJobIdRef.current = res.job_id;
+        setUploadJobId(res.job_id);
+      } else {
+        const d = res as any;
+        setDataset(d.filename || file.name, d.parquet_path ?? '', d.row_count ?? 0, d.columns ?? [], d.preview ?? []);
+        setIsUploadProcessing(false);
+        toast.success('Dataset loaded!');
+      }
+    } catch (err: any) {
+      setIsUploadProcessing(false);
+      toast.error(err?.message || 'Upload failed');
+    }
+  }, [clientId, setDataset]);
+
+  const handleLoadDemo = useCallback(async () => {
+    setIsUploadProcessing(true);
+    setUploadProgress(0);
+    setUploadStage('PARSING');
+    setUploadMessage('Loading demo dataset.');
+    setUploadLogs([]);
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    try {
+      const res = await workspaceApi.loadDemoDataset(clientId);
+      if (res.job_id) {
+        uploadJobIdRef.current = res.job_id;
+        setUploadJobId(res.job_id);
+        
+        const poll = setInterval(async () => {
+          try {
+             const statusRes = await fetch(`${API_BASE_URL}/api/jobs/${res.job_id}`);
+             if (statusRes.ok) {
+               const statusData = await statusRes.json();
+               if (statusData.status === 'COMPLETED') {
+                 clearInterval(poll);
+                 const d = statusData.result || {};
+                 setDataset(d.filename, d.parquet_path, d.row_count, d.columns, d.preview);
+                 setIsUploadProcessing(false);
+                 toast.success('Demo dataset loaded.');
+               } else if (statusData.status === 'FAILED') {
+                 clearInterval(poll);
+                 setIsUploadProcessing(false);
+                 toast.error('Demo dataset failed to load.');
+               } else if (statusData.progress) {
+                 setUploadProgress(statusData.progress);
+                 if (statusData.stage) setUploadStage(statusData.stage);
+                 if (statusData.message) setUploadMessage(statusData.message);
+               }
+             }
+          } catch (e) { /* ignore */ }
+        }, 1500);
+      } else {
+        const legacy = res as any;
+        setDataset(res.filename, legacy.parquet_path ?? '', legacy.row_count ?? 0, legacy.columns ?? [], legacy.preview ?? []);
+        setIsUploadProcessing(false);
+        toast.success('Demo dataset loaded.');
+      }
+    } catch (err: any) {
+      setIsUploadProcessing(false);
+      toast.error(err?.message || 'Failed to load demo');
+    }
+  }, [clientId, setDataset]);
+
+  const handleCurateColumns = async (colsToDrop: string[]) => {
+    try {
+      const t = toast.loading('Curating columns…');
+      const d = await uploadApi.curateColumns(colsToDrop, clientId);
+      toast.success('Dataset curated.', { id: t });
+      setDataset(filename || 'dataset.parquet', d.parquet_path, d.row_count, d.columns, d.preview);
+      setActiveTab('generator');
+    } catch (err: any) {
+      toast.error(err?.message || 'Curation failed');
+    }
+  };
+
+  const handleRunEnrichment = async () => {
+    try {
+      const s = useWorkspaceStore.getState();
+      const r = await enrichmentApi.runEnrichment(s.selectedDescriptors, s.includeMordred, s.enrichmentMode, clientId);
+      setActiveJobId(r.job_id);
+      setActiveJobType('enrichment');
+      socket.connectToJob(r.job_id);
+      toast.success('Enrichment job dispatched.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Enrichment failed');
+    }
+  };
+
+  const handleCancelJob = useCallback(async () => {
+    try {
+      if (activeJobType === 'enrichment' && activeJobId) {
+        await enrichmentApi.cancelJob(clientId);
+        toast('Job cancelled.', { icon: '⚠️' });
+      } else if (isUploadProcessing && uploadJobId) {
+        await fetch(`${API}/api/jobs/${uploadJobId}/cancel`, { method: 'POST' });
+        setIsUploadProcessing(false);
+        toast('Upload job cancelled.', { icon: '⚠️' });
+      }
+    } catch { /* ignore */ }
+  }, [clientId, activeJobType, activeJobId, isUploadProcessing, uploadJobId]);
+
+  const handleFetchEnrichmentResults = async () => {
+    const s = useWorkspaceStore.getState();
+    if (!s.activeJobId) {
+      toast.error('No enrichment job found.');
+      return;
+    }
+    try {
+      const t = toast.loading('Assembling enriched parquet…');
+      const d = await enrichmentApi.fetchResults(clientId, s.activeJobId);
+      toast.success('Enrichment matrix loaded.', { id: t });
+      setDataset(d.job_id + '.parquet', d.parquet_path, d.total_rows, d.columns, d.preview);
+      setActiveTab('readiness');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to fetch results');
+    }
+  };
 
   const handleReset = async () => {
     try {
@@ -111,19 +299,40 @@ export const QSARStudio: React.FC<QSARStudioProps> = ({ onGoHub }) => {
     switch (activeTab) {
       case 'upload':
         return (
-          <QSARUploadPanel
-            {...props}
-            sessionInfo={sessionInfo}
-            onSessionLoaded={(info) => {
-              setSessionInfo(info);
-              const rows = info.rows ?? info.total_rows ?? 0;
-              useWorkspaceStore.getState().setDataset(info.filename || 'qsar_dataset', '', rows, [], []);
-            }}
-            onSuccess={() => setActiveTab('generator')}
+          <UploadWorkspace
+            filename={filename}
+            rowCount={rowCount}
+            columns={columns}
+            preview={preview}
+            isProcessing={isUploadProcessing}
+            processingStage={uploadStage}
+            processingMessage={uploadMessage}
+            processingProgress={uploadProgress}
+            processingEta={uploadEta}
+            processingItemsPerSec={uploadItemsPerSec}
+            processingStageLogs={uploadLogs}
+            activeJobId={uploadJobId}
+            handleIngestFile={handleIngestFile}
+            handleLoadDemo={handleLoadDemo}
+            handleCurateColumns={handleCurateColumns}
+            onCancelJob={handleCancelJob}
           />
         );
       case 'generator':
-        return <DescriptorGeneratorPanel {...props} />;
+        return (
+          <DescriptorEnrichment
+            enrichmentMode={enrichmentMode}
+            setEnrichmentMode={setEnrichmentMode}
+            includeMordred={includeMordred}
+            setIncludeMordred={setIncludeMordred}
+            handleRunEnrichment={handleRunEnrichment}
+            handleCancelJob={handleCancelJob}
+            handleFetchEnrichmentResults={handleFetchEnrichmentResults}
+            socket={socket}
+            ramUsage={45}
+            fps={60}
+          />
+        );
       case 'readiness':
         return (
           <QSARReadinessPanel
@@ -185,4 +394,3 @@ export const QSARStudio: React.FC<QSARStudioProps> = ({ onGoHub }) => {
     </StudioShell>
   );
 };
-

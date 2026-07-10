@@ -48,8 +48,8 @@ const stepsConfig: NavigationStep[] = [
 
 const StructureEnrichmentStudioInner: React.FC<{ onGoHub: () => void }> = ({ onGoHub }) => {
   useStudioInit('enrichment');
-  const { steps, activeTab, getStepStatus, handleNext, handlePrevious } = useStudioNavigation();
-  const { workspaceId, mappings, filename, setDataset, setWorkspaceId } = useWorkspaceStore();
+  const { steps, activeTab, getStepStatus, handleNext, handlePrevious, handleJump } = useStudioNavigation();
+  const { workspaceId, mappings, filename, setDataset, setWorkspaceId, resetWorkspace } = useWorkspaceStore();
 
   const genId = React.useRef(`ENRICH_${Math.random().toString(36).substring(2, 9)}`).current;
   const storeId = useWorkspaceStore(s => s.workspaceId);
@@ -375,17 +375,22 @@ const StructureEnrichmentStudioInner: React.FC<{ onGoHub: () => void }> = ({ onG
       isProcessing={polling}
       onPauseAndGoHub={onGoHub}
       sidebar={
-        <SidebarSection title="Structure Enrichment Steps">
+        <div className="flex flex-col h-full space-y-2">
+          <SidebarSection label="Structure Enrichment Steps" />
           {steps.map(step => (
             <SidebarNavItem
               key={step.id}
-              stepId={step.id}
-              label={step.label}
               icon={step.icon}
-              status={getStepStatus(step.id)}
+              label={step.label}
+              isActive={activeTab === step.id}
+              isDisabled={!filename && step.id !== 'ingest'}
+              onClick={() => handleJump(step.id)}
+              accentClass="text-cyan-400"
+              activeBgClass="bg-cyan-500/10"
+              activeBorderClass="border-cyan-400"
             />
           ))}
-        </SidebarSection>
+        </div>
       }
     >
       <div className="max-w-5xl mx-auto py-8 px-4 text-white">
@@ -430,7 +435,7 @@ const StructureEnrichmentStudioInner: React.FC<{ onGoHub: () => void }> = ({ onG
 
                   <div className="flex gap-4 justify-center">
                     <button
-                      onClick={() => { setFilename(''); }}
+                      onClick={() => { resetWorkspace(); }}
                       className="px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-bold transition-all"
                     >
                       Reupload Different File

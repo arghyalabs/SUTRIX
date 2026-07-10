@@ -276,11 +276,11 @@ export const MLBenchmarkPanel: React.FC<Props> = ({ clientId, apiBase, sessionIn
               <select
                 value={subgroup}
                 onChange={e => setSubgroup(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05] text-slate-300 text-xs focus:outline-none focus:border-cyan-400/30"
+                className="w-full px-3 py-2 rounded-lg bg-[#0b1224] border border-white/[0.05] text-slate-300 text-xs focus:outline-none focus:border-cyan-400/30"
               >
-                <option value="">All (merged)</option>
+                <option value="" className="bg-[#0b1224] text-[#CBD5E1]">All (merged)</option>
                 {subgroups.map(s => (
-                  <option key={s} value={s}>
+                  <option key={s} value={s} className="bg-[#0b1224] text-[#CBD5E1]">
                     {s}
                   </option>
                 ))}

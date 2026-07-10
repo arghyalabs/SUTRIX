@@ -172,18 +172,22 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
                             loop
                         )
 
-    # Fill empty smiles values in the dataframe using the resolved mapping
+    # Fill empty smiles values in the dataframe using vectorized pandas operations (NOT iterrows)
     if smiles_col in df.columns:
         df[smiles_col] = df[smiles_col].astype('object')
-        
-    for idx, row in df.iterrows():
-        sm_val = str(row[smiles_col]).strip() if pd.notna(row[smiles_col]) else ""
-        if not sm_val and name_col and name_col in df.columns:
-            name_val = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
-            if name_val in resolved_mapping:
-                df.at[idx, smiles_col] = resolved_mapping[name_val]
-        elif sm_val in resolved_mapping:
-            df.at[idx, smiles_col] = resolved_mapping[sm_val]
+
+        # Vectorized canonical SMILES update via .map()
+        existing_smiles = df[smiles_col].fillna('').astype(str).str.strip()
+        updated_smiles = existing_smiles.map(lambda s: resolved_mapping.get(s, s))
+        df[smiles_col] = updated_smiles.replace('', pd.NA)
+
+        # Vectorized backfill for rows where SMILES was empty but name resolved
+        if name_col and name_col in df.columns:
+            empty_mask = df[smiles_col].isna() | (df[smiles_col].astype(str).str.strip() == '')
+            if empty_mask.any():
+                name_vals = df.loc[empty_mask, name_col].fillna('').astype(str).str.strip()
+                resolved_from_name = name_vals.map(resolved_mapping)
+                df.loc[empty_mask, smiles_col] = resolved_from_name
 
     # Filter resolved unique non-empty SMILES for offline descriptors phase
     unique_smiles = [s for s in resolved_smiles_set if s]
@@ -218,21 +222,20 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
 
     # 3. Phase 2: Persistent SQLite Cache Lookup (Instant speedups)
     tracker.log("🔎 Starting Phase 2: Persistent SQLite Cache scan...")
-    cache_hits = 0
+    
+    current_job = job_registry.get_job(job_id)
+    if current_job and current_job.get("status") == "CANCELLED":
+        tracker.log("🛑 Job execution aborted by cancellation instruction.")
+        del active_tracker[job_id]
+        clean_memory()
+        return
+
+    bulk_hits = cache.get_many(unique_smiles, mode, include_mordred)
+    cache_hits = len(bulk_hits)
     
     for smiles in unique_smiles:
-        # Check cancellation state in cache lookup loop
-        current_job = job_registry.get_job(job_id)
-        if current_job and current_job.get("status") == "CANCELLED":
-            tracker.log("🛑 Job execution aborted by cancellation instruction.")
-            del active_tracker[job_id]
-            clean_memory()
-            return
-
-        hit = cache.get(smiles, mode, include_mordred)
-        if hit:
-            cached_results[smiles] = {"success": True, "data": hit}
-            cache_hits += 1
+        if smiles in bulk_hits:
+            cached_results[smiles] = {"success": True, "data": bulk_hits[smiles]}
         else:
             smiles_to_calculate.append(smiles)
 
@@ -302,14 +305,15 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
             finally:
                 heartbeat_task.cancel()
             
-            # Write new calculation data back to sqlite cache
+            # Write new calculation data back to sqlite cache using a single bulk transaction
             tracker.log("💾 Writing calculated descriptors back to persistent SQLite cache database...")
-            write_count = 0
-            for sm, res in calculation_results.items():
-                if res.get("success") and res.get("data"):
-                    cache.put(sm, mode, include_mordred, res["data"])
-                    write_count += 1
-            tracker.log(f"✓ Cache synchronized: Added {write_count} records to SQLite cache database.")
+            bulk_write_items = [
+                (sm, res["data"])
+                for sm, res in calculation_results.items()
+                if res.get("success") and res.get("data")
+            ]
+            write_count = cache.put_many(bulk_write_items, mode, include_mordred)
+            tracker.log(f"✓ Cache synchronized: Added {write_count} records to SQLite cache database in single bulk transaction.")
             
         except Exception as exc:
             if "JOB_CANCELLED" in str(exc):
@@ -353,18 +357,37 @@ async def process_enrichment_task(job_id: str, payload: Dict[str, Any]):
     if 'PubChem_Error' not in enriched_df.columns:
         enriched_df['PubChem_Error'] = None
             
-    # Populate values row by row
-    for idx, row in enriched_df.iterrows():
-        sm = str(row[smiles_col]).strip() if pd.notna(row[smiles_col]) else ""
-        if sm in all_descriptor_results:
-            res = all_descriptor_results[sm]
-            if res.get("success") and res.get("data"):
-                for dk, val in res["data"].items():
-                    enriched_df.at[idx, dk] = val
-            elif res.get("error"):
-                enriched_df.at[idx, 'PubChem_Error'] = res["error"]
-        else:
-            enriched_df.at[idx, 'PubChem_Error'] = "SMILES_NOT_RESOLVED"
+    # Populate values via vectorized bulk assignment (NOT row-by-row iterrows)
+    # Build lookup: smiles -> flat descriptor dict for successful results
+    smiles_to_desc: dict = {}
+    smiles_to_error: dict = {}
+    for sm_key, res in all_descriptor_results.items():
+        if res.get("success") and res.get("data"):
+            smiles_to_desc[sm_key] = res["data"]
+        elif res.get("error"):
+            smiles_to_error[sm_key] = res["error"]
+
+    if smiles_to_desc:
+        # Build a temporary DataFrame from the descriptor dicts, indexed by SMILES
+        desc_df = pd.DataFrame.from_dict(smiles_to_desc, orient='index')
+        desc_df.index.name = '__smiles_key__'
+
+        # Map the SMILES column in enriched_df to the desc_df index
+        smiles_series = enriched_df[smiles_col].fillna('').astype(str).str.strip()
+        # Left-join the descriptor columns into enriched_df without any Python loop
+        aligned = desc_df.reindex(smiles_series.values)
+        aligned.index = enriched_df.index
+        for dk in desc_df.columns:
+            enriched_df[dk] = aligned[dk].values
+
+    if smiles_to_error or True:  # always fill PubChem_Error column
+        smiles_series = enriched_df[smiles_col].fillna('').astype(str).str.strip()
+        enriched_df['PubChem_Error'] = smiles_series.map(smiles_to_error).where(
+            ~smiles_series.isin(smiles_to_desc), other=None
+        )
+        # Rows whose SMILES was never resolved at all
+        not_resolved_mask = (~smiles_series.isin(smiles_to_desc)) & (~smiles_series.isin(smiles_to_error))
+        enriched_df.loc[not_resolved_mask, 'PubChem_Error'] = 'SMILES_NOT_RESOLVED'
 
     # Cast new descriptor columns to true numerical values where possible (excluding string identifiers)
     string_cols = {"CanonicalSMILES", "IsomericSMILES", "InChIKey", "MolecularFormula", "PubChem_Error"}

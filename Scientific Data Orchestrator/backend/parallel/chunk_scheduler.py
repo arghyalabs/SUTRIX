@@ -45,15 +45,24 @@ def determine_optimal_scheduler_limits(total_compounds: int) -> tuple:
     # 2. Determine batch chunk size dynamically
     # For tiny datasets, avoid overhead by using smaller chunks
     if total_compounds < 50:
-        chunk_size = max(5, total_compounds // recommended_workers)
+        chunk_size = max(5, total_compounds // max(recommended_workers, 1))
+    elif total_compounds >= 10_000:
+        # Large dataset fast-path: maximize chunk size to minimize thread scheduling overhead
+        # 100k compounds with chunk_size=1500 → ~67 futures instead of ~400
+        if available_gb > 8.0:
+            chunk_size = 1500
+        elif available_gb > 4.0:
+            chunk_size = 750
+        else:
+            chunk_size = 300
     else:
         # Scale chunk size based on available RAM (larger RAM -> larger batch to minimize IPC overhead)
         if available_gb > 8.0:
-            chunk_size = 250
+            chunk_size = 500
         elif available_gb > 4.0:
-            chunk_size = 100
+            chunk_size = 200
         else:
-            chunk_size = 40
+            chunk_size = 80
             
     # Absolute minimum bound
     chunk_size = max(1, chunk_size)

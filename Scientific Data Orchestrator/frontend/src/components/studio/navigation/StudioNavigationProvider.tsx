@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useWorkspaceStore } from '../../../store/useWorkspaceStore';
 import { workspaceManager } from '../../../services/workspaceManagerService';
+import type { StudioId } from '../../../services/workspaceManagerService';
 import { toast } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 
@@ -77,7 +78,7 @@ export const useStudioNavigation = (): NavigationContextType => {
 
 interface ProviderProps {
   steps: NavigationStep[];
-  studioId: 'hierarchy' | 'analytics' | 'compound' | 'normalization' | 'qsar' | 'intelligence' | 'oecd';
+  studioId: StudioId;
   onReset: () => Promise<void> | void;
   onResetStep?: (stepId: string) => void;
   children: React.ReactNode;

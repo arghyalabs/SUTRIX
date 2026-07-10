@@ -85,9 +85,9 @@ export const ApplicabilityDomainPanel: React.FC<Props> = ({ clientId, apiBase, s
           <div className="w-40">
             <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Subgroup</label>
             <select value={subgroup} onChange={e => setSubgroup(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05] text-slate-300 text-xs focus:outline-none focus:border-cyan-400/30">
-              <option value="">All</option>
-              {subgroups.map(s => <option key={s} value={s}>{s}</option>)}
+              className="w-full px-3 py-2 rounded-lg bg-[#0b1224] border border-white/[0.05] text-slate-300 text-xs focus:outline-none focus:border-cyan-400/30">
+              <option value="" className="bg-[#0b1224] text-[#CBD5E1]">All</option>
+              {subgroups.map(s => <option key={s} value={s} className="bg-[#0b1224] text-[#CBD5E1]">{s}</option>)}
             </select>
           </div>
         )}

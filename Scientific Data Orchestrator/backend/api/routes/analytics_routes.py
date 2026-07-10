@@ -1166,3 +1166,107 @@ async def dimensionality_reduction(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{client_id}/scatter-data")
+async def get_scatter_data(client_id: str, col_x: str, col_y: str):
+    """Fetch paired values of two columns for interactive scatter plotting and compute regression/correlation statistics."""
+    try:
+        import scipy.stats as sp_stats
+        df, _ = _load_df(client_id)
+        
+        if col_x not in df.columns or col_y not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Column not found in active dataset.")
+
+        # Identify structural identifiers if they exist in the dataset to return them
+        smiles_col = next((c for c in df.columns if c.lower() in ["smiles", "structure"]), None)
+        id_col = next((c for c in df.columns if c.lower() in ["id", "cas", "cas_number", "chemical_name"]), None)
+
+        cols_to_load = [col_x, col_y]
+        if smiles_col and smiles_col not in cols_to_load:
+            cols_to_load.append(smiles_col)
+        if id_col and id_col not in cols_to_load:
+            cols_to_load.append(id_col)
+
+        valid_df = df[cols_to_load].dropna(subset=[col_x, col_y])
+        if len(valid_df) < 3:
+            raise HTTPException(status_code=400, detail="Too few matched data points (minimum 3 required) between selected variables.")
+
+        x_vals = pd.to_numeric(valid_df[col_x], errors="coerce")
+        y_vals = pd.to_numeric(valid_df[col_y], errors="coerce")
+        
+        # Filter rows where values are not numeric
+        mask = x_vals.notna() & y_vals.notna()
+        valid_df = valid_df[mask]
+        x_vals = x_vals[mask]
+        y_vals = y_vals[mask]
+
+        if len(valid_df) < 3:
+            raise HTTPException(status_code=400, detail="Selected columns must contain numeric values to compute correlations.")
+
+        # Run linear regression & correlations
+        slope, intercept, r_val, p_val, _ = sp_stats.linregress(x_vals, y_vals)
+        spearman_rho, spearman_p = sp_stats.spearmanr(x_vals, y_vals)
+        r2 = r_val ** 2
+
+        # Interpret correlation strength
+        abs_r = abs(r_val)
+        direction = "positive" if r_val >= 0 else "negative"
+        if abs_r >= 0.7:
+            strength = "strong"
+        elif abs_r >= 0.4:
+            strength = "moderate"
+        elif abs_r >= 0.1:
+            strength = "weak"
+        else:
+            strength = "negligible"
+
+        if strength == "negligible":
+            verdict = "No significant correlation detected."
+        else:
+            verdict = f"Scientific indicator reveals a {strength} {direction} correlation (r={r_val:.3f}, p={p_val:.4f})."
+
+        total_points = len(valid_df)
+        max_ui_points = 2000
+        if total_points > max_ui_points:
+            step = total_points / max_ui_points
+            indices = [int(i * step) for i in range(max_ui_points)]
+            indices[-1] = total_points - 1
+            
+            sampled_df = valid_df.iloc[indices]
+            sampled_x = x_vals.iloc[indices]
+            sampled_y = y_vals.iloc[indices]
+        else:
+            sampled_df = valid_df
+            sampled_x = x_vals
+            sampled_y = y_vals
+
+        points = []
+        for idx in sampled_df.index:
+            pt = {
+                "x": _safe(float(sampled_x.loc[idx])),
+                "y": _safe(float(sampled_y.loc[idx])),
+                "label": str(sampled_df.loc[idx, id_col]) if id_col else f"Row {idx}"
+            }
+            if smiles_col:
+                pt["smiles"] = str(sampled_df.loc[idx, smiles_col])
+            points.append(pt)
+
+        return {
+            "col_x": col_x,
+            "col_y": col_y,
+            "r": _safe(r_val),
+            "p_value": _safe(p_val),
+            "r2": _safe(r2),
+            "spearman_rho": _safe(spearman_rho),
+            "slope": _safe(slope),
+            "intercept": _safe(intercept),
+            "verdict": verdict,
+            "points": points
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Scatter data calculation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+

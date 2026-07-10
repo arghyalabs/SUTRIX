@@ -167,13 +167,13 @@ export const QSARReadinessPanel: React.FC<Props> = ({ clientId, apiBase, onSessi
           <select
             value={epCol}
             onChange={e => setEpCol(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-blue-500/40"
+            className="w-full px-3 py-2 rounded-lg bg-[#0b1224] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-blue-500/40"
           >
-            <option value="">Auto-detect</option>
+            <option value="" className="bg-[#0b1224] text-[#CBD5E1]">Auto-detect</option>
             {columns
               .filter(c => c.role === 'ENDPOINT' || c.role === 'DESCRIPTOR' || c.role === 'UNKNOWN')
               .map(c => (
-                <option key={c.name} value={c.name}>
+                <option key={c.name} value={c.name} className="bg-[#0b1224] text-[#CBD5E1]">
                   {c.name} ({c.role})
                 </option>
               ))}
@@ -341,11 +341,11 @@ export const QSARReadinessPanel: React.FC<Props> = ({ clientId, apiBase, onSessi
                     <select
                       value={transform}
                       onChange={e => setTransform(e.target.value as any)}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-blue-500/40"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b1224] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-blue-500/40"
                     >
-                      <option value="log10">log₁₀ Transformation</option>
-                      <option value="neg_log10">Negative log₁₀ (-log₁₀)</option>
-                      <option value="sqrt">Square Root (√x)</option>
+                      <option value="log10" className="bg-[#0b1224] text-[#CBD5E1]">log₁₀ Transformation</option>
+                      <option value="neg_log10" className="bg-[#0b1224] text-[#CBD5E1]">Negative log₁₀ (-log₁₀)</option>
+                      <option value="sqrt" className="bg-[#0b1224] text-[#CBD5E1]">Square Root (√x)</option>
                     </select>
                   </div>
                   <div>
