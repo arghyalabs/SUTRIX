@@ -59,7 +59,6 @@ workspaces/
 frontend/pw_log.txt
 frontend/pw_run_log.txt
 out_profile.json
-thesis_compiler/
 
 # Root folders and temporary media
 /outputs/
@@ -69,9 +68,5 @@ thesis_compiler/
 *.jpg
 *.gif
 
-# Thesis Workspace
-thesis_workspace/
-
 # Architecture Document
 SDO_COMPLETE_ARCHITECTURE.md
-
